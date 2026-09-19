@@ -68,6 +68,17 @@ export class BackendStack extends cdk.Stack {
 			billingMode: BillingMode.PAY_PER_REQUEST,
 		});
 
+		// Populated offline by scripts/loadSeedPool.ts from the Phase 1
+		// cubiomes output (seed-filter/output/match_seeds.json) - this
+		// table is the bridge between the seed-filtering tool and actual
+		// matches. `used` + conditional updates make claiming a pair
+		// atomic, so two matches created at the same instant can't collide
+		// on the same seed.
+		const seedPoolTable = new Table(this, 'SeedPoolTable', {
+			partitionKey: { name: 'seedPairId', type: AttributeType.STRING },
+			billingMode: BillingMode.PAY_PER_REQUEST,
+		});
+
 		const queueJoinFn = new NodejsFunction(this, 'QueueJoinFunction', {
 			entry: path.join(__dirname, '..', 'lambda', 'queueJoin.ts'),
 			runtime: Runtime.NODEJS_24_X,
@@ -77,12 +88,14 @@ export class BackendStack extends cdk.Stack {
 				PLAYERS_TABLE_NAME: playersTable.tableName,
 				QUEUE_TABLE_NAME: queueTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
+				SEED_POOL_TABLE_NAME: seedPoolTable.tableName,
 			},
 		});
 		sessionsTable.grantReadData(queueJoinFn);
 		playersTable.grantReadData(queueJoinFn);
 		queueTable.grantReadWriteData(queueJoinFn);
 		matchesTable.grantWriteData(queueJoinFn);
+		seedPoolTable.grantReadWriteData(queueJoinFn);
 
 		api.addRoutes({
 			path: '/queue/join',
@@ -91,5 +104,6 @@ export class BackendStack extends cdk.Stack {
 		});
 
 		new cdk.CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
+		new cdk.CfnOutput(this, 'SeedPoolTableName', { value: seedPoolTable.tableName });
 	}
 }

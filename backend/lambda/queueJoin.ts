@@ -9,6 +9,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'crypto';
 import { resolveSessionToken } from './lib/auth';
+import { claimSeedPair } from './lib/seedPool';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -16,6 +17,7 @@ const SESSIONS_TABLE_NAME = process.env.SESSIONS_TABLE_NAME!;
 const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
 const QUEUE_TABLE_NAME = process.env.QUEUE_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
+const SEED_POOL_TABLE_NAME = process.env.SEED_POOL_TABLE_NAME!;
 
 // MVP pairing only: match with the first other waiting player found, no
 // skill-range matching yet (not worth building until there's an actual
@@ -56,6 +58,15 @@ export const handler = async (
 	}
 
 	const matchId = randomUUID();
+
+	// Claim the seed before persisting the match - if the pool is
+	// exhausted, fail loudly rather than create a match nobody can
+	// actually play.
+	const seedPair = await claimSeedPair(SEED_POOL_TABLE_NAME, matchId);
+	if (!seedPair) {
+		return { statusCode: 503, body: JSON.stringify({ error: 'no seed pairs available' }) };
+	}
+
 	await ddb.send(new PutCommand({
 		TableName: MATCHES_TABLE_NAME,
 		Item: {
@@ -64,6 +75,8 @@ export const handler = async (
 				{ uuid, username: player.Item.username },
 				{ uuid: opponent.uuid, username: opponent.username },
 			],
+			overworldSeed: seedPair.overworldSeed,
+			netherSeed: seedPair.netherSeed,
 			status: 'pending',
 			createdAt: Date.now(),
 		},
@@ -77,6 +90,8 @@ export const handler = async (
 			matched: true,
 			matchId,
 			opponent: { uuid: opponent.uuid, username: opponent.username },
+			overworldSeed: seedPair.overworldSeed,
+			netherSeed: seedPair.netherSeed,
 		}),
 	};
 };
