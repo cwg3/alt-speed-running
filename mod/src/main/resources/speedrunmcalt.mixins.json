@@ -1,0 +1,11 @@
+{
+	"required": true,
+	"package": "com.speedrunmcalt.mixin",
+	"compatibilityLevel": "JAVA_8",
+	"mixins": [
+		"StartupProofMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

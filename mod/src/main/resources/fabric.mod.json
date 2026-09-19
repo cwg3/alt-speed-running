@@ -1,0 +1,26 @@
+{
+	"schemaVersion": 1,
+	"id": "speedrunmcalt",
+	"version": "${version}",
+	"name": "Speedrun MC Alt",
+	"description": "Open, transparent alternative ranked ladder for Minecraft 1.16.1 speedrunning.",
+	"authors": [
+		"cwg3"
+	],
+	"license": "All-Rights-Reserved",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.speedrunmcalt.SpeedrunMcAlt"
+		]
+	},
+	"mixins": [
+		"speedrunmcalt.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "1.16.1",
+		"java": ">=8",
+		"fabric": "*"
+	}
+}
