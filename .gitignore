@@ -12,10 +12,10 @@ run/
 .idea/
 *.iml
 
-# C build artifacts (Cubiomes)
-tools/cubiomes/*.o
-tools/cubiomes/find
-tools/cubiomes/generate
+# C build artifacts (cubiomes is now a submodule and ignores its own build output)
+seed-filter/smoketest
+seed-filter/*.o
+seed-filter/seed-filter
 
 # Node / CDK
 node_modules/
