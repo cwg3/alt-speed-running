@@ -65,7 +65,12 @@ public final class MicrosoftAuth {
 					+ "&scope=" + urlEncode(SCOPE)
 					+ "&code_challenge=" + urlEncode(codeChallenge)
 					+ "&code_challenge_method=S256"
-					+ "&state=" + urlEncode(state);
+					+ "&state=" + urlEncode(state)
+					// Force the account chooser instead of silently reusing
+					// an existing browser SSO session - otherwise a browser
+					// already signed into one Microsoft account will never
+					// let you pick a different one.
+					+ "&prompt=select_account";
 
 			SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Opening browser for Microsoft login. "
 					+ "If it doesn't open automatically, visit: {}", authorizeUri);
