@@ -2,6 +2,7 @@ package com.speedrunmcalt;
 
 import com.speedrunmcalt.auth.MinecraftIdentity;
 import com.speedrunmcalt.auth.SessionAuth;
+import com.speedrunmcalt.world.MatchWorldCreator;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 
@@ -30,6 +31,19 @@ public class SpeedrunMcAltClient implements ClientModInitializer {
 			} catch (Exception e) {
 				SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] Session join failed "
 						+ "(expected in the dev environment, which has no real access token)", e);
+			}
+
+			// Temporary proof-of-concept trigger: normally these seeds come
+			// from the backend's /queue/join match response, not a hardcoded
+			// pair. Using the exact seeds (60/49) a real matchmaking test
+			// already assigned, so this is testing MatchWorldCreator itself,
+			// not fabricated data. Real wiring (mod calling /queue/join and
+			// creating a world from its response) is separate, later work.
+			try {
+				SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Creating test match world (overworldSeed=60, netherSeed=49)");
+				MatchWorldCreator.createMatchWorld(client, "speedrunmcalt-test-match", 60L, 49L);
+			} catch (Exception e) {
+				SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Match world creation failed", e);
 			}
 		});
 	}
