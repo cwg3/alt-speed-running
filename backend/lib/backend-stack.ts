@@ -3,7 +3,7 @@ import * as cdk from 'aws-cdk-lib/core';
 import { Construct } from 'constructs';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
-import { HttpApi } from 'aws-cdk-lib/aws-apigatewayv2';
+import { HttpApi, HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 
 export class BackendStack extends cdk.Stack {
@@ -23,6 +23,17 @@ export class BackendStack extends cdk.Stack {
 		api.addRoutes({
 			path: '/health',
 			integration: new HttpLambdaIntegration('HealthIntegration', healthFn),
+		});
+
+		const verifySessionFn = new NodejsFunction(this, 'VerifySessionFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'verifySession.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+		});
+		api.addRoutes({
+			path: '/auth/verify',
+			methods: [HttpMethod.POST],
+			integration: new HttpLambdaIntegration('VerifySessionIntegration', verifySessionFn),
 		});
 
 		new cdk.CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
