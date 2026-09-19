@@ -24,7 +24,9 @@ public class SpeedrunMcAltClient implements ClientModInitializer {
 			// can only be tested for real once the mod is installed into
 			// an actual Minecraft Launcher profile.
 			try {
-				SessionAuth.joinServer(identity, SessionAuth.randomServerId());
+				String serverId = SessionAuth.randomServerId();
+				SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Using serverId: {}", serverId);
+				SessionAuth.joinServer(identity, serverId);
 			} catch (Exception e) {
 				SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] Session join failed "
 						+ "(expected in the dev environment, which has no real access token)", e);
