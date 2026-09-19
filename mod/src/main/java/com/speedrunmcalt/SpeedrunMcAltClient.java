@@ -1,23 +1,33 @@
 package com.speedrunmcalt;
 
-import com.speedrunmcalt.auth.MicrosoftAuth;
+import com.speedrunmcalt.auth.MinecraftIdentity;
+import com.speedrunmcalt.auth.SessionAuth;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 
 public class SpeedrunMcAltClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
-		// Phase 2 proof-of-concept: log in automatically on client start and
-		// log the result. Real UX (a login screen, caching the refresh
-		// token so this doesn't happen on every launch) comes later - this
-		// is here to prove the full Microsoft -> Xbox -> Minecraft chain
-		// actually works end to end.
-		SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Starting Microsoft login...");
-		MicrosoftAuth.login().whenComplete((profile, error) -> {
-			if (error != null) {
-				SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Login failed", error);
-			} else {
-				SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Login succeeded: {} ({})",
-						profile.getName(), profile.getUuid());
+		// MinecraftClient.getInstance() isn't guaranteed to be assigned yet
+		// during onInitializeClient() itself (confirmed against the actual
+		// 1.16.1 boot order) - CLIENT_STARTED fires once the client is
+		// fully constructed, which is the safe point to read the session.
+		ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
+			MinecraftIdentity identity = SessionAuth.currentIdentity();
+			SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Session identity: {} ({})",
+					identity.getUsername(), identity.getUuid());
+
+			// Proof of concept only: in the real flow, serverId comes from
+			// our backend when a match starts. The dev environment
+			// (./gradlew runClient) uses a fake session with no real
+			// access token, so this call is expected to fail here - it
+			// can only be tested for real once the mod is installed into
+			// an actual Minecraft Launcher profile.
+			try {
+				SessionAuth.joinServer(identity, SessionAuth.randomServerId());
+			} catch (Exception e) {
+				SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] Session join failed "
+						+ "(expected in the dev environment, which has no real access token)", e);
 			}
 		});
 	}
