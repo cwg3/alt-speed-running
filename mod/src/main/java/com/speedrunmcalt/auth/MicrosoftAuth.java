@@ -22,6 +22,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -212,13 +213,40 @@ public final class MicrosoftAuth {
 		return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
 	}
 
-	private static void openBrowser(String uri) throws IOException {
-		if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-			Desktop.getDesktop().browse(URI.create(uri));
-		} else {
-			SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] Can't open a browser automatically on this system; "
-					+ "open the URL above manually.");
+	private static void openBrowser(String uri) {
+		// java.awt.Desktop.browse() is unreliable from inside a GLFW-based
+		// game window (GLFW takes over the platform's main-thread/event-loop
+		// handling in a way that breaks AWT's Cocoa integration on macOS in
+		// particular) - shell out to the OS's native URL opener directly,
+		// which is what every real Minecraft launcher/mod does for this
+		// exact reason.
+		String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+		try {
+			if (os.contains("mac")) {
+				new ProcessBuilder("open", uri).start();
+				return;
+			} else if (os.contains("win")) {
+				new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", uri).start();
+				return;
+			} else {
+				new ProcessBuilder("xdg-open", uri).start();
+				return;
+			}
+		} catch (IOException nativeOpenFailed) {
+			SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] Native browser open failed, trying AWT Desktop", nativeOpenFailed);
 		}
+
+		try {
+			if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+				Desktop.getDesktop().browse(URI.create(uri));
+				return;
+			}
+		} catch (IOException desktopFailed) {
+			SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] AWT Desktop browse failed too", desktopFailed);
+		}
+
+		SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] Can't open a browser automatically on this system; "
+				+ "open the URL above manually.");
 	}
 
 	// --- PKCE helpers ---
