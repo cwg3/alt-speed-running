@@ -1,0 +1,29 @@
+.DS_Store
+*.log
+
+# Java / Gradle / Fabric
+.gradle/
+build/
+out/
+*.class
+run/
+
+# IntelliJ
+.idea/
+*.iml
+
+# C build artifacts (Cubiomes)
+tools/cubiomes/*.o
+tools/cubiomes/find
+tools/cubiomes/generate
+
+# Node / CDK
+node_modules/
+cdk.out/
+
+# Secrets - never commit these
+.env
+.env.*
+*.pem
+*.key
+credentials.json
