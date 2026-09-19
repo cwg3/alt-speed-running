@@ -2,7 +2,7 @@ CUBIOMES := ../tools/cubiomes
 
 .PHONY: all clean cubiomes
 
-all: smoketest
+all: seedfilter
 
 cubiomes:
 	$(MAKE) -C $(CUBIOMES) release
@@ -10,5 +10,8 @@ cubiomes:
 smoketest: smoketest.c cubiomes
 	$(CC) -O3 -o smoketest smoketest.c $(CUBIOMES)/libcubiomes.a -lm -lpthread
 
+seedfilter: seedfilter.c cubiomes
+	$(CC) -O3 -o seedfilter seedfilter.c $(CUBIOMES)/libcubiomes.a -lm -lpthread
+
 clean:
-	rm -f smoketest
+	rm -f smoketest seedfilter

@@ -14,8 +14,9 @@ run/
 
 # C build artifacts (cubiomes is now a submodule and ignores its own build output)
 seed-filter/smoketest
+seed-filter/seedfilter
 seed-filter/*.o
-seed-filter/seed-filter
+seed-filter/output/
 
 # Node / CDK
 node_modules/
