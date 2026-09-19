@@ -12,6 +12,9 @@
 	"entrypoints": {
 		"main": [
 			"com.speedrunmcalt.SpeedrunMcAlt"
+		],
+		"client": [
+			"com.speedrunmcalt.SpeedrunMcAltClient"
 		]
 	},
 	"mixins": [
