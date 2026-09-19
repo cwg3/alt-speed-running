@@ -71,7 +71,17 @@ public final class MicrosoftAuth {
 					+ "If it doesn't open automatically, visit: {}", authorizeUri);
 			openBrowser(authorizeUri);
 
-			String authCode = loopback.codeFuture.get(5, TimeUnit.MINUTES);
+			String authCode;
+			try {
+				authCode = loopback.codeFuture.get(5, TimeUnit.MINUTES);
+			} catch (java.util.concurrent.TimeoutException timedOut) {
+				// get() timing out doesn't complete codeFuture itself, so
+				// without this the loopback HttpServer would keep listening
+				// forever. Cancelling it completes the future (exceptionally),
+				// which triggers the whenComplete below that stops the server.
+				loopback.codeFuture.cancel(true);
+				throw new IOException("Timed out waiting for Microsoft login (5 minutes)", timedOut);
+			}
 
 			JsonObject tokenResp = postForm(TOKEN_URL, formParams(
 					"client_id", CLIENT_ID,
