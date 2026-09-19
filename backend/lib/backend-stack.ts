@@ -58,6 +58,38 @@ export class BackendStack extends cdk.Stack {
 			integration: new HttpLambdaIntegration('VerifySessionIntegration', verifySessionFn),
 		});
 
+		const queueTable = new Table(this, 'QueueTable', {
+			partitionKey: { name: 'uuid', type: AttributeType.STRING },
+			billingMode: BillingMode.PAY_PER_REQUEST,
+		});
+
+		const matchesTable = new Table(this, 'MatchesTable', {
+			partitionKey: { name: 'matchId', type: AttributeType.STRING },
+			billingMode: BillingMode.PAY_PER_REQUEST,
+		});
+
+		const queueJoinFn = new NodejsFunction(this, 'QueueJoinFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'queueJoin.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			environment: {
+				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				PLAYERS_TABLE_NAME: playersTable.tableName,
+				QUEUE_TABLE_NAME: queueTable.tableName,
+				MATCHES_TABLE_NAME: matchesTable.tableName,
+			},
+		});
+		sessionsTable.grantReadData(queueJoinFn);
+		playersTable.grantReadData(queueJoinFn);
+		queueTable.grantReadWriteData(queueJoinFn);
+		matchesTable.grantWriteData(queueJoinFn);
+
+		api.addRoutes({
+			path: '/queue/join',
+			methods: [HttpMethod.POST],
+			integration: new HttpLambdaIntegration('QueueJoinIntegration', queueJoinFn),
+		});
+
 		new cdk.CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
 	}
 }
