@@ -63,6 +63,9 @@ public final class MatchFlow {
 					// often make the same simplification.
 					MatchState.matchStartMillis = System.currentTimeMillis();
 					MatchState.firstBarterLogged = false;
+					MatchState.barterCount = 0;
+					MatchState.obsidianThisWindow = 0;
+					MatchState.pearlsThisWindow = 0;
 					MatchWorldCreator.createMatchWorld(client, "match-" + finalResult.matchId,
 							finalResult.overworldSeed, finalResult.netherSeed);
 				} catch (Exception e) {

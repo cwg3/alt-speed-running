@@ -16,4 +16,12 @@ public final class MatchState {
 	// a plain static boolean elsewhere would incorrectly carry over
 	// between separate matches played in the same client session.
 	public static volatile boolean firstBarterLogged = false;
+
+	// Piglin barter fairness window (see PiglinBarterMixin): our own
+	// documented policy, not an attempt to reverse-engineer any other
+	// platform's undisclosed exact numbers. Reset alongside the fields
+	// above when a new match starts.
+	public static volatile int barterCount = 0;
+	public static volatile int obsidianThisWindow = 0;
+	public static volatile int pearlsThisWindow = 0;
 }
