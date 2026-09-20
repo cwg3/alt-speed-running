@@ -87,6 +87,13 @@ public final class BackendClient {
 				splits);
 	}
 
+	/** Gives up the current match. The opponent is awarded the win. */
+	public static void forfeit(String sessionToken, String matchId) throws IOException {
+		JsonObject body = new JsonObject();
+		body.addProperty("matchId", matchId);
+		post(API_BASE + "/matches/forfeit", body, sessionToken);
+	}
+
 	/**
 	 * Sends the recorded position timeline. Samples are packed as flat
 	 * arrays rather than named objects - at one sample per second a

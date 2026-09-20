@@ -11,6 +11,7 @@ public class SpeedrunMcAltClient implements ClientModInitializer {
 		// unconditionally here is safe.
 		MatchHud.register();
 		ReplayRecorder.register();
+		com.speedrunmcalt.menu.AltKeybinds.register();
 
 		// Everything else is driven from the title screen button added by
 		// TitleScreenMixin - nothing touches the network until the player

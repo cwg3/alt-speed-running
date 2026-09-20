@@ -162,6 +162,26 @@ export class BackendStack extends cdk.Stack {
 			integration: new HttpLambdaIntegration('LiveMatchIntegration', liveMatchFn),
 		});
 
+		const forfeitMatchFn = new NodejsFunction(this, 'ForfeitMatchFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'forfeitMatch.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			environment: {
+				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				PLAYERS_TABLE_NAME: playersTable.tableName,
+				MATCHES_TABLE_NAME: matchesTable.tableName,
+			},
+		});
+		sessionsTable.grantReadData(forfeitMatchFn);
+		playersTable.grantReadWriteData(forfeitMatchFn);
+		matchesTable.grantReadWriteData(forfeitMatchFn);
+
+		api.addRoutes({
+			path: '/matches/forfeit',
+			methods: [HttpMethod.POST],
+			integration: new HttpLambdaIntegration('ForfeitMatchIntegration', forfeitMatchFn),
+		});
+
 		// Match replays: position timelines, gzipped. Private - these are
 		// player movement records, not public artefacts. Retained on
 		// stack deletion so an integrity investigation can outlive a
