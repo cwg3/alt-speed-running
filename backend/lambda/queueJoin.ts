@@ -48,6 +48,34 @@ export const handler = async (
 	}
 	const myRating: number = player.Item.skillRating;
 
+	// A player whose opponent created the match must still be told about
+	// it. Only the caller that finds an opponent gets matched:true, so
+	// without this the other side sees an empty queue, re-queues itself
+	// and waits forever while its match sits pending.
+	const existingMatchId: string | undefined = player.Item.currentMatchId;
+	if (existingMatchId) {
+		const existing = await ddb.send(new GetCommand({
+			TableName: MATCHES_TABLE_NAME,
+			Key: { matchId: existingMatchId },
+		}));
+		if (existing.Item && existing.Item.status === 'pending') {
+			const them = (existing.Item.players as any[]).find((p) => p.uuid !== uuid);
+			// Drop any stale queue row so this player isn't matched twice.
+			await ddb.send(new DeleteCommand({ TableName: QUEUE_TABLE_NAME, Key: { uuid } }));
+			return {
+				statusCode: 200,
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					matched: true,
+					matchId: existingMatchId,
+					opponent: { uuid: them.uuid, username: them.username },
+					overworldSeed: existing.Item.overworldSeed,
+					netherSeed: existing.Item.netherSeed,
+				}),
+			};
+		}
+	}
+
 	// Full table Scan is a known simplification, fine at test scale - see
 	// the seed pool / matches tables for the same reasoning elsewhere in
 	// this backend.
@@ -125,6 +153,17 @@ export const handler = async (
 	// this is safe even for a caller matching on their very first call.
 	await ddb.send(new DeleteCommand({ TableName: QUEUE_TABLE_NAME, Key: { uuid: bestOpponent.uuid } }));
 	await ddb.send(new DeleteCommand({ TableName: QUEUE_TABLE_NAME, Key: { uuid } }));
+
+	// Record the match on both players so the opponent - who never sees
+	// this response - can discover it on their next poll.
+	for (const participant of [uuid, bestOpponent.uuid]) {
+		await ddb.send(new UpdateCommand({
+			TableName: PLAYERS_TABLE_NAME,
+			Key: { uuid: participant },
+			UpdateExpression: 'SET currentMatchId = :m',
+			ExpressionAttributeValues: { ':m': matchId },
+		}));
+	}
 
 	return {
 		statusCode: 200,

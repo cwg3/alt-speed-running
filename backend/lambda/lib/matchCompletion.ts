@@ -129,6 +129,16 @@ export async function applyMatchCompletion(
 		ExpressionAttributeValues: { ':delta': loserDelta },
 	}));
 
+	// Clear the pointer so neither player is handed this finished match
+	// again on their next queue poll.
+	for (const player of [winner, loser]) {
+		await ddb.send(new UpdateCommand({
+			TableName: playersTableName,
+			Key: { uuid: player.uuid },
+			UpdateExpression: 'REMOVE currentMatchId',
+		}));
+	}
+
 	// Review runs against each player's own history. Purely advisory -
 	// it records a flag for human review and never alters the result.
 	const reviews: Record<string, ReviewResult> = {};
