@@ -9,7 +9,7 @@ font's own hinting rather than from hand-drawn approximations of it.
 
 The CRT pass deliberately avoids a brightness gradient across the
 glyphs. A monochrome phosphor monitor lights every lit pixel equally;
-the depth comes from bloom, scanlines and vignette, not from shading
+the depth comes from bloom and vignette, not from shading
 the letters.
 
 Requires Pillow:  python3 -m venv venv && venv/bin/pip install Pillow
@@ -41,8 +41,6 @@ BLOOM_TIGHT_GAIN = 0.85
 BLOOM_WIDE_RADIUS = 9.0
 BLOOM_WIDE_GAIN = 0.45
 
-SCANLINE_EVERY = 3
-SCANLINE_FACTOR = 0.62
 VIGNETTE_STRENGTH = 0.55
 
 
@@ -122,19 +120,8 @@ def vignette(img, strength):
     return ImageChops.multiply(img, Image.merge("RGB", (grad, grad, grad)))
 
 
-def scanlines(img, every, factor):
-    px = img.load()
-    w, h = img.size
-    for y in range(every - 1, h, every):
-        for x in range(w):
-            r, g, b = px[x, y][:3]
-            px[x, y] = (int(r * factor), int(g * factor), int(b * factor))
-    return img
-
-
 def crt(mask, transparent):
-    """Compose the monitor look: flat phosphor text, bloom, scanlines,
-    vignette."""
+    """Compose the monitor look: flat phosphor text, bloom, vignette."""
     size = mask.size
     core = Image.new("RGB", size, (0, 0, 0))
     core.paste(Image.new("RGB", size, PHOSPHOR), mask=mask)
@@ -152,9 +139,7 @@ def crt(mask, transparent):
         return out
 
     screen = ImageChops.add(Image.new("RGB", size, SCREEN_BG), lit)
-    screen = scanlines(screen, SCANLINE_EVERY, SCANLINE_FACTOR)
-    screen = vignette(screen, VIGNETTE_STRENGTH)
-    return screen.convert("RGBA")
+    return vignette(screen, VIGNETTE_STRENGTH).convert("RGBA")
 
 
 def main():
@@ -170,7 +155,7 @@ def main():
     # Square 128x128 mod icon. The mask is centred on the full canvas
     # and the CRT pass runs over the whole thing - treating a smaller
     # image and pasting it left a visible rectangular seam where the
-    # scanlines and vignette stopped.
+    # vignette stopped.
     art = upscaled_mask(rows, w, h, scale=2, pad=0)
     icon_mask = Image.new("L", (128, 128), 0)
     icon_mask.paste(art, ((128 - art.width) // 2, (128 - art.height) // 2))
