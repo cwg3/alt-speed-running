@@ -54,6 +54,9 @@ public final class LiveMatchPoller {
 				LiveMatchResult live = BackendClient.getLiveMatch(sessionToken, matchId);
 				consecutiveFailures = 0;
 
+				MatchState.opponentUsername = live.opponentUsername;
+				MatchState.opponentSplits.putAll(live.opponentSplits);
+
 				for (Map.Entry<String, Long> split : live.opponentSplits.entrySet()) {
 					if (reported.add(split.getKey())) {
 						SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] OPPONENT {} reached {} at {} ms",

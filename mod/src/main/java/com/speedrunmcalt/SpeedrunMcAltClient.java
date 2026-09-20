@@ -1,14 +1,18 @@
 package com.speedrunmcalt;
 
+import com.speedrunmcalt.match.MatchHud;
 import net.fabricmc.api.ClientModInitializer;
 
 public class SpeedrunMcAltClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
-		// Everything is driven from the title screen button added by
-		// TitleScreenMixin - nothing touches the network until the
-		// player asks for it. Replaces the placeholder that connected
-		// and queued automatically on launch.
+		// The match HUD only draws while a match is active, so it's safe
+		// to register unconditionally here.
+		MatchHud.register();
+
+		// Everything else is driven from the title screen button added by
+		// TitleScreenMixin - nothing touches the network until the player
+		// asks for it.
 		SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] client ready");
 	}
 }

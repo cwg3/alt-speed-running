@@ -32,6 +32,9 @@ public final class SplitReporter {
 		String sessionToken = MatchState.sessionToken;
 
 		SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] SPLIT {} at {} ms", splitName, elapsedMs);
+		// Record locally first so the HUD updates immediately rather than
+		// waiting on the network round trip.
+		MatchState.mySplits.put(splitName, elapsedMs);
 
 		if (matchId == null || sessionToken == null) {
 			// Practice/solo world, or a dev test - nothing to report to.

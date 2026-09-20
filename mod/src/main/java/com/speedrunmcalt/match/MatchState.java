@@ -31,6 +31,16 @@ public final class MatchState {
 	public static volatile String matchId = null;
 	public static volatile String sessionToken = null;
 
+	// Split name -> elapsed ms, for the in-game HUD. Concurrent because
+	// the reporter thread and the opponent poll thread both write while
+	// the HUD reads them every frame. LinkedHashMap ordering wouldn't
+	// survive that, so the HUD sorts by time instead.
+	public static final java.util.Map<String, Long> mySplits =
+			new java.util.concurrent.ConcurrentHashMap<>();
+	public static final java.util.Map<String, Long> opponentSplits =
+			new java.util.concurrent.ConcurrentHashMap<>();
+	public static volatile String opponentUsername = null;
+
 	public static void reset() {
 		matchStartMillis = -1;
 		firstBarterLogged = false;
@@ -39,5 +49,17 @@ public final class MatchState {
 		pearlsThisWindow = 0;
 		matchId = null;
 		sessionToken = null;
+		mySplits.clear();
+		opponentSplits.clear();
+		opponentUsername = null;
+	}
+
+	public static boolean inMatch() {
+		return matchStartMillis > 0 && matchId != null;
+	}
+
+	public static String formatTime(long millis) {
+		long totalSeconds = Math.max(0, millis) / 1000;
+		return String.format("%d:%02d", totalSeconds / 60, totalSeconds % 60);
 	}
 }
