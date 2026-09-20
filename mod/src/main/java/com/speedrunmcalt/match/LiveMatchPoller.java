@@ -66,6 +66,11 @@ public final class LiveMatchPoller {
 
 				if (live.isComplete()) {
 					SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Match finished - winner {}", live.winnerUuid);
+					boolean iWon = live.winnerUuid != null
+							&& live.winnerUuid.equals(com.speedrunmcalt.menu.AltSession.uuid());
+					MatchState.finish(iWon
+							? "VICTORY"
+							: "DEFEAT - " + live.opponentUsername + " finished first");
 					// Covers losing the race, where this client never
 					// reports a final split of its own.
 					ReplayRecorder.uploadIfFinished();

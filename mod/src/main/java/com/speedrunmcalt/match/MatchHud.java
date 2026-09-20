@@ -62,9 +62,16 @@ public final class MatchHud {
 		}
 
 		int y = Y;
-		long elapsed = System.currentTimeMillis() - MatchState.matchStartMillis;
+		long elapsed = MatchState.elapsedMillis();
+		String outcome = MatchState.result;
 		drawShadowed(matrices, client, "alt  " + MatchState.formatTime(elapsed), X, y, PHOSPHOR);
 		y += LINE;
+
+		if (outcome != null) {
+			drawShadowed(matrices, client, outcome, X, y,
+					outcome.startsWith("VICTORY") ? AHEAD : BEHIND);
+			y += LINE;
+		}
 
 		String opponent = MatchState.opponentUsername;
 		drawShadowed(matrices, client,

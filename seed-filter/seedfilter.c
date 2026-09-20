@@ -8,11 +8,23 @@
 // nether structure locations from overworld terrain. This is the same
 // tradeoff MCSR Ranked documents using independent seeds for.
 //
-// Criteria (intentionally simpler than the incumbent's full per-tier
-// system - this is the MVP pass, not the final tuned filter):
+// Criteria:
 //   overworld: a Village within MAX_VILLAGE_DIST of spawn
 //   nether:    a Bastion within MAX_BASTION_DIST of nether origin,
 //              AND a Fortress within MAX_FORTRESS_DIST of that Bastion
+//
+// The distances are deliberately tight. An earlier pass allowed a
+// village up to 2000 blocks from spawn, which is far enough away to be
+// useless and produced starts a runner would just reset. 112 blocks is
+// 7 chunks, comparable to what MCSR Ranked filters for. Tightening cost
+// nothing measurable - qualifying seeds are still found in well under a
+// second.
+//
+// NOT filtered: whether the village contains a blacksmith. Since 1.14
+// villages are generated with jigsaw assembly, which cubiomes does not
+// model - its getHouseList is documented as mc < MC_1_14 only. So a
+// village is guaranteed to be close, but not to be a good one. Fixing
+// that needs village piece generation cubiomes doesn't have.
 //
 // Output: JSON files under output/ listing accepted seeds, plus a
 // combined match_seeds.json pairing them 1:1 for actual match use.
@@ -24,9 +36,9 @@
 #include <math.h>
 #include <sys/stat.h>
 
-#define MAX_VILLAGE_DIST   2000.0
-#define MAX_BASTION_DIST   2000.0
-#define MAX_FORTRESS_DIST  1200.0
+#define MAX_VILLAGE_DIST   112.0
+#define MAX_BASTION_DIST   300.0
+#define MAX_FORTRESS_DIST  300.0
 
 typedef struct {
     uint64_t seed;

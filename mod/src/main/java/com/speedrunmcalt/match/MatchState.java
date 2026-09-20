@@ -41,6 +41,26 @@ public final class MatchState {
 			new java.util.concurrent.ConcurrentHashMap<>();
 	public static volatile String opponentUsername = null;
 
+	// Set when the match ends. Non-null freezes the HUD timer and swaps
+	// the header for the result, so a player who loses is actually told
+	// rather than left watching a clock that no longer means anything.
+	public static volatile String result = null;
+	public static volatile long resultAtMillis = 0;
+
+	public static void finish(String text) {
+		resultAtMillis = System.currentTimeMillis();
+		result = text;
+	}
+
+	/** Elapsed run time, frozen once the match has ended. */
+	public static long elapsedMillis() {
+		if (matchStartMillis <= 0) {
+			return 0;
+		}
+		long end = result != null ? resultAtMillis : System.currentTimeMillis();
+		return end - matchStartMillis;
+	}
+
 	public static void reset() {
 		matchStartMillis = -1;
 		firstBarterLogged = false;
@@ -52,6 +72,8 @@ public final class MatchState {
 		mySplits.clear();
 		opponentSplits.clear();
 		opponentUsername = null;
+		result = null;
+		resultAtMillis = 0;
 	}
 
 	public static boolean inMatch() {

@@ -51,11 +51,14 @@ public final class SplitReporter {
 					ReplayRecorder.uploadIfFinished();
 				}
 				if (result.completed) {
+					MatchState.finish("VICTORY  +" + result.winnerRatingDelta + " elo, +"
+							+ result.winnerSeasonPoints + " pts");
 					SpeedrunMcAlt.LOGGER.info(
 							"[speedrunmcalt] Match complete - you win! rating {}{}, +{} season points",
 							result.winnerRatingDelta >= 0 ? "+" : "", result.winnerRatingDelta,
 							result.winnerSeasonPoints);
 				} else if (result.alreadyCompleted) {
+					MatchState.finish("DEFEAT - opponent finished first");
 					SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Match already finished - opponent got there first");
 				}
 			} catch (Exception e) {
