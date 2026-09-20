@@ -66,6 +66,9 @@ public final class LiveMatchPoller {
 
 				if (live.isComplete()) {
 					SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Match finished - winner {}", live.winnerUuid);
+					// Covers losing the race, where this client never
+					// reports a final split of its own.
+					ReplayRecorder.uploadIfFinished();
 					return;
 				}
 			} catch (Exception e) {

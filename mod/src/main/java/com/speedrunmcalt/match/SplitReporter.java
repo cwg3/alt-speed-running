@@ -1,6 +1,7 @@
 package com.speedrunmcalt.match;
 
 import com.speedrunmcalt.SpeedrunMcAlt;
+import com.speedrunmcalt.match.ReplayRecorder;
 import com.speedrunmcalt.net.BackendClient;
 import com.speedrunmcalt.net.SplitReportResult;
 
@@ -44,6 +45,11 @@ public final class SplitReporter {
 		EXECUTOR.submit(() -> {
 			try {
 				SplitReportResult result = BackendClient.reportSplit(sessionToken, matchId, splitName, elapsedMs);
+				// Upload the timeline once the run is over, whichever way
+				// the result lands.
+				if (result.completed || result.alreadyCompleted) {
+					ReplayRecorder.uploadIfFinished();
+				}
 				if (result.completed) {
 					SpeedrunMcAlt.LOGGER.info(
 							"[speedrunmcalt] Match complete - you win! rating {}{}, +{} season points",

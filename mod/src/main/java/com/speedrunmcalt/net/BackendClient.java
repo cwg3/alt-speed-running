@@ -1,5 +1,6 @@
 package com.speedrunmcalt.net;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -84,6 +85,31 @@ public final class BackendClient {
 				winnerUuid,
 				opponent.get("username").getAsString(),
 				splits);
+	}
+
+	/**
+	 * Sends the recorded position timeline. Samples are packed as flat
+	 * arrays rather than named objects - at one sample per second a
+	 * long run is thousands of entries, and repeating four field names
+	 * on each of them roughly triples the payload for no benefit.
+	 */
+	public static void uploadReplay(String sessionToken, String matchId,
+			java.util.List<com.speedrunmcalt.match.ReplayRecorder.Sample> samples) throws IOException {
+		JsonArray packed = new JsonArray();
+		for (com.speedrunmcalt.match.ReplayRecorder.Sample s : samples) {
+			JsonArray row = new JsonArray();
+			row.add(s.t);
+			row.add(s.dim);
+			row.add(Math.round(s.x * 10.0) / 10.0);
+			row.add(Math.round(s.y * 10.0) / 10.0);
+			row.add(Math.round(s.z * 10.0) / 10.0);
+			packed.add(row);
+		}
+
+		JsonObject body = new JsonObject();
+		body.addProperty("matchId", matchId);
+		body.add("samples", packed);
+		post(API_BASE + "/matches/replay", body, sessionToken);
 	}
 
 	private static JsonObject get(String url, String bearerToken) throws IOException {

@@ -6,6 +6,7 @@ import { Runtime } from 'aws-cdk-lib/aws-lambda';
 import { HttpApi, HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import { AttributeType, BillingMode, Table } from 'aws-cdk-lib/aws-dynamodb';
+import { BlockPublicAccess, Bucket } from 'aws-cdk-lib/aws-s3';
 
 export class BackendStack extends cdk.Stack {
 	constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -161,7 +162,39 @@ export class BackendStack extends cdk.Stack {
 			integration: new HttpLambdaIntegration('LiveMatchIntegration', liveMatchFn),
 		});
 
+		// Match replays: position timelines, gzipped. Private - these are
+		// player movement records, not public artefacts. Retained on
+		// stack deletion so an integrity investigation can outlive a
+		// redeploy.
+		const replayBucket = new Bucket(this, 'ReplayBucket', {
+			blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+			removalPolicy: cdk.RemovalPolicy.RETAIN,
+		});
+
+		const uploadReplayFn = new NodejsFunction(this, 'UploadReplayFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'uploadReplay.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			timeout: cdk.Duration.seconds(30),
+			memorySize: 512,
+			environment: {
+				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				MATCHES_TABLE_NAME: matchesTable.tableName,
+				REPLAY_BUCKET: replayBucket.bucketName,
+			},
+		});
+		sessionsTable.grantReadData(uploadReplayFn);
+		matchesTable.grantReadWriteData(uploadReplayFn);
+		replayBucket.grantPut(uploadReplayFn);
+
+		api.addRoutes({
+			path: '/matches/replay',
+			methods: [HttpMethod.POST],
+			integration: new HttpLambdaIntegration('UploadReplayIntegration', uploadReplayFn),
+		});
+
 		new cdk.CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
+		new cdk.CfnOutput(this, 'ReplayBucketName', { value: replayBucket.bucketName });
 		new cdk.CfnOutput(this, 'SeedPoolTableName', { value: seedPoolTable.tableName });
 	}
 }

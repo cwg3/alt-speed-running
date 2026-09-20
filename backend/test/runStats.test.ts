@@ -1,4 +1,6 @@
-import { foldRun, MIN_SAMPLES, review, segments, stdDev, update } from '../lambda/lib/runStats';
+import {
+	foldRun, MIN_SAMPLES, review, segments, SplitStats, stdDev, update,
+} from '../lambda/lib/runStats';
 
 /** Builds cumulative split times from per-segment durations. */
 function runFrom(segmentMs: number[]): Record<string, number> {
@@ -35,8 +37,8 @@ function fakedFinish(): Record<string, number> {
 	return runFrom([...TYPICAL_SEGMENTS.slice(0, 4), 5_000]);
 }
 
-function baselineFrom(runs: Record<string, number>[]) {
-	return runs.reduce((stats, run) => foldRun(stats, run), {});
+function baselineFrom(runs: Record<string, number>[]): SplitStats {
+	return runs.reduce<SplitStats>((stats, run) => foldRun(stats, run), {});
 }
 
 describe('Welford accumulator', () => {

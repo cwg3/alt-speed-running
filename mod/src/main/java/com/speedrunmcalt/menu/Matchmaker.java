@@ -3,6 +3,7 @@ package com.speedrunmcalt.menu;
 import com.speedrunmcalt.SpeedrunMcAlt;
 import com.speedrunmcalt.match.LiveMatchPoller;
 import com.speedrunmcalt.match.MatchState;
+import com.speedrunmcalt.match.ReplayRecorder;
 import com.speedrunmcalt.net.BackendClient;
 import com.speedrunmcalt.net.QueueJoinResult;
 import com.speedrunmcalt.world.MatchWorldCreator;
@@ -102,6 +103,7 @@ public final class Matchmaker {
 				client.execute(() -> {
 					try {
 						MatchState.reset();
+						ReplayRecorder.reset();
 						MatchState.matchId = match.matchId;
 						MatchState.sessionToken = token;
 						MatchState.matchStartMillis = System.currentTimeMillis();
@@ -111,6 +113,7 @@ public final class Matchmaker {
 						state = State.IDLE;
 					} catch (Exception e) {
 						MatchState.reset();
+						ReplayRecorder.reset();
 						error = e.getMessage();
 						state = State.ERROR;
 						SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Match world creation failed", e);
