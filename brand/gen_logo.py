@@ -1,97 +1,28 @@
 #!/usr/bin/env python3
-"""Generate the 8-bit lowercase 'alt' logo, terminal/hacker styling.
-Pure stdlib - no PIL."""
-import zlib, struct, sys
+"""Generate the 'alt' wordmark: Andale Mono at 33px, rendered with
+antialiasing disabled so the glyphs land on a hard pixel grid, then
+given CRT phosphor styling.
+
+Rendering a real terminal face at a small size with AA off is what
+produces authentic 8-bit letterforms - the pixel grid comes from the
+font's own hinting rather than from hand-drawn approximations of it.
+
+Requires Pillow:  python3 -m venv venv && venv/bin/pip install Pillow
+Usage:            venv/bin/python gen_logo.py [out_dir]
+"""
+import sys
 from collections import deque
 
-# --- glyph bitmaps -----------------------------------------------------
-# 12 rows, baseline at row 11. Squared terminal letterforms, uniform 2px
-# strokes, no curves or tapers - that's what reads as a monospace
-# terminal face rather than a game font.
-GLYPH_H = 12
+from PIL import Image, ImageDraw, ImageFont
 
-A = [
-    ".......",
-    ".......",
-    ".......",
-    ".......",
-    ".......",
-    ".#####.",
-    ".....##",
-    ".######",
-    ".##..##",
-    ".##..##",
-    ".##..##",
-    ".######",
-]
+FONT_PATH = "/System/Library/Fonts/Supplemental/Andale Mono.ttf"
+FONT_SIZE = 33
+TEXT = "alt"
 
-L = [
-    ".##.",
-    ".##.",
-    ".##.",
-    ".##.",
-    ".##.",
-    ".##.",
-    ".##.",
-    ".##.",
-    ".##.",
-    ".##.",
-    ".##.",
-    "####",
-]
-
-T = [
-    ".......",
-    "..##...",
-    "..##...",
-    "#######",
-    "..##...",
-    "..##...",
-    "..##...",
-    "..##...",
-    "..##...",
-    "..##...",
-    "..##...",
-    "...####",
-]
-
-# Terminal cursor block on the baseline - reads instantly as a command
-# prompt, which is the whole point of the hacker treatment.
-CURSOR = [
-    "......",
-    "......",
-    "......",
-    "......",
-    "......",
-    "######",
-    "######",
-    "######",
-    "######",
-    "######",
-    "######",
-    "######",
-]
-
-GAP = 3
-CURSOR_GAP = 3
-
-
-def compose(parts):
-    rows = []
-    for r in range(GLYPH_H):
-        line = ""
-        for i, (g, gap) in enumerate(parts):
-            if i:
-                line += "." * gap
-            line += g[r]
-        rows.append(line)
-    return rows, len(rows[0])
-
-
-# --- colors ------------------------------------------------------------
-# Phosphor green. Deliberately a NARROW ramp: a CRT phosphor is close to
-# uniformly lit, and a wide gradient made the bottom of the letters
-# darker than the surrounding glow, which looked inverted.
+# Phosphor green ramp, brightest at the top. Deliberately narrow: a CRT
+# phosphor is close to uniformly lit, and a wide gradient makes the
+# bottom of the letters darker than the surrounding glow, which reads
+# as inverted.
 GRADIENT = [
     (140, 255, 175),
     (126, 255, 165),
@@ -106,172 +37,147 @@ GRADIENT = [
     (34, 202, 84),
     (30, 192, 78),
 ]
-# Glow must stay clearly dimmer than every ink value above, or it reads
-# as a pale outline instead of light bleeding off the glyph.
+# Glow stays clearly dimmer than every ink value above, or it reads as a
+# pale sticker outline instead of light bleeding off the glyph.
 GLOW = [(30, 200, 90, 70), (26, 170, 76, 34), (20, 140, 62, 14)]
-TRANSPARENT = (0, 0, 0, 0)
+BG = (8, 12, 10, 255)
 
 
-def render(rows, width, scale, pad, bg=None, scanlines=False):
-    h = GLYPH_H
-    cw = width + pad * 2
-    ch = h + pad * 2
+def text_mask():
+    """Rasterize TEXT with antialiasing off, cropped to its ink."""
+    font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
+    probe = Image.new("L", (FONT_SIZE * len(TEXT) * 2, FONT_SIZE * 3), 0)
+    draw = ImageDraw.Draw(probe)
+    draw.fontmode = "1"  # disables antialiasing - hard pixel edges only
+    draw.text((FONT_SIZE // 2, FONT_SIZE // 2), TEXT, font=font, fill=255)
 
-    ink = [[False] * cw for _ in range(ch)]
-    for y in range(h):
+    bbox = probe.getbbox()
+    if not bbox:
+        raise RuntimeError("font rendered nothing - check FONT_PATH")
+    cropped = probe.crop(bbox)
+    w, h = cropped.size
+    px = cropped.load()
+    return [[px[x, y] > 127 for x in range(w)] for y in range(h)], w, h
+
+
+def build(ink, width, height, pad):
+    cw, ch = width + pad * 2, height + pad * 2
+    grid = [[False] * cw for _ in range(ch)]
+    for y in range(height):
         for x in range(width):
-            if rows[y][x] == "#":
-                ink[y + pad][x + pad] = True
+            if ink[y][x]:
+                grid[y + pad][x + pad] = True
 
-    # Flood fill the OUTSIDE from the canvas border. Without this the
-    # glow radiates into enclosed counters (the hole in 'a', the gaps
-    # in 't'), filling them with pale green and making the word
-    # illegible - which is exactly what the first attempt did.
+    # Flood fill the outside from the border. Without this the glow
+    # radiates into enclosed counters (the bowl of 'a'), filling them
+    # and making the word illegible.
     outside = [[False] * cw for _ in range(ch)]
     q = deque()
     for x in range(cw):
         for y in (0, ch - 1):
-            if not ink[y][x] and not outside[y][x]:
+            if not grid[y][x] and not outside[y][x]:
                 outside[y][x] = True
                 q.append((x, y))
     for y in range(ch):
         for x in (0, cw - 1):
-            if not ink[y][x] and not outside[y][x]:
+            if not grid[y][x] and not outside[y][x]:
                 outside[y][x] = True
                 q.append((x, y))
     while q:
         x, y = q.popleft()
         for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             nx, ny = x + dx, y + dy
-            if 0 <= nx < cw and 0 <= ny < ch and not ink[ny][nx] and not outside[ny][nx]:
+            if 0 <= nx < cw and 0 <= ny < ch and not grid[ny][nx] and not outside[ny][nx]:
                 outside[ny][nx] = True
                 q.append((nx, ny))
 
-    # glow level per outside pixel, by chebyshev distance to nearest ink
     glow = [[0] * cw for _ in range(ch)]
     for y in range(ch):
         for x in range(cw):
-            if ink[y][x] or not outside[y][x]:
+            if grid[y][x] or not outside[y][x]:
                 continue
             best = 0
             for dy in range(-3, 4):
                 for dx in range(-3, 4):
                     oy, ox = y + dy, x + dx
-                    if 0 <= oy < ch and 0 <= ox < cw and ink[oy][ox]:
-                        d = max(abs(dy), abs(dx))
-                        lvl = 4 - d  # d=1 -> 3, d=2 -> 2, d=3 -> 1
-                        if lvl > best:
-                            best = lvl
+                    if 0 <= oy < ch and 0 <= ox < cw and grid[oy][ox]:
+                        lvl = 4 - max(abs(dy), abs(dx))
+                        best = max(best, lvl)
             glow[y][x] = best
+    return grid, glow, cw, ch
 
-    rgba = []
+
+def colorize(grid, glow, cw, ch, pad, height, bg):
+    img = Image.new("RGBA", (cw, ch))
+    px = img.load()
     for y in range(ch):
-        row = bytearray()
         for x in range(cw):
-            if ink[y][x]:
-                gy = min(max(y - pad, 0), len(GRADIENT) - 1)
-                r, g, b = GRADIENT[gy]
-                px = (r, g, b, 255)
+            if grid[y][x]:
+                gy = min(max(y - pad, 0), height - 1)
+                idx = gy * len(GRADIENT) // max(height, 1)
+                r, g, b = GRADIENT[min(idx, len(GRADIENT) - 1)]
+                px[x, y] = (r, g, b, 255)
             elif glow[y][x]:
                 gr, gg, gb, ga = GLOW[3 - glow[y][x]]
                 if bg:
-                    # Composite over the known background ourselves.
-                    # Leaving these semi-transparent means the *viewer*
-                    # composites them over whatever it likes (white, in
-                    # most image viewers), which turned a dim glow into
-                    # a thick pale outline.
+                    # Composite over the known background here. Leaving
+                    # these semi-transparent means the viewer composites
+                    # them over whatever it likes (white, usually), which
+                    # turns a dim glow into a thick pale outline.
                     br, bgc, bb, _ = bg
-                    px = (
+                    px[x, y] = (
                         (gr * ga + br * (255 - ga)) // 255,
                         (gg * ga + bgc * (255 - ga)) // 255,
                         (gb * ga + bb * (255 - ga)) // 255,
                         255,
                     )
                 else:
-                    px = (gr, gg, gb, ga)
+                    px[x, y] = (gr, gg, gb, ga)
             else:
-                px = bg if bg else TRANSPARENT
-            row += bytes(px)
-        rgba.append(row)
-
-    out = []
-    for row in rgba:
-        big = bytearray()
-        for x in range(cw):
-            big += row[x * 4:(x + 1) * 4] * scale
-        for sub in range(scale):
-            if scanlines and sub % 4 == 3:
-                dark = bytearray()
-                for i in range(0, len(big), 4):
-                    r, g, b, a = big[i:i + 4]
-                    dark += bytes((r * 70 // 100, g * 70 // 100, b * 70 // 100, a))
-                out.append(dark)
-            else:
-                out.append(bytearray(big))
-    return out, cw * scale, ch * scale
+                px[x, y] = bg if bg else (0, 0, 0, 0)
+    return img
 
 
-def write_png(path, width, height, rows):
-    raw = b"".join(b"\x00" + bytes(r) for r in rows)
-    comp = zlib.compress(raw, 9)
-
-    def chunk(typ, data):
-        return (struct.pack(">I", len(data)) + typ + data
-                + struct.pack(">I", zlib.crc32(typ + data) & 0xFFFFFFFF))
-
-    png = b"\x89PNG\r\n\x1a\n"
-    png += chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
-    png += chunk(b"IDAT", comp)
-    png += chunk(b"IEND", b"")
-    with open(path, "wb") as f:
-        f.write(png)
-    print(f"wrote {path} ({width}x{height})")
+def scanline(img, every=4, factor=0.70):
+    px = img.load()
+    w, h = img.size
+    for y in range(h):
+        if y % every != every - 1:
+            continue
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            px[x, y] = (int(r * factor), int(g * factor), int(b * factor), a)
+    return img
 
 
 def main():
     out_dir = sys.argv[1] if len(sys.argv) > 1 else "."
-    parts = [(A, 0), (L, GAP), (T, GAP), (CURSOR, CURSOR_GAP)]
-    rows, width = compose(parts)
+    ink, w, h = text_mask()
+    print(f"Andale Mono {FONT_SIZE}px -> {w}x{h} pixel grid")
 
-    px, w, h = render(rows, width, scale=12, pad=4)
-    write_png(f"{out_dir}/logo_alt.png", w, h, px)
+    # wide transparent wordmark
+    grid, glow, cw, ch = build(ink, w, h, pad=3)
+    img = colorize(grid, glow, cw, ch, 3, h, bg=None)
+    img = img.resize((cw * 6, ch * 6), Image.NEAREST)
+    img.save(f"{out_dir}/logo_alt.png")
 
-    px, w, h = render(rows, width, scale=16, pad=5,
-                      bg=(8, 12, 10, 255), scanlines=True)
-    write_png(f"{out_dir}/logo_alt_preview.png", w, h, px)
+    # dark preview with scanlines
+    grid, glow, cw, ch = build(ink, w, h, pad=4)
+    img = colorize(grid, glow, cw, ch, 4, h, bg=BG)
+    img = img.resize((cw * 8, ch * 8), Image.NEAREST)
+    img = scanline(img)
+    img.save(f"{out_dir}/logo_alt_preview.png")
 
-    # Square 128x128 mod icon. Drops the cursor block - at icon size the
-    # wordmark alone is already small, and the extra glyph would shrink
-    # the letters below legibility in a launcher's mod list.
-    icon_rows, icon_w = compose([(A, 0), (L, GAP), (T, GAP)])
-    px, w, h = render(icon_rows, icon_w, scale=4, pad=1,
-                      bg=(8, 12, 10, 255))
-    px, w, h = pad_to_square(px, w, h, 128, (8, 12, 10, 255))
-    write_png(f"{out_dir}/icon.png", w, h, px)
+    # square 128x128 mod icon
+    grid, glow, cw, ch = build(ink, w, h, pad=2)
+    img = colorize(grid, glow, cw, ch, 2, h, bg=BG)
+    scale = max(1, min(128 // cw, 128 // ch))
+    img = img.resize((cw * scale, ch * scale), Image.NEAREST)
+    icon = Image.new("RGBA", (128, 128), BG)
+    icon.paste(img, ((128 - img.width) // 2, (128 - img.height) // 2))
+    icon.save(f"{out_dir}/icon.png")
 
-
-def pad_to_square(rows, width, height, size, bg):
-    """Center an image on a square canvas of the given size."""
-    if width > size or height > size:
-        # Silently clamping here produced rows of the wrong byte length
-        # and a corrupt PNG that only failed when something tried to
-        # decode it - fail at generation time instead.
-        raise ValueError(f"image {width}x{height} does not fit in {size}x{size}")
-    bg_px = bytes(bg)
-    out = []
-    top = (size - height) // 2
-    left = (size - width) // 2
-    blank = bytearray(bg_px * size)
-    for _ in range(top):
-        out.append(bytearray(blank))
-    for row in rows:
-        line = bytearray(bg_px * left)
-        line += row[:width * 4]
-        line += bg_px * (size - left - width)
-        out.append(line)
-    while len(out) < size:
-        out.append(bytearray(blank))
-    return out[:size], size, size
+    print("wrote logo_alt.png, logo_alt_preview.png, icon.png")
 
 
 if __name__ == "__main__":
