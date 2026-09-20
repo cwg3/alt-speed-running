@@ -125,11 +125,17 @@ def build(ink, width, height, pad):
     glow = [[0] * cw for _ in range(ch)]
     for y in range(ch):
         for x in range(cw):
-            if grid[y][x] or not outside[y][x]:
+            if grid[y][x]:
                 continue
+            # A real phosphor stroke glows on both sides, so enclosed
+            # counters get a glow ring too - but only the innermost one.
+            # At full radius the glow swallows a counter this small
+            # whole and fills the bowl of the 'a' solid, which is what
+            # made the word illegible in the first place.
+            reach = 1 if not outside[y][x] else 3
             best = 0
-            for dy in range(-3, 4):
-                for dx in range(-3, 4):
+            for dy in range(-reach, reach + 1):
+                for dx in range(-reach, reach + 1):
                     oy, ox = y + dy, x + dx
                     if 0 <= oy < ch and 0 <= ox < cw and grid[oy][ox]:
                         lvl = 4 - max(abs(dy), abs(dx))
