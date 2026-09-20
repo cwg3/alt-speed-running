@@ -8,7 +8,9 @@
 		"PiglinBarterMixin",
 		"EyeOfEnderFairnessMixin",
 		"WorldRandomAccessor",
-		"SpawnerDeterminismMixin"
+		"SpawnerDeterminismMixin",
+		"SheepShearFairnessMixin",
+		"EndermiteFairnessMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
