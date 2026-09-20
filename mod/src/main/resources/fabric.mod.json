@@ -2,12 +2,13 @@
 	"schemaVersion": 1,
 	"id": "speedrunmcalt",
 	"version": "${version}",
-	"name": "Speedrun MC Alt",
+	"name": "alt",
 	"description": "Open, transparent alternative ranked ladder for Minecraft 1.16.1 speedrunning.",
 	"authors": [
 		"cwg3"
 	],
 	"license": "All-Rights-Reserved",
+	"icon": "assets/speedrunmcalt/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
