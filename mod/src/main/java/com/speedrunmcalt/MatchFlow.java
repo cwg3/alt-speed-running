@@ -2,6 +2,7 @@ package com.speedrunmcalt;
 
 import com.speedrunmcalt.auth.MinecraftIdentity;
 import com.speedrunmcalt.auth.SessionAuth;
+import com.speedrunmcalt.match.MatchState;
 import com.speedrunmcalt.net.BackendClient;
 import com.speedrunmcalt.net.QueueJoinResult;
 import com.speedrunmcalt.net.VerifyResult;
@@ -56,9 +57,15 @@ public final class MatchFlow {
 			// main thread, not this background polling thread.
 			client.execute(() -> {
 				try {
+					// Approximate run start: world-creation kickoff, not the
+					// exact moment the player gains control after the load
+					// screen. Close enough for the MVP; real timer mods
+					// often make the same simplification.
+					MatchState.matchStartMillis = System.currentTimeMillis();
 					MatchWorldCreator.createMatchWorld(client, "match-" + finalResult.matchId,
 							finalResult.overworldSeed, finalResult.netherSeed);
 				} catch (Exception e) {
+					MatchState.matchStartMillis = -1;
 					SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Match world creation failed", e);
 				}
 			});

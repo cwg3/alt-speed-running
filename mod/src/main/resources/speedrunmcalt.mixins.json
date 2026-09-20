@@ -3,7 +3,8 @@
 	"package": "com.speedrunmcalt.mixin",
 	"compatibilityLevel": "JAVA_8",
 	"mixins": [
-		"StartupProofMixin"
+		"StartupProofMixin",
+		"SplitTrackerMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
