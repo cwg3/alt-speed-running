@@ -60,7 +60,8 @@ export const handler = async (
 	}
 
 	const result = await applyMatchCompletion(
-		MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, body.matchId, winner, loser);
+		MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, body.matchId, winner, loser,
+		match.Item.splits ?? {});
 
 	if (result.alreadyCompleted) {
 		return {

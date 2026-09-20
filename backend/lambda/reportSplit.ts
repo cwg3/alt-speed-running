@@ -129,8 +129,14 @@ export const handler = async (
 	// Dragon kill ends the race - first report wins, enforced by the
 	// conditional update inside applyMatchCompletion.
 	const loser = players.find((p) => p.uuid !== reporterUuid)!;
+	// Include the split just written - the copy read at the top of the
+	// handler predates it.
+	const finalSplits = {
+		...allSplits,
+		[reporterUuid]: { ...mine, [body.splitName]: body.elapsedMs },
+	};
 	const result = await applyMatchCompletion(
-		MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, body.matchId, reporter, loser);
+		MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, body.matchId, reporter, loser, finalSplits);
 
 	return {
 		statusCode: 200,

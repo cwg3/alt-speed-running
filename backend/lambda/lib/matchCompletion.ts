@@ -1,5 +1,6 @@
 import { ConditionalCheckFailedException, DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { emptyStats, foldRun, review, ReviewResult } from './runStats';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -37,12 +38,50 @@ export interface CompletionResult {
  * "first player to report the dragon kill wins" correct race semantics
  * AND prevents a second report from double-applying rating changes.
  */
+/**
+ * Runs the statistical review for one player and updates their
+ * baseline.
+ *
+ * A flagged run is deliberately NOT folded into the baseline. Folding
+ * it would let a repeat cheater drag their own average toward their
+ * faked times until later fakes look unremarkable - the detector would
+ * quietly train itself to accept them.
+ */
+async function reviewPlayer(
+	playersTableName: string,
+	uuid: string,
+	splits: Record<string, number> | undefined,
+): Promise<ReviewResult | null> {
+	if (!splits || Object.keys(splits).length === 0) {
+		return null;
+	}
+
+	const record = await ddb.send(new GetCommand({
+		TableName: playersTableName,
+		Key: { uuid },
+		ProjectionExpression: 'splitStats',
+	}));
+	const history = record.Item?.splitStats ?? emptyStats();
+
+	const result = review(history, splits);
+	if (!result.flagged) {
+		await ddb.send(new UpdateCommand({
+			TableName: playersTableName,
+			Key: { uuid },
+			UpdateExpression: 'SET splitStats = :stats',
+			ExpressionAttributeValues: { ':stats': foldRun(history, splits) },
+		}));
+	}
+	return result;
+}
+
 export async function applyMatchCompletion(
 	matchesTableName: string,
 	playersTableName: string,
 	matchId: string,
 	winner: MatchPlayer,
 	loser: MatchPlayer,
+	splits: Record<string, Record<string, number>> = {},
 ): Promise<CompletionResult> {
 	try {
 		await ddb.send(new UpdateCommand({
@@ -89,6 +128,25 @@ export async function applyMatchCompletion(
 		UpdateExpression: 'SET skillRating = skillRating + :delta',
 		ExpressionAttributeValues: { ':delta': loserDelta },
 	}));
+
+	// Review runs against each player's own history. Purely advisory -
+	// it records a flag for human review and never alters the result.
+	const reviews: Record<string, ReviewResult> = {};
+	for (const player of [winner, loser]) {
+		const result = await reviewPlayer(playersTableName, player.uuid, splits[player.uuid]);
+		if (result) {
+			reviews[player.uuid] = result;
+		}
+	}
+	const anyFlagged = Object.values(reviews).some((r) => r.flagged);
+	if (Object.keys(reviews).length > 0) {
+		await ddb.send(new UpdateCommand({
+			TableName: matchesTableName,
+			Key: { matchId },
+			UpdateExpression: 'SET review = :review, needsReview = :needsReview',
+			ExpressionAttributeValues: { ':review': reviews, ':needsReview': anyFlagged },
+		}));
+	}
 
 	return {
 		alreadyCompleted: false,
