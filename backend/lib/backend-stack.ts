@@ -93,9 +93,13 @@ export class BackendStack extends cdk.Stack {
 			},
 		});
 		sessionsTable.grantReadData(queueJoinFn);
-		playersTable.grantReadData(queueJoinFn);
+		// Write access is needed to stamp currentMatchId on both players
+		// when a match is created.
+		playersTable.grantReadWriteData(queueJoinFn);
 		queueTable.grantReadWriteData(queueJoinFn);
-		matchesTable.grantWriteData(queueJoinFn);
+		// Reads too: an existing pending match is looked up so the player
+		// who did not create it can still be told about it.
+		matchesTable.grantReadWriteData(queueJoinFn);
 		seedPoolTable.grantReadWriteData(queueJoinFn);
 
 		api.addRoutes({
