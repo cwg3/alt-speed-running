@@ -5,7 +5,10 @@
 	"mixins": [
 		"StartupProofMixin",
 		"SplitTrackerMixin",
-		"PiglinBarterMixin"
+		"PiglinBarterMixin",
+		"EyeOfEnderFairnessMixin",
+		"WorldRandomAccessor",
+		"SpawnerDeterminismMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
