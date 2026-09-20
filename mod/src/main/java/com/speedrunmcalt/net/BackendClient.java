@@ -10,6 +10,8 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** Client for our own AWS backend - see backend/lambda/ in the repo. */
 public final class BackendClient {
@@ -62,6 +64,41 @@ public final class BackendClient {
 			seasonPoints = winner.get("seasonPointsAwarded").getAsInt();
 		}
 		return new SplitReportResult(completed, alreadyCompleted, ratingDelta, seasonPoints);
+	}
+
+	public static LiveMatchResult getLiveMatch(String sessionToken, String matchId) throws IOException {
+		JsonObject resp = get(API_BASE + "/matches/" + matchId + "/live", sessionToken);
+
+		JsonObject opponent = resp.getAsJsonObject("opponent");
+		Map<String, Long> splits = new LinkedHashMap<>();
+		JsonObject splitsJson = opponent.getAsJsonObject("splits");
+		for (Map.Entry<String, com.google.gson.JsonElement> entry : splitsJson.entrySet()) {
+			splits.put(entry.getKey(), entry.getValue().getAsLong());
+		}
+
+		String winnerUuid = resp.get("winnerUuid").isJsonNull() ? null : resp.get("winnerUuid").getAsString();
+		return new LiveMatchResult(
+				resp.get("status").getAsString(),
+				winnerUuid,
+				opponent.get("username").getAsString(),
+				splits);
+	}
+
+	private static JsonObject get(String url, String bearerToken) throws IOException {
+		HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
+		conn.setRequestMethod("GET");
+		conn.setRequestProperty("Accept", "application/json");
+		if (bearerToken != null) {
+			conn.setRequestProperty("Authorization", "Bearer " + bearerToken);
+		}
+
+		int status = conn.getResponseCode();
+		boolean ok = status >= 200 && status < 300;
+		String text = readAll(ok ? conn.getInputStream() : conn.getErrorStream());
+		if (!ok) {
+			throw new IOException("GET " + url + " failed with HTTP " + status + ": " + text);
+		}
+		return new JsonParser().parse(text).getAsJsonObject();
 	}
 
 	private static JsonObject post(String url, JsonObject body, String bearerToken) throws IOException {

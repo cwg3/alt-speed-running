@@ -2,6 +2,7 @@ package com.speedrunmcalt;
 
 import com.speedrunmcalt.auth.MinecraftIdentity;
 import com.speedrunmcalt.auth.SessionAuth;
+import com.speedrunmcalt.match.LiveMatchPoller;
 import com.speedrunmcalt.match.MatchState;
 import com.speedrunmcalt.net.BackendClient;
 import com.speedrunmcalt.net.QueueJoinResult;
@@ -68,6 +69,7 @@ public final class MatchFlow {
 					MatchState.matchStartMillis = System.currentTimeMillis();
 					MatchWorldCreator.createMatchWorld(client, "match-" + finalResult.matchId,
 							finalResult.overworldSeed, finalResult.netherSeed);
+					LiveMatchPoller.start();
 				} catch (Exception e) {
 					MatchState.reset();
 					SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Match world creation failed", e);
