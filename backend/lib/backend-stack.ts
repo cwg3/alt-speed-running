@@ -123,6 +123,26 @@ export class BackendStack extends cdk.Stack {
 			integration: new HttpLambdaIntegration('CompleteMatchIntegration', completeMatchFn),
 		});
 
+		const reportSplitFn = new NodejsFunction(this, 'ReportSplitFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'reportSplit.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			environment: {
+				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				PLAYERS_TABLE_NAME: playersTable.tableName,
+				MATCHES_TABLE_NAME: matchesTable.tableName,
+			},
+		});
+		sessionsTable.grantReadData(reportSplitFn);
+		playersTable.grantReadWriteData(reportSplitFn);
+		matchesTable.grantReadWriteData(reportSplitFn);
+
+		api.addRoutes({
+			path: '/matches/split',
+			methods: [HttpMethod.POST],
+			integration: new HttpLambdaIntegration('ReportSplitIntegration', reportSplitFn),
+		});
+
 		new cdk.CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
 		new cdk.CfnOutput(this, 'SeedPoolTableName', { value: seedPoolTable.tableName });
 	}

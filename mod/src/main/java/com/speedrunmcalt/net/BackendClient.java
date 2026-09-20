@@ -43,6 +43,27 @@ public final class BackendClient {
 				resp.get("netherSeed").getAsLong());
 	}
 
+	public static SplitReportResult reportSplit(String sessionToken, String matchId,
+			String splitName, long elapsedMs) throws IOException {
+		JsonObject body = new JsonObject();
+		body.addProperty("matchId", matchId);
+		body.addProperty("splitName", splitName);
+		body.addProperty("elapsedMs", elapsedMs);
+
+		JsonObject resp = post(API_BASE + "/matches/split", body, sessionToken);
+		boolean completed = resp.has("completed") && resp.get("completed").getAsBoolean();
+		boolean alreadyCompleted = resp.has("alreadyCompleted") && resp.get("alreadyCompleted").getAsBoolean();
+
+		int ratingDelta = 0;
+		int seasonPoints = 0;
+		if (completed && resp.has("winner") && resp.get("winner").isJsonObject()) {
+			JsonObject winner = resp.getAsJsonObject("winner");
+			ratingDelta = winner.get("ratingDelta").getAsInt();
+			seasonPoints = winner.get("seasonPointsAwarded").getAsInt();
+		}
+		return new SplitReportResult(completed, alreadyCompleted, ratingDelta, seasonPoints);
+	}
+
 	private static JsonObject post(String url, JsonObject body, String bearerToken) throws IOException {
 		HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
 		conn.setRequestMethod("POST");

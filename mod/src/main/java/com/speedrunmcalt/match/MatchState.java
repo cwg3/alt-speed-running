@@ -24,4 +24,20 @@ public final class MatchState {
 	public static volatile int barterCount = 0;
 	public static volatile int obsidianThisWindow = 0;
 	public static volatile int pearlsThisWindow = 0;
+
+	// Identify the active match to the backend when reporting splits.
+	// Null when no ranked match is in progress, which is what
+	// SplitReporter checks before attempting any network call.
+	public static volatile String matchId = null;
+	public static volatile String sessionToken = null;
+
+	public static void reset() {
+		matchStartMillis = -1;
+		firstBarterLogged = false;
+		barterCount = 0;
+		obsidianThisWindow = 0;
+		pearlsThisWindow = 0;
+		matchId = null;
+		sessionToken = null;
+	}
 }

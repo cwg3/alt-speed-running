@@ -53,6 +53,7 @@ public final class MatchFlow {
 					result.opponentUsername, result.matchId, result.overworldSeed, result.netherSeed);
 
 			QueueJoinResult finalResult = result;
+			String verifiedToken = verified.sessionToken;
 			// World creation touches client/server state - must run on the
 			// main thread, not this background polling thread.
 			client.execute(() -> {
@@ -61,15 +62,14 @@ public final class MatchFlow {
 					// exact moment the player gains control after the load
 					// screen. Close enough for the MVP; real timer mods
 					// often make the same simplification.
+					MatchState.reset();
+					MatchState.matchId = finalResult.matchId;
+					MatchState.sessionToken = verifiedToken;
 					MatchState.matchStartMillis = System.currentTimeMillis();
-					MatchState.firstBarterLogged = false;
-					MatchState.barterCount = 0;
-					MatchState.obsidianThisWindow = 0;
-					MatchState.pearlsThisWindow = 0;
 					MatchWorldCreator.createMatchWorld(client, "match-" + finalResult.matchId,
 							finalResult.overworldSeed, finalResult.netherSeed);
 				} catch (Exception e) {
-					MatchState.matchStartMillis = -1;
+					MatchState.reset();
 					SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Match world creation failed", e);
 				}
 			});

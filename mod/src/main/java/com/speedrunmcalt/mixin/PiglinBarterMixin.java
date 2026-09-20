@@ -2,6 +2,7 @@ package com.speedrunmcalt.mixin;
 
 import com.speedrunmcalt.SpeedrunMcAlt;
 import com.speedrunmcalt.match.MatchState;
+import com.speedrunmcalt.match.SplitReporter;
 import net.minecraft.entity.mob.PiglinBrain;
 import net.minecraft.entity.mob.PiglinEntity;
 import net.minecraft.item.ItemStack;
@@ -44,7 +45,7 @@ public class PiglinBarterMixin {
 		}
 		MatchState.firstBarterLogged = true;
 		long elapsedMs = System.currentTimeMillis() - MatchState.matchStartMillis;
-		SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] SPLIT piglin_barter at {} ms", elapsedMs);
+		SplitReporter.report("piglin_barter", elapsedMs);
 	}
 
 	// One real call site for doBarter passes Collections.singletonList(...)

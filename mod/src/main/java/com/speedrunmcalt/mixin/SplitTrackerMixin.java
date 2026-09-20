@@ -1,8 +1,8 @@
 package com.speedrunmcalt.mixin;
 
-import com.speedrunmcalt.SpeedrunMcAlt;
 import com.speedrunmcalt.match.MatchState;
 import com.speedrunmcalt.match.SplitEvents;
+import com.speedrunmcalt.match.SplitReporter;
 import net.minecraft.advancement.Advancement;
 import net.minecraft.advancement.PlayerAdvancementTracker;
 import org.spongepowered.asm.mixin.Mixin;
@@ -36,6 +36,6 @@ public class SplitTrackerMixin {
 		}
 
 		long elapsedMs = System.currentTimeMillis() - MatchState.matchStartMillis;
-		SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] SPLIT {} at {} ms", splitName, elapsedMs);
+		SplitReporter.report(splitName, elapsedMs);
 	}
 }
