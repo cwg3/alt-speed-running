@@ -6,6 +6,7 @@ import {
 	GetCommand,
 	PutCommand,
 	ScanCommand,
+	UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'crypto';
 import { resolveSessionToken } from './lib/auth';
@@ -19,11 +20,17 @@ const QUEUE_TABLE_NAME = process.env.QUEUE_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
 const SEED_POOL_TABLE_NAME = process.env.SEED_POOL_TABLE_NAME!;
 
-// MVP pairing only: match with the first other waiting player found, no
-// skill-range matching yet (not worth building until there's an actual
-// population to match within). Also uses a full table Scan, which is
-// fine at test scale but won't be once the queue is more than a handful
-// of rows - a known simplification, not an oversight.
+// Skill-range matchmaking: our own documented policy (not a copy of any
+// other platform's undisclosed formula). Range widens the longer a
+// waiting candidate has been queued, capped at MAX_RANGE (effectively
+// open matchmaking after ~45s of waiting) - uses the CANDIDATE's wait
+// time specifically, since the point is "how much should we relax
+// match quality for someone who's already been waiting a while", not
+// the freshly-joining player's (whose wait is always ~0).
+const BASE_RATING_RANGE = 50;
+const RANGE_GROWTH_PER_SECOND = 10;
+const MAX_RATING_RANGE = 500;
+
 export const handler = async (
 	event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> => {
@@ -39,16 +46,46 @@ export const handler = async (
 	if (!player.Item) {
 		return { statusCode: 404, body: JSON.stringify({ error: 'no player record for this session' }) };
 	}
+	const myRating: number = player.Item.skillRating;
 
-	// Look for another waiting player before adding ourselves, so a
-	// player can't be paired with themselves.
+	// Full table Scan is a known simplification, fine at test scale - see
+	// the seed pool / matches tables for the same reasoning elsewhere in
+	// this backend.
 	const waiting = await ddb.send(new ScanCommand({ TableName: QUEUE_TABLE_NAME }));
-	const opponent = (waiting.Items ?? []).find((item) => item.uuid !== uuid);
+	const now = Date.now();
 
-	if (!opponent) {
-		await ddb.send(new PutCommand({
+	let bestOpponent: any = null;
+	let bestDiff = Infinity;
+	for (const candidate of waiting.Items ?? []) {
+		if (candidate.uuid === uuid) {
+			continue; // can't match with yourself
+		}
+		const waitSeconds = (now - candidate.joinedAt) / 1000;
+		const allowedRange = Math.min(
+			MAX_RATING_RANGE,
+			BASE_RATING_RANGE + waitSeconds * RANGE_GROWTH_PER_SECOND,
+		);
+		const diff = Math.abs(candidate.skillRating - myRating);
+		if (diff <= allowedRange && diff < bestDiff) {
+			bestOpponent = candidate;
+			bestDiff = diff;
+		}
+	}
+
+	if (!bestOpponent) {
+		// if_not_exists on joinedAt: repeated polls from the same player
+		// while waiting must not reset their wait-time clock, or the
+		// range-widening above would never actually widen for them.
+		await ddb.send(new UpdateCommand({
 			TableName: QUEUE_TABLE_NAME,
-			Item: { uuid, username: player.Item.username, joinedAt: Date.now() },
+			Key: { uuid },
+			UpdateExpression: 'SET username = :username, skillRating = :rating, '
+				+ 'joinedAt = if_not_exists(joinedAt, :now)',
+			ExpressionAttributeValues: {
+				':username': player.Item.username,
+				':rating': myRating,
+				':now': now,
+			},
 		}));
 		return {
 			statusCode: 200,
@@ -72,16 +109,22 @@ export const handler = async (
 		Item: {
 			matchId,
 			players: [
-				{ uuid, username: player.Item.username },
-				{ uuid: opponent.uuid, username: opponent.username },
+				{ uuid, username: player.Item.username, skillRating: myRating },
+				{ uuid: bestOpponent.uuid, username: bestOpponent.username, skillRating: bestOpponent.skillRating },
 			],
+			ratingDiff: bestDiff,
 			overworldSeed: seedPair.overworldSeed,
 			netherSeed: seedPair.netherSeed,
 			status: 'pending',
-			createdAt: Date.now(),
+			createdAt: now,
 		},
 	}));
-	await ddb.send(new DeleteCommand({ TableName: QUEUE_TABLE_NAME, Key: { uuid: opponent.uuid } }));
+	// Delete both sides - the caller may already have a row from an
+	// earlier unmatched poll (the normal case for anyone who polls more
+	// than once). DeleteItem on a nonexistent key is a harmless no-op, so
+	// this is safe even for a caller matching on their very first call.
+	await ddb.send(new DeleteCommand({ TableName: QUEUE_TABLE_NAME, Key: { uuid: bestOpponent.uuid } }));
+	await ddb.send(new DeleteCommand({ TableName: QUEUE_TABLE_NAME, Key: { uuid } }));
 
 	return {
 		statusCode: 200,
@@ -89,7 +132,7 @@ export const handler = async (
 		body: JSON.stringify({
 			matched: true,
 			matchId,
-			opponent: { uuid: opponent.uuid, username: opponent.username },
+			opponent: { uuid: bestOpponent.uuid, username: bestOpponent.username },
 			overworldSeed: seedPair.overworldSeed,
 			netherSeed: seedPair.netherSeed,
 		}),
