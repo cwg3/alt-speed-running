@@ -84,7 +84,11 @@ export const handler = async (
 	// Single atomic upsert: if_not_exists means a first-time login creates
 	// the row with defaults, a returning login only touches username/
 	// lastLoginAt - no separate get-then-put race condition.
-	await ddb.send(new UpdateCommand({
+	// ALL_NEW returns the row after the upsert, so the client gets the
+	// player's rating and season points from the login call itself
+	// rather than needing a second round trip to show a profile.
+	const player = await ddb.send(new UpdateCommand({
+		ReturnValues: 'ALL_NEW',
 		TableName: PLAYERS_TABLE_NAME,
 		Key: { uuid: profile.id },
 		UpdateExpression:
@@ -114,6 +118,12 @@ export const handler = async (
 	return {
 		statusCode: 200,
 		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ uuid: profile.id, username: profile.name, sessionToken }),
+		body: JSON.stringify({
+			uuid: profile.id,
+			username: profile.name,
+			sessionToken,
+			skillRating: player.Attributes?.skillRating ?? DEFAULT_SKILL_RATING,
+			seasonPoints: player.Attributes?.seasonPoints ?? 0,
+		}),
 	};
 };

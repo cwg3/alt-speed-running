@@ -29,7 +29,9 @@ public final class BackendClient {
 		return new VerifyResult(
 				resp.get("uuid").getAsString(),
 				resp.get("username").getAsString(),
-				resp.get("sessionToken").getAsString());
+				resp.get("sessionToken").getAsString(),
+				resp.get("skillRating").getAsInt(),
+				resp.get("seasonPoints").getAsInt());
 	}
 
 	public static QueueJoinResult joinQueue(String sessionToken) throws IOException {
