@@ -4,7 +4,8 @@
 	"compatibilityLevel": "JAVA_8",
 	"mixins": [
 		"StartupProofMixin",
-		"SplitTrackerMixin"
+		"SplitTrackerMixin",
+		"PiglinBarterMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

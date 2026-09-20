@@ -62,6 +62,7 @@ public final class MatchFlow {
 					// screen. Close enough for the MVP; real timer mods
 					// often make the same simplification.
 					MatchState.matchStartMillis = System.currentTimeMillis();
+					MatchState.firstBarterLogged = false;
 					MatchWorldCreator.createMatchWorld(client, "match-" + finalResult.matchId,
 							finalResult.overworldSeed, finalResult.netherSeed);
 				} catch (Exception e) {
