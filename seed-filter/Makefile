@@ -14,4 +14,7 @@ seedfilter: seedfilter.c cubiomes
 	$(CC) -O3 -o seedfilter seedfilter.c $(CUBIOMES)/libcubiomes.a -lm -lpthread
 
 clean:
-	rm -f smoketest seedfilter
+	rm -f smoketest seedfilter query
+
+query: query.c cubiomes
+	$(CC) -O3 -o query query.c $(CUBIOMES)/libcubiomes.a -lm -lpthread

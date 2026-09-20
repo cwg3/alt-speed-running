@@ -7,8 +7,8 @@ import net.fabricmc.api.ClientModInitializer;
 public class SpeedrunMcAltClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
-		// The match HUD only draws while a match is active, so it's safe
-		// to register unconditionally here.
+		// Both only act while a match is active, so registering them
+		// unconditionally here is safe.
 		MatchHud.register();
 		ReplayRecorder.register();
 
