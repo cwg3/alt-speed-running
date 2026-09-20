@@ -18,6 +18,11 @@ from PIL import Image, ImageDraw, ImageFont
 FONT_PATH = "/System/Library/Fonts/Supplemental/Andale Mono.ttf"
 FONT_SIZE = 33
 TEXT = "alt"
+# Columns of blank space between glyphs. Andale Mono is monospace, so
+# drawing the string in one call leaves a wide fixed advance between
+# letters; each glyph is rendered separately and re-packed to this gap
+# instead. Lower is tighter.
+LETTER_GAP = 2
 
 # Phosphor green ramp, brightest at the top. Deliberately narrow: a CRT
 # phosphor is close to uniformly lit, and a wide gradient makes the
@@ -44,20 +49,46 @@ BG = (8, 12, 10, 255)
 
 
 def text_mask():
-    """Rasterize TEXT with antialiasing off, cropped to its ink."""
-    font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
-    probe = Image.new("L", (FONT_SIZE * len(TEXT) * 2, FONT_SIZE * 3), 0)
-    draw = ImageDraw.Draw(probe)
-    draw.fontmode = "1"  # disables antialiasing - hard pixel edges only
-    draw.text((FONT_SIZE // 2, FONT_SIZE // 2), TEXT, font=font, fill=255)
+    """Rasterize TEXT with antialiasing off and re-pack the glyphs to
+    LETTER_GAP columns apart.
 
-    bbox = probe.getbbox()
-    if not bbox:
-        raise RuntimeError("font rendered nothing - check FONT_PATH")
-    cropped = probe.crop(bbox)
-    w, h = cropped.size
-    px = cropped.load()
-    return [[px[x, y] > 127 for x in range(w)] for y in range(h)], w, h
+    Each glyph is drawn on its own canvas at the same origin, then
+    trimmed horizontally only - trimming vertically per glyph would
+    discard each one's offset from the baseline and leave 'a', 'l' and
+    't' all sitting at the same height.
+    """
+    font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
+    canvas_h = FONT_SIZE * 3
+    origin = (FONT_SIZE, FONT_SIZE)
+
+    glyphs = []
+    for ch in TEXT:
+        img = Image.new("L", (FONT_SIZE * 3, canvas_h), 0)
+        draw = ImageDraw.Draw(img)
+        draw.fontmode = "1"  # disables antialiasing - hard pixel edges only
+        draw.text(origin, ch, font=font, fill=255)
+        bbox = img.getbbox()
+        if not bbox:
+            raise RuntimeError(f"font rendered nothing for {ch!r} - check FONT_PATH")
+        left, _, right, _ = bbox
+        px = img.load()
+        glyphs.append([[px[x, y] > 127 for x in range(left, right)]
+                       for y in range(canvas_h)])
+
+    width = sum(len(g[0]) for g in glyphs) + LETTER_GAP * (len(glyphs) - 1)
+    rows = []
+    for y in range(canvas_h):
+        row = []
+        for i, g in enumerate(glyphs):
+            if i:
+                row += [False] * LETTER_GAP
+            row += g[y]
+        rows.append(row)
+
+    # now trim the blank rows above and below the whole word
+    used = [y for y, row in enumerate(rows) if any(row)]
+    rows = rows[used[0]:used[-1] + 1]
+    return rows, width, len(rows)
 
 
 def build(ink, width, height, pad):
