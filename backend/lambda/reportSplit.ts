@@ -3,23 +3,13 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { resolveSessionToken } from './lib/auth';
 import { applyMatchCompletion, MatchPlayer } from './lib/matchCompletion';
+import { isSplitName, validateSplit } from './lib/splitRules';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 const SESSIONS_TABLE_NAME = process.env.SESSIONS_TABLE_NAME!;
 const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
-
-// Mirrors the mod's SplitEvents - the server decides what's a valid
-// split name rather than trusting whatever a client sends.
-const VALID_SPLITS = new Set([
-	'enter_nether',
-	'piglin_barter',
-	'obtain_rod',
-	'enter_stronghold',
-	'enter_end',
-	'kill_dragon',
-]);
 
 // Reaching this split ends the race, so it completes the match with
 // the reporting player as the winner.
@@ -51,7 +41,7 @@ export const handler = async (
 			body: JSON.stringify({ error: 'matchId, splitName and numeric elapsedMs are required' }),
 		};
 	}
-	if (!VALID_SPLITS.has(body.splitName)) {
+	if (!isSplitName(body.splitName)) {
 		return { statusCode: 400, body: JSON.stringify({ error: `unknown split: ${body.splitName}` }) };
 	}
 
@@ -67,6 +57,41 @@ export const handler = async (
 	const reporter = players.find((p) => p.uuid === reporterUuid);
 	if (!reporter) {
 		return { statusCode: 403, body: JSON.stringify({ error: 'you are not a participant in this match' }) };
+	}
+
+	// Plausibility check before anything is recorded. Rules are in
+	// lib/splitRules.ts and every rejection explains itself, so a player
+	// can see exactly why a result was refused rather than being told
+	// only that it was.
+	const allSplits: Record<string, Record<string, number>> = match.Item.splits ?? {};
+	const mine = allSplits[reporterUuid] ?? {};
+	const check = validateSplit(
+		body.splitName, body.elapsedMs, mine, match.Item.createdAt, Date.now());
+
+	if (!check.ok) {
+		// Rejections are kept on the match for audit and appeals - a ban
+		// that can't be explained afterwards is the thing this project
+		// exists to avoid.
+		await ddb.send(new UpdateCommand({
+			TableName: MATCHES_TABLE_NAME,
+			Key: { matchId: body.matchId },
+			UpdateExpression: 'SET rejections = list_append(if_not_exists(rejections, :empty), :entry)',
+			ExpressionAttributeValues: {
+				':empty': [],
+				':entry': [{
+					uuid: reporterUuid,
+					splitName: body.splitName,
+					elapsedMs: body.elapsedMs,
+					reason: check.reason,
+					at: Date.now(),
+				}],
+			},
+		}));
+		return {
+			statusCode: 422,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ recorded: false, rejected: true, reason: check.reason }),
+		};
 	}
 
 	// Record the split. Nested map keyed by uuid then split name, with
