@@ -103,6 +103,26 @@ export class BackendStack extends cdk.Stack {
 			integration: new HttpLambdaIntegration('QueueJoinIntegration', queueJoinFn),
 		});
 
+		const completeMatchFn = new NodejsFunction(this, 'CompleteMatchFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'completeMatch.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			environment: {
+				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				PLAYERS_TABLE_NAME: playersTable.tableName,
+				MATCHES_TABLE_NAME: matchesTable.tableName,
+			},
+		});
+		sessionsTable.grantReadData(completeMatchFn);
+		playersTable.grantReadWriteData(completeMatchFn);
+		matchesTable.grantReadWriteData(completeMatchFn);
+
+		api.addRoutes({
+			path: '/matches/complete',
+			methods: [HttpMethod.POST],
+			integration: new HttpLambdaIntegration('CompleteMatchIntegration', completeMatchFn),
+		});
+
 		new cdk.CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
 		new cdk.CfnOutput(this, 'SeedPoolTableName', { value: seedPoolTable.tableName });
 	}
