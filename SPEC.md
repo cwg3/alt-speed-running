@@ -498,6 +498,39 @@ swept out of band and **voided** — neither player was there, so there
 is nobody to award a win to and nobody who deserves a loss. The seed
 goes back to the pool, since nothing was wrong with it.
 
+## Match format
+
+| Guarantee | Status |
+|---|---|
+| Both players race the same seed in separate worlds | built |
+| Seed type announced with a 10-second countdown before the run | built — confirmed in play |
+
+**The countdown is a real mechanic, not a nicety.** MCSR Ranked tells
+both players which seed TYPE they have drawn - village, desert temple,
+shipwreck, buried treasure, ruined portal - and counts down ten
+seconds before the run begins. The layout stays hidden; what is shared
+is the opening you will be running, so the route is planned rather
+than improvised from a cold start.
+
+The screen is a PAUSE screen, and that is the mechanism rather than a
+side effect: MatchClock already refuses to claim a run start while the
+game is paused, so closing the screen at zero is what releases the
+clock. No extra coordination, and the rule that loading is never
+charged to the run still holds.
+
+The countdown starts on the player's FIRST PLAYABLE TICK, not when the
+match is made. Starting it at matchmaking was wrong and invisible -
+world generation takes about twelve seconds, so a ten-second countdown
+begun then had already expired before the player could see it and the
+screen never appeared at all. Confirmed in play: reveal at 11:19:55,
+clock at 11:20:06.
+
+**ZSG is not the standard to copy.** It filters for fast single-player
+times (sub-5 theoretical), with much tighter distances — bastion within
+96 blocks against MCSR's 14 chunks. Same mechanics, different purpose:
+ZSG optimises a time attack, MCSR balances a race. Its `terrain_checker`
+idea is worth borrowing; its distances are not.
+
 ## Disputes
 
 **Bad seed: both players, or nothing.** Either player can vote that a

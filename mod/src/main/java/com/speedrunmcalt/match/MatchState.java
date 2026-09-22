@@ -88,6 +88,16 @@ public final class MatchState {
 	 */
 	public static volatile boolean netherArrivalChecked = false;
 
+	/**
+	 * When the pre-race countdown ends, or 0 if there is none.
+	 *
+	 * Both players are shown their seed TYPE and given ten seconds to
+	 * plan the opening before the race starts. World generation happens
+	 * behind that screen, so loading is not merely uncharged - it is
+	 * the planning window.
+	 */
+	public static volatile long countdownEndsAt = 0;
+
 	// Identify the active match to the backend when reporting splits.
 	// Null when no ranked match is in progress, which is what
 	// SplitReporter checks before attempting any network call.
@@ -161,6 +171,7 @@ public final class MatchState {
 		bastionZ = 0;
 		bastionLootApplied = false;
 		netherArrivalChecked = false;
+		countdownEndsAt = 0;
 		BarterSchedule.reset();
 		DropSchedule.reset();
 		MatchClock.reset();
@@ -171,6 +182,11 @@ public final class MatchState {
 		BadSeedVote.reset();
 		result = null;
 		resultAtMillis = 0;
+	}
+
+	/** Milliseconds left on the pre-race countdown; 0 once it is done. */
+	public static long countdownRemaining() {
+		return countdownEndsAt <= 0 ? 0 : Math.max(0, countdownEndsAt - System.currentTimeMillis());
 	}
 
 	public static boolean inMatch() {

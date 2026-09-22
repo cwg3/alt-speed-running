@@ -1,6 +1,7 @@
 package com.speedrunmcalt.match;
 
 import com.speedrunmcalt.SpeedrunMcAlt;
+import com.speedrunmcalt.menu.SeedRevealScreen;
 import com.speedrunmcalt.net.BackendClient;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
@@ -43,6 +44,12 @@ public final class MatchClock {
 	 */
 	private static volatile boolean claiming = false;
 
+	/**
+	 * Planning time before the race starts, once the player is in the
+	 * world. Ten seconds matches the standard.
+	 */
+	private static final long COUNTDOWN_MS = 10_000;
+
 	private MatchClock() {
 	}
 
@@ -60,7 +67,35 @@ public final class MatchClock {
 		if (MatchState.matchId == null || MatchState.matchStartMillis > 0 || claiming) {
 			return;
 		}
-		if (client.player == null || client.world == null || client.isPaused()) {
+		if (client.player == null || client.world == null) {
+			return;
+		}
+
+		// The pre-race countdown starts HERE, on the first tick the
+		// player is actually in the world - not when the match was
+		// made.
+		//
+		// Starting it at match time was wrong and invisible: world
+		// generation takes about twelve seconds, so a ten-second
+		// countdown begun at matchmaking had already expired before
+		// the player could see it, and the screen never appeared.
+		//
+		// The screen pauses the game, which is what keeps the clock
+		// from starting - the isPaused() check below does the gating,
+		// and this needs no coordination with it.
+		if (MatchState.countdownEndsAt == 0) {
+			MatchState.countdownEndsAt = System.currentTimeMillis() + COUNTDOWN_MS;
+			SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Seed reveal: {} - race starts in {}s",
+					MatchState.seedType, COUNTDOWN_MS / 1000);
+		}
+		if (MatchState.countdownRemaining() > 0) {
+			if (!(client.currentScreen instanceof SeedRevealScreen)) {
+				client.openScreen(new SeedRevealScreen());
+			}
+			return;
+		}
+
+		if (client.isPaused()) {
 			return;
 		}
 
