@@ -628,6 +628,15 @@ underlying contention is unfixed.
 Engineering debt that is not itself a match guarantee, kept here so it
 lives in one place rather than in somebody's memory.
 
+**The filter can pair a bastion with the wrong fortress.** Verified
+across the 21-seed pool: bastion distance held 21/21, fortress
+distance 19/21, with two seeds overshooting the 16-chunk limit at 279
+and 324 blocks. `seedtypes.c` scans regions independently and takes the
+nearest-to-origin bastion, but does not then search for the fortress
+nearest THAT bastion - so it can measure a pair the player would never
+walk. The two offenders were removed from the pool by hand; the filter
+will keep admitting them until the pairing is fixed.
+
 **Parallel seed verification.** Tier 3 of the pool build runs serially
 because four workers fail roughly 70% of the time. Serial is reliable
 but slow: 70 village seeds is about 15 minutes, and a full rebuild
