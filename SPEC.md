@@ -297,6 +297,27 @@ crying-obsidian rate all vary by seed, and it plays identically. Its
 chest is given the vanilla loot table so the normal guarantees apply to
 it with no special case.
 
+**Placement can fail, and failure must not ship.** Found in play
+2026-09-22: a seed whose vanilla portal was submerged in open ocean.
+The submerged check worked exactly as designed; the fallback placer
+then found nowhere dry to build - all 256 candidate sites rejected for
+no ground - and the race started anyway, on a world with no portal and
+no lava pool. The player had no route, and no way to tell our failure
+from their own bad luck.
+
+The mod now records what it could not provide in
+`MatchState.setupFailure`, logs it at ERROR rather than WARN, and tells
+the player in chat that the seed is broken and points them at the
+bad-seed vote. That is the one mechanism that ends a match with no
+rating change for either side.
+
+The real fix is upstream: **the pool build must run the same placement
+the mod runs and reject seeds where it fails.** Filtering for "a portal
+is predicted here" and then trusting the runtime to rescue it is the
+same shape of mistake as verifying a piece name instead of a chest.
+This must be done BEFORE the next pool rebuild, or the rebuild will
+re-admit the same class of seed.
+
 **This is the most visible thing the mod builds.** A placed portal is
 not at a vanilla-determined location, so "seed X has a portal at Y"
 stops being checkable against the game. It stays reproducible from the

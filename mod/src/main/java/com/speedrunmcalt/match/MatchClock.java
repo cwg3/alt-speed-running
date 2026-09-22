@@ -5,6 +5,8 @@ import com.speedrunmcalt.menu.SeedRevealScreen;
 import com.speedrunmcalt.net.BackendClient;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.LiteralText;
+import net.minecraft.util.Formatting;
 
 /**
  * Starts the run timer when the player can actually play, once per run.
@@ -44,6 +46,9 @@ public final class MatchClock {
 	 */
 	private static volatile boolean claiming = false;
 
+	/** So the broken-seed warning is said once, not every tick. */
+	private static volatile boolean setupFailureAnnounced = false;
+
 	/**
 	 * Planning time before the race starts, once the player is in the
 	 * world. Ten seconds matches the standard.
@@ -60,6 +65,7 @@ public final class MatchClock {
 	/** Lets a new match claim a start after the previous one finished. */
 	public static void reset() {
 		claiming = false;
+		setupFailureAnnounced = false;
 	}
 
 	private static void tick(MinecraftClient client) {
@@ -116,6 +122,24 @@ public final class MatchClock {
 
 		if (client.isPaused()) {
 			return;
+		}
+
+		// Tell the player, once, if the world could not be given what it
+		// was promised. This used to go only to the log: a player was
+		// dropped into open ocean with no portal and no lava pool, three
+		// warnings deep, and had no way to tell our failure from their
+		// own bad luck. Pointing them at the bad-seed vote matters -
+		// that is the one route that ends the match with no rating
+		// change for either side.
+		if (MatchState.setupFailure != null && !setupFailureAnnounced) {
+			setupFailureAnnounced = true;
+			client.player.sendMessage(new LiteralText(
+					"This seed is broken: " + MatchState.setupFailure)
+					.formatted(Formatting.RED), false);
+			client.player.sendMessage(new LiteralText(
+					"It is not your fault and not a fair race. Open the pause menu and "
+							+ "vote BAD SEED - if your opponent agrees, nobody loses rating.")
+					.formatted(Formatting.YELLOW), false);
 		}
 
 		final String matchId = MatchState.matchId;

@@ -302,6 +302,17 @@ public final class MatchWorldSetup {
 						// a placed portal does not have, so point it at
 						// the new one.
 						MatchState.placedPortal = placed;
+					} else {
+						// Nowhere dry to build. This used to be a WARN
+						// and nothing else, so the race started on a
+						// seed with no route at all - see
+						// MatchState.setupFailure.
+						MatchState.setupFailure =
+								"no usable ruined portal - vanilla's is submerged and "
+										+ "there was nowhere to place one";
+						SpeedrunMcAlt.LOGGER.error(
+								"[speedrunmcalt] GUARANTEE FAILED: {} (seed {} at {},{})",
+								MatchState.setupFailure, seed, x, z);
 					}
 				}
 				LavaPoolPlacer.placePortalAccess(world, seed, x, z);

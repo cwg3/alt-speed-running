@@ -115,6 +115,25 @@ public final class MatchState {
 	 */
 	public static volatile boolean runAlreadyStarted = false;
 
+	/**
+	 * A guarantee the world setup could not provide, or null if setup
+	 * did everything it promised.
+	 *
+	 * Seen in play 2026-09-22: a ruined portal seed whose vanilla portal
+	 * was submerged. The check caught it correctly and the fallback
+	 * placer then found nowhere dry to build - open ocean, all 256
+	 * candidate sites rejected. Three warnings went to the log and the
+	 * race started anyway, dropping the player into a world with no
+	 * portal and no lava pool. They had no route and no way to know that
+	 * was our fault rather than their bad luck.
+	 *
+	 * A guarantee that fails must never ship in silence. The player is
+	 * told plainly and pointed at the bad-seed vote, which is the one
+	 * mechanism that can void the match without either side losing
+	 * rating.
+	 */
+	public static volatile String setupFailure = null;
+
 	// Identify the active match to the backend when reporting splits.
 	// Null when no ranked match is in progress, which is what
 	// SplitReporter checks before attempting any network call.
@@ -190,6 +209,7 @@ public final class MatchState {
 		netherArrivalChecked = false;
 		countdownEndsAt = 0;
 		runAlreadyStarted = false;
+		setupFailure = null;
 		BarterSchedule.reset();
 		DropSchedule.reset();
 		MatchClock.reset();
