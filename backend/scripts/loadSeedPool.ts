@@ -108,6 +108,15 @@ async function clearPool(ddb: DynamoDBDocumentClient, tableName: string, onlyTyp
 async function main() {
 	const tableName = process.argv[2];
 	const replace = process.argv.includes('--replace');
+	// Load the pool HELD: every row written used=true, so nothing can
+	// be dealt until it has been verified and released.
+	//
+	// The pipeline's own stages verify a SEED. Tiers 4 and 5 verify a
+	// PAIR - the nether as a match world generates it, and the
+	// overworld opening MatchWorldSetup actually produces - and those
+	// need the paired rows to exist before they can run. Loading held
+	// is what keeps that from meaning "briefly drawable and unchecked".
+	const held = process.argv.includes('--held');
 	const skipArg = process.argv.find((a) => a.startsWith('--skip='));
 	const skip = new Set(skipArg ? skipArg.slice('--skip='.length).split(',') : []);
 	// Rebuild exactly one seed type, leaving the rest of the pool
@@ -115,7 +124,7 @@ async function main() {
 	const onlyArg = process.argv.find((a) => a.startsWith('--only='));
 	const only = onlyArg ? onlyArg.slice('--only='.length) : undefined;
 	if (!tableName) {
-		console.error('usage: npx tsx scripts/loadSeedPool.ts <table> [--replace] [--only=<type>] [--skip=a,b]');
+		console.error('usage: npx tsx scripts/loadSeedPool.ts <table> [--replace] [--held] [--only=<type>] [--skip=a,b]');
 		process.exit(1);
 	}
 	if (only && !SEED_TYPES.includes(only as typeof SEED_TYPES[number])) {
@@ -191,7 +200,8 @@ async function main() {
 				bastionZ: nh.bastion.z,
 				smithX: smithPos.get(String(ow.seed))?.x ?? null,
 				smithZ: smithPos.get(String(ow.seed))?.z ?? null,
-				used: false,
+				used: held,
+				...(held ? { heldUnverified: true } : {}),
 			});
 		}
 	}

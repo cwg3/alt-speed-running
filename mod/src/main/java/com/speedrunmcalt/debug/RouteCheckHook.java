@@ -53,6 +53,9 @@ public class RouteCheckHook implements DedicatedServerModInitializer {
 	/** How far from the objective a chest may be and still be its chest. */
 	private static final int CHEST_RADIUS = 96;
 
+	/** The published magma ravine rule: 2 within 10 chunks. */
+	private static final int RAVINE_RADIUS = 160;
+
 	private static String seedType;
 	private static int smithX;
 	private static int smithZ;
@@ -150,7 +153,17 @@ public class RouteCheckHook implements DedicatedServerModInitializer {
 			} else {
 				// Shipwreck and buried treasure route through an ocean
 				// magma ravine rather than a surface pool.
-				MagmaRavine.Result r = MagmaRavine.find(world, sx, sz, 128);
+				// 160 blocks = 10 chunks, which is the PUBLISHED rule
+				// (SPEC.md: "2 magma ravines within 10 chunks") and what
+				// RavineCheckHook uses in tier 3.
+				//
+				// This was 128 on its first run and quarantined a seed
+				// tier 3 had just passed. The seed was fine; the checker
+				// was stricter than the rule it was checking. A verifier
+				// that disagrees with the spec is not a stricter
+				// verifier, it is a wrong one - and it fails seeds in a
+				// way that looks exactly like a real defect.
+				MagmaRavine.Result r = MagmaRavine.find(world, sx, sz, RAVINE_RADIUS);
 				extra = "ravine=" + r.ravine + " magma=" + r.magmaBlocks
 						+ " nearest=" + r.nearestDistance;
 				chests = countChests(world, sx, sz, CHEST_RADIUS);

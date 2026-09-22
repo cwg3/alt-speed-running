@@ -646,19 +646,24 @@ filter stage. A pool that silently shrinks teaches nothing.
 
 ## Pool
 
-**15 live seeds**, from 19 built - four were quarantined on
-2026-09-22 by match-world nether verification:
+**31 live seeds**, rebuilt 2026-09-22, with 11 quarantined:
 
 | type | live | quarantined |
 |---|---|---|
-| village | 5 | 0 |
-| shipwreck | 4 | 1 |
-| ruined portal | 3 | 1 |
-| desert temple | 2 | 2 |
-| buried treasure | 1 | 0 |
+| village | 9 | 1 |
+| shipwreck | 8 | 2 |
+| desert temple | 6 | 3 |
+| ruined portal | 6 | 3 |
+| buried treasure | 2 | 2 |
 
-Buried treasure is short because only 2 of 40 candidates passed the
-two-magma-ravine check, against 23% for shipwreck.
+Buried treasure is short because only about 3% of candidates pass the
+two-magma-ravine check, against roughly 18% for shipwreck.
+
+**Tiers 4 and 5 rejected 7 of 23 freshly filtered pairs - 30%.** Six
+failed in the nether, three of those shipping a bastion coordinate 487
+to 577 blocks from any real bastion. Every one had passed the cubiomes
+filter. That rate is the argument for the held-load flow below: the
+filter's output is not a pool, it is a list of candidates.
 
 For scale: the incumbent draws from roughly a million pre-vetted
 worlds. Ours is a test pool, not a production one — at this size seeds
@@ -672,6 +677,14 @@ candidate JSON in `seed-filter/output/` is gitignored, so the exact
 seeds currently live exist only in DynamoDB. The tier-4 verification
 results ARE committed, in `seed-filter/results/`. Commit that directory
 deliberately if a specific pool ever needs to be reproducible.
+
+**Load held, verify, then release.** Tiers 1 to 3 verify a SEED; tiers
+4 and 5 verify a PAIR, and a pair does not exist until the loader has
+made one. So `loadSeedPool.ts --held` writes every row `used=true`, and
+`seed-filter/verify-and-release.sh` runs both tiers and releases only
+what passes. Nothing unverified is ever drawable, not even briefly -
+and briefly is all it takes, because a seed is dealt the moment someone
+queues.
 
 Built by `seed-filter/build-pool.sh` in tiers of increasing cost:
 

@@ -198,4 +198,14 @@ PY
 echo
 echo "=== stage 5: load ==="
 cd "$ROOT/backend"
-npx tsx scripts/loadSeedPool.ts "$TABLE" --replace 2>&1 | tail -3
+# LOAD_FLAGS defaults to a full replace, which is what a from-scratch
+# rebuild wants. Override it to add to an existing pool instead:
+#
+#   LOAD_FLAGS="--held" ./build-pool.sh 5
+#
+# --held writes every row used=true so nothing is drawable until tiers
+# 4 and 5 (verify-pairs.sh, verify-routes.sh) have passed it and it has
+# been released. Those verify a PAIR rather than a seed, so they can
+# only run after the rows exist - and a pool that is briefly drawable
+# and unchecked is how a player ends up in open ocean with no portal.
+npx tsx scripts/loadSeedPool.ts "$TABLE" ${LOAD_FLAGS:---replace} 2>&1 | tail -3
