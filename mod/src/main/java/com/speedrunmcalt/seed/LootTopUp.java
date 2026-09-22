@@ -239,11 +239,24 @@ public final class LootTopUp {
 	}
 
 	public static boolean apply(ServerWorld world, SeedType type, BlockBox box, long seed) {
+		return apply(world, type, box, seed, false);
+	}
+
+	/**
+	 * @param strictBox honour the box's Y as well as its X and Z. Use it
+	 *                  only when the box describes something we built
+	 *                  and therefore measured, never a predicted
+	 *                  structure box - see ContainerScan.findWithin.
+	 */
+	public static boolean apply(ServerWorld world, SeedType type, BlockBox box, long seed,
+			boolean strictBox) {
 		// Filter to this structure's own containers BEFORE rolling any
 		// of them: rolling clears the loot table id, so the evidence of
 		// which structure a container belongs to is gone afterwards.
 		List<BlockPos> containers = new java.util.ArrayList<>();
-		for (BlockPos pos : ContainerScan.find(world, box)) {
+		for (BlockPos pos : (strictBox
+				? ContainerScan.findWithin(world, box)
+				: ContainerScan.find(world, box))) {
 			LootableContainerBlockEntity container =
 					(LootableContainerBlockEntity) world.getBlockEntity(pos);
 			if (container == null) {

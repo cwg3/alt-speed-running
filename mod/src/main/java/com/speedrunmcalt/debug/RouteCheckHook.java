@@ -134,6 +134,20 @@ public class RouteCheckHook implements DedicatedServerModInitializer {
 					}
 				}
 				chests = countChests(world, sx, sz, CHEST_RADIUS);
+
+				// Can the portal actually be LIT? Existing is not
+				// enough. A player reached a placed portal with flint,
+				// obsidian and a golden pickaxe and no way to open it,
+				// because the guarantee had been satisfied from a chest
+				// buried 22 blocks down in the vanilla portal it
+				// replaced. "A portal is here" was true and useless.
+				BlockPos pp = MatchState.placedPortal;
+				int ix = pp != null ? pp.getX() : sx;
+				int iz = pp != null ? pp.getZ() : sz;
+				if (!hasIgniter(world, ix, iz, 24) && "PASS".equals(verdict)) {
+					verdict = "FAIL";
+					detail = "no flint and steel or fire charge in reach of the portal";
+				}
 			} else if ("village".equals(seedType) || "desert_temple".equals(seedType)) {
 				// Both openings cast a portal from lava, so lava near
 				// the objective IS the route. Counting it is the whole
@@ -240,8 +254,57 @@ public class RouteCheckHook implements DedicatedServerModInitializer {
 		return found;
 	}
 
+	/** A means of lighting the portal, in a container near it. */
+	private static boolean hasIgniter(ServerWorld world, int cx, int cz, int radius) {
+		BlockBox box = new BlockBox(cx - radius, 0, cz - radius, cx + radius, 255, cz + radius);
+		for (BlockPos cp : ContainerScan.findWithin(world, box)) {
+			net.minecraft.block.entity.BlockEntity be = world.getBlockEntity(cp);
+			if (!(be instanceof net.minecraft.inventory.Inventory)) {
+				continue;
+			}
+			net.minecraft.inventory.Inventory inv = (net.minecraft.inventory.Inventory) be;
+			for (int i = 0; i < inv.size(); i++) {
+				net.minecraft.item.Item item = inv.getStack(i).getItem();
+				if (item == net.minecraft.item.Items.FLINT_AND_STEEL
+						|| item == net.minecraft.item.Items.FIRE_CHARGE) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	private static int countChests(ServerWorld world, int cx, int cz, int radius) {
 		BlockBox box = new BlockBox(cx - radius, 0, cz - radius, cx + radius, 255, cz + radius);
-		return ContainerScan.find(world, box).size();
+		java.util.List<BlockPos> found = ContainerScan.find(world, box);
+
+		// Log what is IN them, not just how many there are.
+		//
+		// "chests=2" passed a ruined portal seed whose player could not
+		// light the portal. A count answers "is there a container", and
+		// the question the route asks is "is the thing you need in it".
+		for (BlockPos cp : found) {
+			net.minecraft.block.entity.BlockEntity be = world.getBlockEntity(cp);
+			if (!(be instanceof net.minecraft.inventory.Inventory)) {
+				continue;
+			}
+			net.minecraft.inventory.Inventory inv = (net.minecraft.inventory.Inventory) be;
+			StringBuilder items = new StringBuilder();
+			for (int i = 0; i < inv.size(); i++) {
+				net.minecraft.item.ItemStack st = inv.getStack(i);
+				if (st.isEmpty()) {
+					continue;
+				}
+				if (items.length() > 0) {
+					items.append(", ");
+				}
+				items.append(st.getCount()).append("x ")
+						.append(net.minecraft.util.registry.Registry.ITEM.getId(st.getItem()));
+			}
+			SpeedrunMcAlt.LOGGER.info("[routecheck] container {},{},{}: {}",
+					cp.getX(), cp.getY(), cp.getZ(),
+					items.length() == 0 ? "(empty)" : items.toString());
+		}
+		return found.size();
 	}
 }

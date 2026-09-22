@@ -54,6 +54,33 @@ public final class ContainerScan {
 	 * @return every loot container in the structure's chunks, in
 	 *         deterministic order
 	 */
+	/**
+	 * Containers strictly INSIDE the box, Y included.
+	 *
+	 * find() takes whole chunks and ignores Y, which is right when the
+	 * box came from a structure prediction - those are exact in X and Z
+	 * and have been observed wrong in Y by fifty blocks.
+	 *
+	 * It is wrong when we BUILT the thing and know exactly where it is.
+	 * A placed ruined portal sits a few blocks from the buried vanilla
+	 * one it replaced, and the chunk-wide scan reached that buried
+	 * chest 22 blocks underground: the guarantee counted its flint and
+	 * steel as the player's light source and posted the player's iron
+	 * into it. The player stood at the surface portal with no way to
+	 * light it, in a match that then had to be voided.
+	 *
+	 * So when the caller knows the real box, it says so and gets it.
+	 */
+	public static List<BlockPos> findWithin(ServerWorld world, BlockBox box) {
+		List<BlockPos> inside = new ArrayList<>();
+		for (BlockPos pos : find(world, box)) {
+			if (box.contains(pos)) {
+				inside.add(pos);
+			}
+		}
+		return inside;
+	}
+
 	public static List<BlockPos> find(ServerWorld world, BlockBox box) {
 		List<BlockPos> found = new ArrayList<>();
 

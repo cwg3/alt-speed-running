@@ -348,7 +348,13 @@ public final class MatchWorldSetup {
 			net.minecraft.util.math.BlockBox box = new net.minecraft.util.math.BlockBox(
 					p.getX() - 8, p.getY() - 4, p.getZ() - 8,
 					p.getX() + 8, p.getY() + 8, p.getZ() + 8);
-			LootTopUp.apply(world, type, box, seed);
+			// strictBox: we BUILT this portal, so its box is measured
+			// rather than predicted. Without it the chunk-wide scan
+			// reaches the buried vanilla portal a few blocks away and
+			// satisfies the guarantees from a chest the player will
+			// never open - which is exactly what happened, and cost a
+			// match.
+			LootTopUp.apply(world, type, box, seed, true);
 			return;
 		}
 

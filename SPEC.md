@@ -318,6 +318,28 @@ same shape of mistake as verifying a piece name instead of a chest.
 This must be done BEFORE the next pool rebuild, or the rebuild will
 re-admit the same class of seed.
 
+**A placed portal's guarantees must be scoped to the portal we
+built.** Found in play 2026-09-22, second ruined portal failure of the
+day: a player reached a placed portal with flint, obsidian and a golden
+pickaxe, and no way to light it.
+
+`ContainerScan.find` takes whole chunks and ignores Y on purpose -
+structure boxes are exact in X and Z and have been seen wrong in Y by
+fifty blocks. That is right for a predicted structure and wrong for one
+we built and therefore measured. The placed portal sat thirteen blocks
+from the buried vanilla portal it replaced, so the chunk-wide scan
+reached that chest 22 blocks underground, counted its flint and steel
+as the player's light source, and posted the player's topped-up iron
+into it. Every guarantee was satisfied, in a chest nobody could open.
+
+`ContainerScan.findWithin` honours the box's Y, and the placed-portal
+path uses it. On the same seed the surface chest now holds the iron and
+a flint and steel, and the buried one is left alone.
+
+Tier 5 now also asserts that a ruined portal can be LIT - an igniter in
+a container within 24 blocks of it. "A portal is here" was true and
+useless.
+
 **This is the most visible thing the mod builds.** A placed portal is
 not at a vanilla-determined location, so "seed X has a portal at Y"
 stops being checkable against the game. It stays reproducible from the
