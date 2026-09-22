@@ -13,8 +13,17 @@ run/
 *.iml
 
 # C build artifacts (cubiomes is now a submodule and ignores its own build output)
+#
+# Listed by name rather than by pattern because the sources sit beside
+# them: seedtypes.c is the source, seedtypes is the binary. Every new
+# tool here needs a line, which is a nuisance - but `query` was once
+# committed as a 500KB binary because this list was not updated when it
+# was added.
 seed-filter/smoketest
 seed-filter/seedfilter
+seed-filter/seedtypes
+seed-filter/netherbiome
+seed-filter/query
 seed-filter/*.o
 seed-filter/output/
 
