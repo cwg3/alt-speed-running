@@ -90,45 +90,65 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 							found, px, pz);
 				}
 				ServerWorld nether = server.getWorld(World.NETHER);
-				BlockPos origin = new BlockPos(0, 64, 0);
 
-				BlockPos bastion = nether.locateStructure(
-						StructureFeature.BASTION_REMNANT, origin, 100, false);
-				// Searched from the BASTION, not the origin. The rule is
-				// "fortress within 16 chunks of the intended bastion",
-				// and the fortress nearest spawn is frequently a
-				// different one - measuring to that produced a 90%
-				// failure rate that was an artefact of the question
-				// being asked wrong, not a property of the seeds.
-				BlockPos fortress = bastion == null ? null
-						: nether.locateStructure(StructureFeature.FORTRESS, bastion, 100, false);
+				// Enumerate STRUCTURE STARTS rather than asking the locator.
+				//
+				// locateStructure does not answer the question the rules ask.
+				// It walks outward through the structure region grid and
+				// returns the first viable placement it meets, which is "a
+				// bastion in an early ring", not "the nearest bastion". On
+				// pool pair b0699117 it returned one 265 blocks out while a
+				// real hoglin stable - nine chests, exactly the type we ship -
+				// stood 160 blocks out at the coordinate we had shipped. Judged
+				// by the locator that seed failed the 14-chunk rule; judged by
+				// what the game generated it passes comfortably.
+				//
+				// Generating each chunk to STRUCTURE_STARTS is cheap - no
+				// terrain, no features - and it is ground truth: it is the same
+				// pass that decides where the structure really goes.
+				java.util.List<BlockPos> bastions =
+						startsWithin(nether, 0, 0, 20, StructureFeature.BASTION_REMNANT);
 
-				// The standard's rules, measured against the GAME rather
-				// than against cubiomes:
-				//   bastion  <= 14 chunks from nether spawn
-				//   fortress <= 16 chunks from THAT BASTION
-				double bd = bastion == null ? -1
-						: Math.hypot(bastion.getX(), bastion.getZ());
-				double fd = (bastion == null || fortress == null) ? -1
-						: Math.hypot(fortress.getX() - bastion.getX(),
+				BlockPos bastion = bastions.isEmpty() ? null : bastions.get(0);
+				double bd = bastion == null ? -1 : Math.hypot(bastion.getX(), bastion.getZ());
+				// The rule is not only "close" but "significantly closer than
+				// any other competing bastion" - a runner who cannot tell which
+				// one was intended has no route, only a guess.
+				double bd2 = bastions.size() < 2 ? -1
+						: Math.hypot(bastions.get(1).getX(), bastions.get(1).getZ());
+
+				// Fortress measured FROM THE BASTION, per the rule. Measuring
+				// from spawn instead produced a 90% failure rate that was an
+				// artefact of asking the wrong question.
+				BlockPos fortress = null;
+				double fd = -1;
+				if (bastion != null) {
+					java.util.List<BlockPos> forts = startsWithin(
+							nether, bastion.getX(), bastion.getZ(), 20, StructureFeature.FORTRESS);
+					if (!forts.isEmpty()) {
+						fortress = forts.get(0);
+						fd = Math.hypot(fortress.getX() - bastion.getX(),
 								fortress.getZ() - bastion.getZ());
+					}
+				}
+
 				boolean pass = bd >= 0 && bd <= 14 * 16 && fd >= 0 && fd <= 16 * 16;
 
 				SpeedrunMcAlt.LOGGER.info(
-						"[netherlocate] {} bastion={} ({} blocks) fortress={} ({} from bastion) {}",
+						"[netherlocate] {} bastion={} ({} blocks, next nearest {}) fortress={} ({} from bastion) {}",
 						seed,
 						bastion == null ? "none" : bastion.getX() + "," + bastion.getZ(),
 						bd < 0 ? "-" : String.valueOf(Math.round(bd)),
+						bd2 < 0 ? "-" : String.valueOf(Math.round(bd2)),
 						fortress == null ? "none" : fortress.getX() + "," + fortress.getZ(),
 						fd < 0 ? "-" : String.valueOf(Math.round(fd)),
 						pass ? "PASS" : "FAIL");
 
-				// How far the coordinate we SHIP is from the bastion the
-				// game actually generated. This is the number a player
-				// experiences: -1 means no coordinate was probed, 0 means
-				// we sent them exactly right, and anything in the
-				// hundreds is the failure that was reported in play as
-				// "the bastion wasn't at the coords you gave me".
+				// How far the coordinate we SHIP is from the bastion the game
+				// actually generated. This is the number a player experiences:
+				// 0 means we sent them exactly right, and anything in the
+				// hundreds is what was reported in play as "the bastion wasn't
+				// at the coords you gave me".
 				double shipErr = (probeX == Integer.MIN_VALUE || bastion == null) ? -1
 						: Math.hypot(bastion.getX() - probeX, bastion.getZ() - probeZ);
 
@@ -149,12 +169,51 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 							+ (probeX == Integer.MIN_VALUE ? "" : String.valueOf(probeX)) + ","
 							+ (probeZ == Integer.MIN_VALUE ? "" : String.valueOf(probeZ)) + ","
 							+ Math.round(shipErr) + ","
-							+ probeContainers + "\n");
+							+ probeContainers + ","
+							+ Math.round(bd2) + ","
+							+ bastions.size() + "\n");
 				}
 			} catch (Exception e) {
 				SpeedrunMcAlt.LOGGER.error("[netherlocate] failed", e);
 			}
 			server.stop(false);
 		});
+	}
+
+	/**
+	 * Every generated start of one structure within chunkRadius of a
+	 * point, nearest first.
+	 *
+	 * hasChildren() is not optional. A chunk's structure-start map
+	 * carries placeholder entries for features that were considered and
+	 * not placed, and counting those would turn "no bastion here" into a
+	 * confident wrong coordinate - the same shape of mistake as counting
+	 * a crashed worker as a zero.
+	 */
+	private static java.util.List<BlockPos> startsWithin(ServerWorld world,
+			int centerX, int centerZ, int chunkRadius, StructureFeature<?> feature) {
+		final int ccx = centerX >> 4;
+		final int ccz = centerZ >> 4;
+		java.util.List<BlockPos> found = new java.util.ArrayList<>();
+		for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
+			for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
+				net.minecraft.world.chunk.Chunk chunk = world.getChunk(
+						ccx + dx, ccz + dz,
+						net.minecraft.world.chunk.ChunkStatus.STRUCTURE_STARTS, true);
+				if (chunk == null) {
+					continue;
+				}
+				net.minecraft.structure.StructureStart<?> start =
+						chunk.getStructureStarts().get(feature);
+				if (start != null && start.hasChildren()) {
+					found.add(start.getPos());
+				}
+			}
+		}
+		final double cx = centerX;
+		final double cz = centerZ;
+		found.sort(java.util.Comparator.comparingDouble(
+				pos -> Math.hypot(pos.getX() - cx, pos.getZ() - cz)));
+		return found;
 	}
 }

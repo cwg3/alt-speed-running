@@ -586,21 +586,19 @@ filter stage. A pool that silently shrinks teaches nothing.
 
 ## Pool
 
-**189 seeds**, one quarantined by a bad-seed vote:
+**15 live seeds**, from 19 built - four were quarantined on
+2026-09-22 by match-world nether verification:
 
-| type | count |
-|---|---|
-| desert temple | 40 |
-| ruined portal | 40 |
-| shipwreck | 40 |
-| buried treasure | 40 |
-| village | 29 |
+| type | live | quarantined |
+|---|---|---|
+| village | 5 | 0 |
+| shipwreck | 4 | 1 |
+| ruined portal | 3 | 1 |
+| desert temple | 2 | 2 |
+| buried treasure | 1 | 0 |
 
-Villages are short because they are the only type verified against a
-generated world: 130 candidates, 70 passed the cheap jigsaw check, and
-29 of those actually had a blacksmith chest. The other four types are
-filtered but not chest-verified, so their counts are round numbers and
-the village count is an honest one.
+Buried treasure is short because only 2 of 40 candidates passed the
+two-magma-ravine check, against 23% for shipwreck.
 
 For scale: the incumbent draws from roughly a million pre-vetted
 worlds. Ours is a test pool, not a production one — at this size seeds
@@ -611,7 +609,8 @@ times in a row before the draw was made random.
 `seedtypes` picks a random start seed on each run, so a rebuild
 produces a different, equally valid set - not the same seeds. The
 candidate JSON in `seed-filter/output/` is gitignored, so the exact
-21 seeds currently live exist only in DynamoDB. Commit that directory
+seeds currently live exist only in DynamoDB. The tier-4 verification
+results ARE committed, in `seed-filter/results/`. Commit that directory
 deliberately if a specific pool ever needs to be reproducible.
 
 Built by `seed-filter/build-pool.sh` in tiers of increasing cost:
@@ -629,6 +628,35 @@ Built by `seed-filter/build-pool.sh` in tiers of increasing cost:
    Carvers and loot tables are both invisible to cubiomes, so the
    world must be built and inspected. Roughly 12 s per seed, and the
    reason a pool build takes half an hour.
+
+4. **match world** — the nether, generated the way a MATCH generates
+   it: world seed = overworld seed, `MatchState.netherSeed` set, the
+   structure-seed mixins live. `seed-filter/verify-pairs.sh`. Roughly
+   40 s per pair.
+
+Tier 4 exists because tiers 1 to 3 all verify a SEED, and a match does
+not ship a seed - it ships a pair, a world built from one seed whose
+nether is redirected to another, plus a coordinate telling the player
+where to go. Every earlier harness generated single-seed worlds, which
+cannot reproduce a two-seed bug by construction. The first run over the
+live pool found 4 of 19 pairs out of spec, and three of those were
+shipping a bastion coordinate with nothing at it - 452, 522 and 828
+blocks from the nearest real bastion, zero containers at two of them.
+That is precisely the failure players had been reporting as "the
+bastion wasn't at the coords you gave me", and no tier below 4 could
+see it.
+
+**Measure generation, not the locator.** Tier 4's first version used
+`locateStructure` for ground truth and failed two good seeds. The
+locator walks outward through the structure region grid and returns the
+first viable placement it meets - *a* bastion in an early ring, not the
+*nearest* bastion. On one pair it reported the bastion 265 blocks out,
+a fail, while a real hoglin stable with nine chests stood 160 blocks
+out at the shipped coordinate. It now enumerates `STRUCTURE_STARTS`
+chunk by chunk, which is the pass that actually decides placement.
+Filter on `hasChildren()`: the map carries placeholder entries for
+features considered and not placed, and counting those would turn "no
+bastion here" into a confident wrong coordinate.
 
 Every tier past the first exists because a requirement was silently
 unchecked and shipped. Villages went out without blacksmiths until one

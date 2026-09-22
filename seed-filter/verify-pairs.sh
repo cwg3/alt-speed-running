@@ -38,7 +38,7 @@ grep -ve '^[[:space:]]*$' "$PAIRS" \
 OUT="$MOD/run/pairs-all.csv"
 mkdir -p "$MOD/run"
 {
-  echo "pairId,type,seed,bx,bz,fx,fz,bastionDist,fortressDist,verdict,shippedX,shippedZ,shipError,containers"
+  echo "pairId,type,seed,bx,bz,fx,fz,bastionDist,fortressDist,verdict,shippedX,shippedZ,shipError,containers,secondBastionDist,bastionCount"
   cat "$POOL"/res_* 2>/dev/null
 } > "$OUT"
 

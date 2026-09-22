@@ -18,7 +18,8 @@
 # have SHIPPED to the player.
 #
 # Row: seed,bx,bz,fx,fz,bastionDist,fortressDist,PASS|FAIL,
-#      shippedX,shippedZ,shipError,containersAtShipped
+#      shippedX,shippedZ,shipError,containersAtShipped,
+#      secondBastionDist,bastionCount
 set -u
 read -r OW NS BX BZ PAIR TYPE <<< "$1"
 POOL="/tmp/pair-workers"
@@ -33,7 +34,7 @@ for attempt in $(seq 1 900); do
   done
   sleep 1
 done
-[ -n "$DIR" ] || { echo "$OW,,,,,-1,-1,ERROR,,,,-1" > "$POOL/res_$PAIR"; exit 0; }
+[ -n "$DIR" ] || { echo "$OW,,,,,-1,-1,ERROR,,,,-1,-1,-1" > "$POOL/res_$PAIR"; exit 0; }
 trap 'rmdir "$CLAIM" 2>/dev/null' EXIT
 
 # Not 25565. A probe that fights the player's own game for the port is
@@ -60,5 +61,5 @@ else
   # An explicit ERROR marker, never a plausible-looking zero. A crashed
   # worker counted as a genuine result is exactly how "35 of 40 villages
   # have no blacksmith" got published.
-  printf '%s,%s,%s,,,,,-1,-1,ERROR,,,,-1\n' "$PAIR" "$TYPE" "$OW" > "$POOL/res_$PAIR"
+  printf '%s,%s,%s,,,,,-1,-1,ERROR,,,,-1,-1,-1\n' "$PAIR" "$TYPE" "$OW" > "$POOL/res_$PAIR"
 fi
