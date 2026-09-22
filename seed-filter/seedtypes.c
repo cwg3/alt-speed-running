@@ -88,6 +88,15 @@
 #define MAX_FORTRESS_DIST  CH(16)   // from the BASTION
 #define BASTION_ISOLATION  CH(10)  // margin over the next nearest bastion
 
+// Fortress region size in 1.16.1: 27 chunks (see s_fortress in
+// cubiomes/finders.c). A fortress within MAX_FORTRESS_DIST of the
+// bastion is in the bastion's own region or one adjacent to it.
+#define FORTRESS_REGION    (27 * 16)
+
+// floordiv() comes from cubiomes/rng.h. It is used rather than C's /
+// because / rounds toward zero: -1 / 432 is 0, not -1, which would put
+// a bastion at x=-100 in region 0 and scan the wrong three regions.
+
 // How far around the nether origin to check the biome.
 //
 // A runner arrives at overworldX/8, overworldZ/8 - not at the nether
@@ -401,6 +410,13 @@ static int classifyOverworld(Generator *g, uint64_t seed, OverworldHit *out)
 // everything.
 static uint64_t netherRejectedBasalt = 0;
 
+// How often more than one fortress sits within range of the intended
+// bastion - i.e. how often "first found" and "nearest" could actually
+// disagree. Counted rather than assumed: the fix below is correct by
+// construction, but a fix whose exposure is never measured is
+// indistinguishable from one that does nothing.
+static uint64_t netherMultiFortress = 0;
+
 static int netherSpawnViable(Generator *g)
 {
     for (int dx = -(int)NETHER_SPAWN_RADIUS; dx <= (int)NETHER_SPAWN_RADIUS; dx += 16)
@@ -468,9 +484,30 @@ static int classifyNether(Generator *g, uint64_t seed, NetherHit *out)
     memset(&sv, 0, sizeof(sv));
     int haveVariant = getVariant(&sv, Bastion, MC_1_16_1, seed, best.x, best.z, -1);
 
-    for (int frx = -2; frx <= 2; frx++)
+    // Search fortress regions around the BASTION, and keep the NEAREST
+    // fortress to it.
+    //
+    // Two separate faults lived here. The scan was centred on the
+    // ORIGIN, which happens to cover every in-spec fortress today only
+    // because a bastion is at most 14 chunks out and a fortress 16
+    // chunks past it - raise either limit and the search silently
+    // under-covers. And it returned the FIRST viable fortress in region
+    // scan order rather than the nearest one, so the pair recorded for
+    // a seed was not necessarily the pair a runner would walk: a closer
+    // fortress could sit unexamined in a region the loop reached later.
+    //
+    // Both are the same mistake in different clothes - answering a
+    // question adjacent to the one the rule asks.
+    int brx = floordiv(best.x, FORTRESS_REGION);
+    int brz = floordiv(best.z, FORTRESS_REGION);
+
+    double bestFd = 1e18;
+    Pos bestF = {0, 0};
+    int foundFortress = 0;
+
+    for (int frx = brx - 1; frx <= brx + 1; frx++)
     {
-        for (int frz = -2; frz <= 2; frz++)
+        for (int frz = brz - 1; frz <= brz + 1; frz++)
         {
             Pos fpos;
             if (!getStructurePos(Fortress, MC_1_16_1, seed, frx, frz, &fpos))
@@ -480,23 +517,32 @@ static int classifyNether(Generator *g, uint64_t seed, NetherHit *out)
             // actually walks. Measuring from spawn instead rejected
             // seeds the standard accepts.
             double fd = dist2d(fpos.x - best.x, fpos.z - best.z);
-            if (fd >= MAX_FORTRESS_DIST)
-                continue;
+            if (fd >= bestFd)
+                continue;   // already have a closer one
             if (!isViableStructurePos(Fortress, g, fpos.x, fpos.z, 0))
                 continue;
 
-            out->seed = seed;
-            out->bx = best.x;
-            out->bz = best.z;
-            out->bastionType = haveVariant ? sv.start : -1;
-            out->bdist = bestDist;
-            out->fx = fpos.x;
-            out->fz = fpos.z;
-            out->fdist = fd;
-            return 1;
+            if (foundFortress && bestFd < MAX_FORTRESS_DIST
+                    && fd < MAX_FORTRESS_DIST)
+                netherMultiFortress++;
+            bestFd = fd;
+            bestF = fpos;
+            foundFortress = 1;
         }
     }
-    return 0;
+
+    if (!foundFortress || bestFd >= MAX_FORTRESS_DIST)
+        return 0;
+
+    out->seed = seed;
+    out->bx = best.x;
+    out->bz = best.z;
+    out->bastionType = haveVariant ? sv.start : -1;
+    out->bdist = bestDist;
+    out->fx = bestF.x;
+    out->fz = bestF.z;
+    out->fdist = bestFd;
+    return 1;
 }
 
 int main(int argc, char **argv)
@@ -583,6 +629,9 @@ int main(int argc, char **argv)
             "", (unsigned long long)netherRejectedBasalt);
     fprintf(stderr, "  %-16s %llu structure matches rejected for no wood within %.0f blocks of spawn\n",
             "", (unsigned long long)rejectedNoWood, MAX_WOOD_DIST);
+    fprintf(stderr, "  %-16s %llu seeds had TWO fortresses in range of the bastion "
+                    "(where nearest-vs-first can differ)\n",
+            "", (unsigned long long)netherMultiFortress);
 
     FILE *f = fopen("output/overworld_by_type.json", "w");
     fprintf(f, "{\n");

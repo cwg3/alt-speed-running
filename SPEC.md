@@ -439,6 +439,36 @@ ender pearls are ~2.13% per ingot bartered, obsidian ~8.53%, and blaze
 rods a flat 50% per blaze. Each of those is a coin-flip that can decide
 a match, which is why the standard pins all three.
 
+**Bastion and fortress pairing.** The intended bastion is the nearest
+viable one to the origin, and it must beat its closest rival by
+`BASTION_ISOLATION` - a runner who cannot tell which bastion was meant
+has a guess, not a route. The fortress is then the nearest one to THAT
+BASTION, searched in the bastion's own fortress region and the eight
+around it.
+
+Both halves were wrong at different times, in the same way: they
+answered a question next to the one the rule asks. The fortress was
+once measured from spawn, which produced a 90% failure rate that was an
+artefact of the question. Later the search was centred on the ORIGIN
+and took the FIRST viable fortress in region scan order rather than the
+nearest to the bastion.
+
+**The second fix changed nothing measurable, and that is worth
+recording.** An A/B over the same 40 accepted seeds produced byte
+identical output, and a counter over 8,753 scanned seeds found ZERO
+cases where two fortresses sit within range of the bastion at once.
+Fortress regions are 27 chunks - 432 blocks - and the rule's radius is
+256, so at most one fortress is normally reachable and "first" and
+"nearest" cannot disagree. The fix is kept because it is correct by
+construction and because raising either distance limit would make the
+old code silently under-scan; the counter is kept so the exposure stays
+measured rather than assumed.
+
+The earlier note claiming two pool seeds overshot the fortress limit at
+279 and 324 blocks described the origin-measured version and was stale.
+No seed in the current pool exceeds it: tier-4 verification measured
+every passing pair's fortress at 137 to 249 blocks from its bastion.
+
 ## Mechanics
 
 | Guarantee | Status |
@@ -736,15 +766,6 @@ underlying contention is unfixed.
 
 Engineering debt that is not itself a match guarantee, kept here so it
 lives in one place rather than in somebody's memory.
-
-**The filter can pair a bastion with the wrong fortress.** Verified
-across the 21-seed pool: bastion distance held 21/21, fortress
-distance 19/21, with two seeds overshooting the 16-chunk limit at 279
-and 324 blocks. `seedtypes.c` scans regions independently and takes the
-nearest-to-origin bastion, but does not then search for the fortress
-nearest THAT bastion - so it can measure a pair the player would never
-walk. The two offenders were removed from the pool by hand; the filter
-will keep admitting them until the pairing is fixed.
 
 **Parallel seed verification.** Tier 3 of the pool build runs serially
 because four workers fail roughly 70% of the time. Serial is reliable
