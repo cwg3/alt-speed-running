@@ -62,6 +62,10 @@ export class BackendStack extends cdk.Stack {
 		const queueTable = new Table(this, 'QueueTable', {
 			partitionKey: { name: 'uuid', type: AttributeType.STRING },
 			billingMode: BillingMode.PAY_PER_REQUEST,
+			// Reaps rows left behind by clients that quit mid-search.
+			// queueJoin ignores stale rows regardless; this just keeps
+			// the table from growing without bound.
+			timeToLiveAttribute: 'expiresAt',
 		});
 
 		const matchesTable = new Table(this, 'MatchesTable', {
@@ -90,6 +94,23 @@ export class BackendStack extends cdk.Stack {
 				QUEUE_TABLE_NAME: queueTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
 				SEED_POOL_TABLE_NAME: seedPoolTable.tableName,
+				// TEMPORARY: restricts which seed types are drawn.
+				//
+				// Empty means draw evenly across all five, which is what
+				// a real ladder must do - an even mix is the whole point
+				// of having five types, and this MUST be cleared before
+				// anyone but us plays.
+				//
+				// Set here in the stack rather than by hand on the
+				// function, because a `cdk deploy` overwrites the
+				// environment from this file: a value set through the
+				// console silently disappeared on the next deploy and
+				// nobody noticed until the draws changed.
+				//
+				// Currently limited to the two land openings while the
+				// ocean routes are being practised - buried treasure and
+				// shipwreck both need the kelp/ravine/bubble technique.
+				SEED_TYPE_BIAS: process.env.SEED_TYPE_BIAS ?? 'village,desert_temple',
 			},
 		});
 		sessionsTable.grantReadData(queueJoinFn);
@@ -155,15 +176,63 @@ export class BackendStack extends cdk.Stack {
 			environment: {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
+				PLAYERS_TABLE_NAME: playersTable.tableName,
 			},
 		});
 		sessionsTable.grantReadData(liveMatchFn);
-		matchesTable.grantReadData(liveMatchFn);
+		// Writes now: the poll doubles as a heartbeat, and resolves a
+		// match whose other player has gone silent.
+		matchesTable.grantReadWriteData(liveMatchFn);
+		playersTable.grantReadWriteData(liveMatchFn);
 
 		api.addRoutes({
 			path: '/matches/{matchId}/live',
 			methods: [HttpMethod.GET],
 			integration: new HttpLambdaIntegration('LiveMatchIntegration', liveMatchFn),
+		});
+
+		// Claims a player's run start, once and only once per match.
+		// The client picks the moment (its first playable tick, so
+		// loading time is not charged to the run); the server owns the
+		// record, so quitting and rejoining cannot mint a fresh 0:00.
+		const startRunFn = new NodejsFunction(this, 'StartRunFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'startRun.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			environment: {
+				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				MATCHES_TABLE_NAME: matchesTable.tableName,
+			},
+		});
+		sessionsTable.grantReadData(startRunFn);
+		matchesTable.grantReadWriteData(startRunFn);
+
+		api.addRoutes({
+			path: '/matches/start',
+			methods: [HttpMethod.POST],
+			integration: new HttpLambdaIntegration('StartRunIntegration', startRunFn),
+		});
+
+		// Both players voting that a seed is unplayable voids the match
+		// with no rating change and pulls the seed from circulation.
+		const badSeedFn = new NodejsFunction(this, 'BadSeedFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'badSeed.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			environment: {
+				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				MATCHES_TABLE_NAME: matchesTable.tableName,
+				SEED_POOL_TABLE_NAME: seedPoolTable.tableName,
+			},
+		});
+		sessionsTable.grantReadData(badSeedFn);
+		matchesTable.grantReadWriteData(badSeedFn);
+		seedPoolTable.grantReadWriteData(badSeedFn);
+
+		api.addRoutes({
+			path: '/matches/bad-seed',
+			methods: [HttpMethod.POST],
+			integration: new HttpLambdaIntegration('BadSeedIntegration', badSeedFn),
 		});
 
 		const forfeitMatchFn = new NodejsFunction(this, 'ForfeitMatchFunction', {

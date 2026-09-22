@@ -69,7 +69,24 @@ const MIN_GAP_MS: Partial<Record<SplitName, { after: SplitName; ms: number }>> =
 
 // Allows for clock skew and request latency between the client's run
 // timer and the server's view of when the match started.
-const WALL_CLOCK_TOLERANCE_MS = 60_000;
+//
+// This is deliberately small, and the asymmetry matters: the check only
+// rejects claiming MORE elapsed time than has really passed, which is
+// the cheating direction - asserting you are further along than the
+// clock allows. Reporting a split late is always fine.
+//
+// It was 60s, which let a client claim to be a full minute ahead of
+// real time on every split without flagging. A synthetic opponent did
+// exactly that six times in a row and the match came back clean. A
+// minute of fake progress is enough to pressure an opponent into
+// resetting a good run, so the tolerance is now only as large as
+// latency and skew actually need.
+//
+// The client's own timer starts AFTER the server writes the match (the
+// world still has to generate), so honest clients report less elapsed
+// time than the server measures, not more. That gives this bound a
+// wide margin in the safe direction.
+const WALL_CLOCK_TOLERANCE_MS = 10_000;
 
 export interface SplitCheck {
 	ok: boolean;

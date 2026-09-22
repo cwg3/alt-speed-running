@@ -28,6 +28,19 @@ const SEED_POOL_TABLE_NAME = process.env.SEED_POOL_TABLE_NAME!;
 // match quality for someone who's already been waiting a while", not
 // the freshly-joining player's (whose wait is always ~0).
 const BASE_RATING_RANGE = 50;
+
+// A queue row is only a real waiting player for as long as that client
+// keeps polling. The client polls every 3s while searching, so a row
+// untouched for this long belongs to someone who quit, crashed, or
+// closed the game.
+//
+// Without this check a dead row waits forever, and because the range
+// widening below is driven by wait time, a dead row's allowed range
+// climbs to the cap - so the longer a ghost sat in the queue the more
+// aggressively it got matched against real players. A stranger who
+// closed the client mid-search would keep being paired into matches
+// they never joined, stranding whoever matched them.
+const QUEUE_STALE_MS = 30_000;
 const RANGE_GROWTH_PER_SECOND = 10;
 const MAX_RATING_RANGE = 500;
 
@@ -52,6 +65,14 @@ export const handler = async (
 	// it. Only the caller that finds an opponent gets matched:true, so
 	// without this the other side sees an empty queue, re-queues itself
 	// and waits forever while its match sits pending.
+	//
+	// KEEP THIS RESPONSE IN STEP WITH THE ONE AT THE END OF THE HANDLER.
+	// Every seed field has to appear in three places - the match row,
+	// the creator's response, and this one - and smithX/smithZ was once
+	// added to the first two only. The result was not a missing log
+	// line: whichever player created the match got the blacksmith's
+	// position and the other did not, on the same seed, which is
+	// exactly the asymmetry this project exists to remove.
 	const existingMatchId: string | undefined = player.Item.currentMatchId;
 	if (existingMatchId) {
 		const existing = await ddb.send(new GetCommand({
@@ -71,6 +92,14 @@ export const handler = async (
 					opponent: { uuid: them.uuid, username: them.username },
 					overworldSeed: existing.Item.overworldSeed,
 					netherSeed: existing.Item.netherSeed,
+					seedType: existing.Item.seedType ?? 'village',
+					structureX: existing.Item.structureX ?? 0,
+					structureZ: existing.Item.structureZ ?? 0,
+					bastionType: existing.Item.bastionType ?? null,
+					bastionX: existing.Item.bastionX ?? 0,
+					bastionZ: existing.Item.bastionZ ?? 0,
+					smithX: existing.Item.smithX ?? null,
+					smithZ: existing.Item.smithZ ?? null,
 				}),
 			};
 		}
@@ -84,10 +113,23 @@ export const handler = async (
 
 	let bestOpponent: any = null;
 	let bestDiff = Infinity;
+	// Whether this player already has a row, and whether it is still
+	// live. A row left over from a previous session must not carry its
+	// old joinedAt forward - see the update below.
+	let myRowIsLive = false;
 	for (const candidate of waiting.Items ?? []) {
 		if (candidate.uuid === uuid) {
+			const mineLastSeen = candidate.lastSeenAt ?? candidate.joinedAt;
+			myRowIsLive = now - mineLastSeen <= QUEUE_STALE_MS;
 			continue; // can't match with yourself
 		}
+		// lastSeenAt is absent on rows written before it existed; fall
+		// back to joinedAt so those age out rather than living forever.
+		const lastSeen = candidate.lastSeenAt ?? candidate.joinedAt;
+		if (now - lastSeen > QUEUE_STALE_MS) {
+			continue; // client stopped polling - not actually waiting
+		}
+
 		const waitSeconds = (now - candidate.joinedAt) / 1000;
 		const allowedRange = Math.min(
 			MAX_RATING_RANGE,
@@ -101,18 +143,35 @@ export const handler = async (
 	}
 
 	if (!bestOpponent) {
-		// if_not_exists on joinedAt: repeated polls from the same player
-		// while waiting must not reset their wait-time clock, or the
-		// range-widening above would never actually widen for them.
+		// While a player is actively waiting, joinedAt must stay put or
+		// the range-widening above would never widen for them.
+		//
+		// But a row left behind by a previous session must not keep its
+		// old joinedAt. Someone who queued yesterday, quit, and came
+		// back would otherwise be credited with a day of waiting, which
+		// pins their allowed range at the cap - so a returning player
+		// gets paired with anyone at up to MAX_RATING_RANGE difference
+		// on their very first poll. That is exactly the mismatch the
+		// widening schedule exists to ramp into gradually.
+		const joinedAtClause = myRowIsLive
+			? 'joinedAt = if_not_exists(joinedAt, :now)'
+			: 'joinedAt = :now';
 		await ddb.send(new UpdateCommand({
 			TableName: QUEUE_TABLE_NAME,
 			Key: { uuid },
+			// lastSeenAt refreshes on every poll - that split between it
+			// and joinedAt is what separates "waiting" from "gone".
 			UpdateExpression: 'SET username = :username, skillRating = :rating, '
-				+ 'joinedAt = if_not_exists(joinedAt, :now)',
+				+ joinedAtClause + ', '
+				+ 'lastSeenAt = :now, expiresAt = :expires',
 			ExpressionAttributeValues: {
 				':username': player.Item.username,
 				':rating': myRating,
 				':now': now,
+				// DynamoDB TTL (seconds) so abandoned rows are reaped
+				// rather than accumulating forever. Correctness comes
+				// from the staleness check above; this is housekeeping.
+				':expires': Math.floor(now / 1000) + 3600,
 			},
 		}));
 		return {
@@ -143,8 +202,29 @@ export const handler = async (
 			ratingDiff: bestDiff,
 			overworldSeed: seedPair.overworldSeed,
 			netherSeed: seedPair.netherSeed,
+			seedType: seedPair.seedType,
+			structureX: seedPair.structureX,
+			structureZ: seedPair.structureZ,
+			bastionType: seedPair.bastionType,
+			bastionX: seedPair.bastionX,
+			bastionZ: seedPair.bastionZ,
+			// Village seeds only. DynamoDB rejects undefined, so these
+			// are written as null rather than omitted conditionally.
+			smithX: seedPair.smithX ?? null,
+			smithZ: seedPair.smithZ ?? null,
 			status: 'pending',
 			createdAt: now,
+			// Both players are demonstrably present at the moment the
+			// match is made, so the abandonment clock starts here
+			// rather than from nothing - otherwise a match whose
+			// opponent never polls would look abandoned from birth.
+			lastSeenAt: { [uuid]: now, [bestOpponent.uuid]: now },
+			// Per-player run starts, filled in by /matches/start at each
+			// player's first playable tick. Present but empty so that
+			// claim is a single conditional write rather than a
+			// create-the-map dance; createdAt is deliberately NOT used
+			// as a run start, because loading time differs by machine.
+			runStarts: {},
 		},
 	}));
 	// Delete both sides - the caller may already have a row from an
@@ -174,6 +254,14 @@ export const handler = async (
 			opponent: { uuid: bestOpponent.uuid, username: bestOpponent.username },
 			overworldSeed: seedPair.overworldSeed,
 			netherSeed: seedPair.netherSeed,
+			seedType: seedPair.seedType,
+			structureX: seedPair.structureX,
+			structureZ: seedPair.structureZ,
+			bastionType: seedPair.bastionType,
+			bastionX: seedPair.bastionX,
+			bastionZ: seedPair.bastionZ,
+			smithX: seedPair.smithX ?? null,
+			smithZ: seedPair.smithZ ?? null,
 		}),
 	};
 };

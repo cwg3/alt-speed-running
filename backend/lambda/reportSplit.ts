@@ -118,6 +118,21 @@ export const handler = async (
 		ExpressionAttributeValues: { ':elapsed': body.elapsedMs },
 	}));
 
+	// Reporting a split is proof of life, so it feeds the same
+	// abandonment clock the live poll does. Without this a client that
+	// reports splits but never polls - the synthetic opponent does
+	// exactly that - would look abandoned and hand away the match.
+	await ddb.send(new UpdateCommand({
+		TableName: MATCHES_TABLE_NAME,
+		Key: { matchId: body.matchId },
+		UpdateExpression: 'SET lastSeenAt.#uuid = :now',
+		ConditionExpression: 'attribute_exists(lastSeenAt)',
+		ExpressionAttributeNames: { '#uuid': reporterUuid },
+		ExpressionAttributeValues: { ':now': Date.now() },
+	})).catch(() => {
+		// Matches predating lastSeenAt have no map to write into.
+	});
+
 	if (body.splitName !== FINAL_SPLIT) {
 		return {
 			statusCode: 200,

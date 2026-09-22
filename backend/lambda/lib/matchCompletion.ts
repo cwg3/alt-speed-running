@@ -129,6 +129,21 @@ export async function applyMatchCompletion(
 		ExpressionAttributeValues: { ':delta': loserDelta },
 	}));
 
+	// Keep the deltas on the match so a result screen can show what the
+	// game actually did, rather than the client having to infer it.
+	await ddb.send(new UpdateCommand({
+		TableName: matchesTableName,
+		Key: { matchId },
+		UpdateExpression: 'SET #results = :r',
+		ExpressionAttributeNames: { '#results': 'results' },
+		ExpressionAttributeValues: {
+			':r': {
+				[winner.uuid]: { ratingDelta: winnerDelta, seasonPointsAwarded: seasonPoints },
+				[loser.uuid]: { ratingDelta: loserDelta, seasonPointsAwarded: 0 },
+			},
+		},
+	}));
+
 	// Clear the pointer so neither player is handed this finished match
 	// again on their next queue poll.
 	for (const player of [winner, loser]) {

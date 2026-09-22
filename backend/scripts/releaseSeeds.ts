@@ -1,0 +1,102 @@
+// Frees seed pairs that are marked used but belong to no live match.
+//
+//   npx tsx scripts/releaseSeeds.ts <seed-pool-table> <matches-table> [--dry-run]
+//
+// A pair is claimed when a match is created and never handed back:
+// completion does not release it, because a finished match's seed
+// should not be dealt again while its replay is still interesting. Over
+// a testing session that leaks the pool away - and pinning a single
+// seed for practice marks every other row used on purpose.
+//
+// This releases any row whose assignedMatchId is absent, or names a
+// match that is no longer pending. A row belonging to a match still in
+// progress is left alone: handing that seed to someone else mid-match
+// would put two players on the same world with different clocks.
+//
+// Deliberately a script rather than an inline loop. It is a bulk write
+// over the whole pool, which is exactly the kind of thing that should
+// be reviewable, re-runnable and dry-runnable rather than typed out
+// once into a shell.
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, ScanCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+
+const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+
+async function main() {
+	const poolTable = process.argv[2];
+	const matchesTable = process.argv[3];
+	const dryRun = process.argv.includes('--dry-run');
+	if (!poolTable || !matchesTable) {
+		console.error('usage: npx tsx scripts/releaseSeeds.ts <seed-pool-table> <matches-table> [--dry-run]');
+		process.exit(1);
+	}
+
+	// Paginate on LastEvaluatedKey. A filtered scan applies Limit
+	// before the filter, so an empty page does not mean the end.
+	const claimed: { seedPairId: string; assignedMatchId?: string }[] = [];
+	let startKey: Record<string, unknown> | undefined;
+	do {
+		const page = await ddb.send(new ScanCommand({
+			TableName: poolTable,
+			ProjectionExpression: 'seedPairId, assignedMatchId, used',
+			FilterExpression: '#u = :true',
+			ExpressionAttributeNames: { '#u': 'used' },
+			ExpressionAttributeValues: { ':true': true },
+			ExclusiveStartKey: startKey,
+		}));
+		for (const item of page.Items ?? []) {
+			claimed.push({
+				seedPairId: item.seedPairId,
+				assignedMatchId: item.assignedMatchId,
+			});
+		}
+		startKey = page.LastEvaluatedKey;
+	} while (startKey);
+
+	console.log(`${claimed.length} rows marked used`);
+
+	// Cache match lookups: a pinned pool has hundreds of rows with no
+	// assignedMatchId at all, and the few that have one often share it.
+	const pending = new Map<string, boolean>();
+	async function isPending(matchId: string): Promise<boolean> {
+		if (pending.has(matchId)) {
+			return pending.get(matchId)!;
+		}
+		const res = await ddb.send(new GetCommand({
+			TableName: matchesTable,
+			Key: { matchId },
+			ProjectionExpression: '#s',
+			ExpressionAttributeNames: { '#s': 'status' },
+		}));
+		const result = res.Item?.status === 'pending';
+		pending.set(matchId, result);
+		return result;
+	}
+
+	let released = 0;
+	let kept = 0;
+	for (const row of claimed) {
+		if (row.assignedMatchId && await isPending(row.assignedMatchId)) {
+			kept++;
+			continue;
+		}
+		if (!dryRun) {
+			await ddb.send(new UpdateCommand({
+				TableName: poolTable,
+				Key: { seedPairId: row.seedPairId },
+				UpdateExpression: 'SET #u = :false REMOVE assignedMatchId',
+				ExpressionAttributeNames: { '#u': 'used' },
+				ExpressionAttributeValues: { ':false': false },
+			}));
+		}
+		released++;
+	}
+
+	console.log(`${dryRun ? 'Would release' : 'Released'} ${released} rows`);
+	console.log(`Kept ${kept} rows belonging to matches still in progress`);
+}
+
+main().catch((err) => {
+	console.error(err);
+	process.exit(1);
+});
