@@ -67,11 +67,29 @@ public final class MatchWorldCreator {
 
 		GeneratorOptions generatorOptions = new GeneratorOptions(overworldSeed, true, false, dimensions);
 
+		// Easy, because that is what runners play on, and NOT locked.
+		//
+		// Toggling difficulty mid-run is a legitimate technique, not an
+		// exploit, and the mod must never restrict it:
+		//
+		//   woodlighting - with no flint and steel, a portal is lit by
+		//     setting wood beside the frame alight from lava. Hard mode
+		//     spreads fire far faster into the frame, so runners flip to
+		//     Hard for the ignition and straight back to Easy.
+		//   piglin bartering - Hard widens mob aggro range, which pulls
+		//     piglins to a trading pit much faster, and lets a runner
+		//     cluster adults and deal with gold-stealing babies before
+		//     taking lethal damage.
+		//
+		// Both players have the same option, so it costs nothing in
+		// fairness. hardcore stays false so difficulty is unlocked, and
+		// allowCommands stays false so this is still a clean survival
+		// world - the pause menu toggle does not need commands.
 		LevelInfo levelInfo = new LevelInfo(
 				worldName,
 				GameMode.SURVIVAL,
 				false,
-				Difficulty.NORMAL,
+				Difficulty.EASY,
 				false,
 				new GameRules(),
 				DataPackSettings.SAFE_MODE);

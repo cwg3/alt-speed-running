@@ -47,18 +47,17 @@ public final class SplitReporter {
 				SplitReportResult result = BackendClient.reportSplit(sessionToken, matchId, splitName, elapsedMs);
 				// Upload the timeline once the run is over, whichever way
 				// the result lands.
-				if (result.completed || result.alreadyCompleted) {
-					ReplayRecorder.uploadIfFinished();
-				}
 				if (result.completed) {
-					MatchState.finish("VICTORY  +" + result.winnerRatingDelta + " elo, +"
-							+ result.winnerSeasonPoints + " pts");
+					MatchEnd.complete(true, MatchState.opponentUsername,
+							result.winnerRatingDelta, result.winnerSeasonPoints);
 					SpeedrunMcAlt.LOGGER.info(
 							"[speedrunmcalt] Match complete - you win! rating {}{}, +{} season points",
 							result.winnerRatingDelta >= 0 ? "+" : "", result.winnerRatingDelta,
 							result.winnerSeasonPoints);
 				} else if (result.alreadyCompleted) {
-					MatchState.finish("DEFEAT - opponent finished first");
+					// Deltas aren't returned on this path; the live poller
+					// fills them in if it gets here first.
+					MatchEnd.complete(false, MatchState.opponentUsername, null, null);
 					SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Match already finished - opponent got there first");
 				}
 			} catch (Exception e) {

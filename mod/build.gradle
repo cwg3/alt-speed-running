@@ -35,3 +35,48 @@ java {
 	sourceCompatibility = JavaVersion.VERSION_1_8
 	targetCompatibility = JavaVersion.VERSION_1_8
 }
+
+
+// Lets several verification servers run side by side.
+//
+// Seed verification is bottlenecked on JVM and Minecraft startup -
+// about 11 seconds of the 12 a check takes - so the way to make a pool
+// build fast is to run several at once rather than to make each one
+// quicker. Loom puts every run in `run/` by default, so parallel
+// workers would fight over the same world directory and config.
+//
+//   ./gradlew runServer -PrunDir=run/w3
+//
+// Defaults to `run` so ordinary single runs are unchanged.
+loom {
+	runs {
+		server {
+			runDir = project.findProperty('runDir') ?: 'run'
+		}
+	}
+}
+
+
+// Dumps the exact command Loom uses to launch the server.
+//
+// Needed because Gradle takes a per-project lock, so several
+// `./gradlew runServer` invocations queue behind each other instead of
+// running side by side - parallel verification workers got zero
+// throughput until this was understood. Extracting the command once
+// lets the workers launch the JVM themselves and actually run
+// concurrently.
+tasks.register('printRunServer') {
+	dependsOn 'build'
+	doLast {
+		def t = tasks.named('runServer').get()
+		def out = new File(projectDir, 'run/launch.properties')
+		out.parentFile.mkdirs()
+		out.text = [
+			'main=' + t.mainClass.get(),
+			'classpath=' + t.classpath.asPath,
+			'jvmArgs=' + t.jvmArgs.join('\u0001'),
+			'args=' + t.args.join('\u0001'),
+		].join('\n')
+		println 'wrote run/launch.properties'
+	}
+}

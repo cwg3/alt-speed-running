@@ -64,16 +64,55 @@ public final class LiveMatchPoller {
 					}
 				}
 
+				// Tell the player their opponent is waiting on them. This
+				// poll is the only channel that carries it - there is no
+				// push - so a vote raised on the other side surfaces
+				// here or nowhere.
+				if (live.badSeedOpponent && !MatchState.opponentProposedBadSeed) {
+					MatchState.opponentProposedBadSeed = true;
+					SpeedrunMcAlt.LOGGER.info(
+							"[speedrunmcalt] {} voted BAD SEED - agree in the pause menu to void the match",
+							live.opponentUsername);
+				}
+
+				if (live.isVoided()) {
+					SpeedrunMcAlt.LOGGER.info(
+							"[speedrunmcalt] Match VOIDED - both players agreed the seed was unplayable");
+					try {
+						// Not a win and not a loss. Passing null for the
+						// rating numbers would make MatchEnd go and fetch
+						// them; zeroes say plainly that nothing moved.
+						MatchEnd.complete(false, live.opponentUsername,
+								Integer.valueOf(0), Integer.valueOf(0),
+								"VOIDED - bad seed, no rating change", 4000);
+					} catch (Throwable t) {
+						SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Void teardown failed", t);
+					}
+					return;
+				}
+
 				if (live.isComplete()) {
 					SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Match finished - winner {}", live.winnerUuid);
 					boolean iWon = live.winnerUuid != null
 							&& live.winnerUuid.equals(com.speedrunmcalt.menu.AltSession.uuid());
-					MatchState.finish(iWon
-							? "VICTORY"
-							: "DEFEAT - " + live.opponentUsername + " finished first");
-					// Covers losing the race, where this client never
-					// reports a final split of its own.
-					ReplayRecorder.uploadIfFinished();
+					try {
+						// Tears down the match: uploads the replay
+						// (covering the losing side, which never reports
+						// a final split of its own), leaves the world and
+						// shows the summary.
+						MatchEnd.complete(iWon, live.opponentUsername,
+								live.ratingDelta, live.seasonPoints);
+					} catch (Throwable t) {
+						// The catch below only wraps the network call, so
+						// anything thrown while HANDLING a result used to
+						// kill this thread outright - the match over on
+						// the server and the client never noticing. A
+						// swapped jar caused exactly that once; a null
+						// field or a bad screen transition would do the
+						// same. Better to log it and leave the player
+						// able to quit than to strand them silently.
+						SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Match teardown failed", t);
+					}
 					return;
 				}
 			} catch (Exception e) {

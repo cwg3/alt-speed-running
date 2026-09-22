@@ -12,6 +12,9 @@ public class SpeedrunMcAlt implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		// Runs on the integrated server when a match world starts, and
+		// no-ops for every other world.
+		com.speedrunmcalt.world.MatchWorldSetup.register();
 		LOGGER.info("speedrun-mc-alt loaded");
 	}
 

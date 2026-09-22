@@ -16,6 +16,20 @@
 		],
 		"client": [
 			"com.speedrunmcalt.SpeedrunMcAltClient"
+		],
+		"server": [
+			"com.speedrunmcalt.debug.NetherLocateHook",
+			"com.speedrunmcalt.debug.LootVerifyHook",
+			"com.speedrunmcalt.debug.SmithCheckHook",
+			"com.speedrunmcalt.debug.DiagHook",
+			"com.speedrunmcalt.debug.LavaCheckHook",
+			"com.speedrunmcalt.debug.LootCheckHook",
+			"com.speedrunmcalt.debug.PortalDiagHook",
+			"com.speedrunmcalt.debug.PortalVerifyHook",
+			"com.speedrunmcalt.debug.PortalPredictHook",
+			"com.speedrunmcalt.debug.RavineCheckHook",
+			"com.speedrunmcalt.debug.BastionTimeHook",
+			"com.speedrunmcalt.debug.PortalPlaceHook"
 		]
 	},
 	"mixins": [

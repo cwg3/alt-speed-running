@@ -54,6 +54,26 @@ public final class AltSession {
 		return error;
 	}
 
+	/**
+	 * Folds a finished match's result into the cached profile.
+	 *
+	 * These values are read once at connect time, so without this the
+	 * menu kept showing the rating the player had when they launched -
+	 * they could lose several matches and still be told they were on
+	 * 1500. Applying the delta locally avoids a round trip; the next
+	 * connect re-reads the authoritative value either way.
+	 */
+	public static void applyMatchResult(Integer ratingDelta, Integer seasonPointsAwarded) {
+		if (ratingDelta != null) {
+			skillRating += ratingDelta;
+		}
+		if (seasonPointsAwarded != null) {
+			seasonPoints += seasonPointsAwarded;
+		}
+		SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Profile now {} elo, {} pts",
+				skillRating, seasonPoints);
+	}
+
 	/** Proves account ownership to the backend. No-op if already connecting or ready. */
 	public static void connect() {
 		if (state == State.CONNECTING || state == State.READY) {

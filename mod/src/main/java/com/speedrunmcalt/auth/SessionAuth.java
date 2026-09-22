@@ -77,10 +77,28 @@ public final class SessionAuth {
 		throw new IOException("Session join failed with HTTP " + status + ": " + text);
 	}
 
+	/**
+	 * A random serverId for the Mojang join/hasJoined handshake.
+	 *
+	 * Hex, and deliberately short. The first version base64url-encoded
+	 * 16 bytes, which yields 22 characters and can include '-' and '_'.
+	 * Mojang's serverId field is limited to 20 characters and rejects
+	 * those symbols, so most values worked and the occasional one came
+	 * back "Invalid serverId" - an intermittent login failure that
+	 * looked like a server problem rather than a client bug.
+	 *
+	 * Eight bytes is 16 hex characters and 64 bits of entropy, which is
+	 * far more than enough for a value used once within seconds.
+	 */
 	public static String randomServerId() {
-		byte[] buf = new byte[16];
+		byte[] buf = new byte[8];
 		new SecureRandom().nextBytes(buf);
-		return Base64.getUrlEncoder().withoutPadding().encodeToString(buf);
+		StringBuilder hex = new StringBuilder(buf.length * 2);
+		for (byte b : buf) {
+			hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+			hex.append(Character.forDigit(b & 0xF, 16));
+		}
+		return hex.toString();
 	}
 
 	private static String readAll(InputStream in) throws IOException {

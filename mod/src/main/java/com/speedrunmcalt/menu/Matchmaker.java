@@ -93,8 +93,11 @@ public final class Matchmaker {
 				opponent = result.opponentUsername;
 				state = State.LAUNCHING;
 				SpeedrunMcAlt.LOGGER.info(
-						"[speedrunmcalt] Matched vs {} - matchId={} overworldSeed={} netherSeed={}",
-						result.opponentUsername, result.matchId,
+						"[speedrunmcalt] Matched vs {} - matchId={} type={} structure={},{} "
+								+ "bastion={}@{},{} overworldSeed={} netherSeed={}",
+						result.opponentUsername, result.matchId, result.seedType,
+						result.structureX, result.structureZ, result.bastionType,
+						result.bastionX, result.bastionZ,
 						result.overworldSeed, result.netherSeed);
 
 				QueueJoinResult match = result;
@@ -106,7 +109,23 @@ public final class Matchmaker {
 						ReplayRecorder.reset();
 						MatchState.matchId = match.matchId;
 						MatchState.sessionToken = token;
-						MatchState.matchStartMillis = System.currentTimeMillis();
+						// Deliberately NOT started here. MatchClock starts
+						// it on the first tick the player can actually
+						// play, so world generation, setup and loading are
+						// not charged to the run - they vary by hardware
+						// and would hand the faster machine free seconds.
+						// Set before the world is created: the setup hook
+						// fires as soon as the integrated server starts,
+						// and reads these to know what to guarantee.
+						MatchState.seedType = match.seedType;
+						MatchState.structureX = match.structureX;
+						MatchState.structureZ = match.structureZ;
+						MatchState.overworldSeed = match.overworldSeed;
+						MatchState.netherSeed = match.netherSeed;
+						MatchState.bastionX = match.bastionX;
+						MatchState.bastionZ = match.bastionZ;
+						MatchState.smithX = match.smithX;
+						MatchState.smithZ = match.smithZ;
 						MatchWorldCreator.createMatchWorld(client, "match-" + match.matchId,
 								match.overworldSeed, match.netherSeed);
 						LiveMatchPoller.start();

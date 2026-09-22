@@ -1,5 +1,6 @@
 package com.speedrunmcalt;
 
+import com.speedrunmcalt.match.MatchClock;
 import com.speedrunmcalt.match.MatchHud;
 import com.speedrunmcalt.match.ReplayRecorder;
 import com.speedrunmcalt.menu.AltKeybinds;
@@ -10,7 +11,9 @@ public class SpeedrunMcAltClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		// All only act while a match is active, so registering them
 		// unconditionally here is safe.
+		com.speedrunmcalt.client.GammaUnlock.apply();
 		MatchHud.register();
+		MatchClock.register();
 		ReplayRecorder.register();
 		AltKeybinds.register();
 

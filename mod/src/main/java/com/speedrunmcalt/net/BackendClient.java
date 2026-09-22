@@ -1,5 +1,6 @@
 package com.speedrunmcalt.net;
 
+import com.speedrunmcalt.SpeedrunMcAlt;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -45,7 +46,30 @@ public final class BackendClient {
 				resp.get("matchId").getAsString(),
 				opponent.get("username").getAsString(),
 				resp.get("overworldSeed").getAsLong(),
-				resp.get("netherSeed").getAsLong());
+				resp.get("netherSeed").getAsLong(),
+				optString(resp, "seedType", "village"),
+				optInt(resp, "structureX", 0),
+				optInt(resp, "structureZ", 0),
+				optString(resp, "bastionType", null),
+				optInt(resp, "bastionX", 0),
+				optInt(resp, "bastionZ", 0),
+				optInt(resp, "smithX", 0),
+				optInt(resp, "smithZ", 0));
+	}
+
+	/** Tolerates a backend older than this client, and nulls in JSON. */
+	private static String optString(JsonObject obj, String key, String fallback) {
+		if (!obj.has(key) || obj.get(key).isJsonNull()) {
+			return fallback;
+		}
+		return obj.get(key).getAsString();
+	}
+
+	private static int optInt(JsonObject obj, String key, int fallback) {
+		if (!obj.has(key) || obj.get(key).isJsonNull()) {
+			return fallback;
+		}
+		return obj.get(key).getAsInt();
 	}
 
 	public static SplitReportResult reportSplit(String sessionToken, String matchId,
@@ -80,11 +104,89 @@ public final class BackendClient {
 		}
 
 		String winnerUuid = resp.get("winnerUuid").isJsonNull() ? null : resp.get("winnerUuid").getAsString();
+
+		// Only present once the match is decided.
+		Integer ratingDelta = null;
+		Integer seasonPoints = null;
+		if (resp.has("yourResult") && !resp.get("yourResult").isJsonNull()) {
+			JsonObject yours = resp.getAsJsonObject("yourResult");
+			ratingDelta = yours.get("ratingDelta").getAsInt();
+			seasonPoints = yours.get("seasonPointsAwarded").getAsInt();
+		}
+
+		// Absent on a backend older than this client, hence the guards.
+		boolean badYours = false;
+		boolean badOpponent = false;
+		String badReason = null;
+		if (resp.has("badSeed") && resp.get("badSeed").isJsonObject()) {
+			JsonObject bad = resp.getAsJsonObject("badSeed");
+			badYours = bad.has("yours") && bad.get("yours").getAsBoolean();
+			badOpponent = bad.has("opponent") && bad.get("opponent").getAsBoolean();
+			badReason = optString(bad, "opponentReason", null);
+		}
+
 		return new LiveMatchResult(
 				resp.get("status").getAsString(),
 				winnerUuid,
 				opponent.get("username").getAsString(),
-				splits);
+				splits, ratingDelta, seasonPoints,
+				badYours, badOpponent, badReason);
+	}
+
+	/**
+	 * Claims this player's run start and returns when it began, as a
+	 * local-clock millisecond value.
+	 *
+	 * The server mints the timestamp once per player per match and
+	 * hands back the same one on every later call, so a client that
+	 * crashed and rejoined resumes the run it was already on instead of
+	 * starting a new one.
+	 *
+	 * The conversion matters. The server's answer is in ITS clock, and
+	 * the two machines do not necessarily agree - a client an hour off
+	 * would otherwise show an hour on the timer. So the elapsed time is
+	 * taken as a difference computed entirely server-side
+	 * (serverNow - runStartedAt) and subtracted from the local clock,
+	 * which leaves skew out of it altogether.
+	 */
+	public static long claimRunStart(String sessionToken, String matchId) throws IOException {
+		JsonObject body = new JsonObject();
+		body.addProperty("matchId", matchId);
+		JsonObject resp = post(API_BASE + "/matches/start", body, sessionToken);
+
+		long runStartedAt = resp.get("runStartedAt").getAsLong();
+		long serverNow = resp.get("serverNow").getAsLong();
+		boolean claimed = resp.has("claimed") && resp.get("claimed").getAsBoolean();
+
+		long elapsedMs = Math.max(0, serverNow - runStartedAt);
+		SpeedrunMcAlt.LOGGER.info(
+				"[speedrunmcalt] Run start {} - {} ms already elapsed",
+				claimed ? "claimed" : "resumed (rejoined an existing run)", elapsedMs);
+		return System.currentTimeMillis() - elapsedMs;
+	}
+
+	/**
+	 * Votes that this match's seed is unplayable.
+	 *
+	 * Takes both players: one vote records and waits, the second voids
+	 * the match with no rating change for either side and pulls the seed
+	 * from the pool. One player alone cannot void a match, because that
+	 * would just be a way to escape a loss.
+	 *
+	 * @return true once BOTH players have agreed and the match is void
+	 */
+	public static boolean voteBadSeed(String sessionToken, String matchId, String reason)
+			throws IOException {
+		JsonObject body = new JsonObject();
+		body.addProperty("matchId", matchId);
+		if (reason != null) {
+			body.addProperty("reason", reason);
+		}
+		JsonObject resp = post(API_BASE + "/matches/bad-seed", body, sessionToken);
+		boolean voided = resp.has("voided") && resp.get("voided").getAsBoolean();
+		SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Bad seed vote: {}",
+				voided ? "both agreed - match voided" : "recorded, waiting for opponent");
+		return voided;
 	}
 
 	/** Gives up the current match. The opponent is awarded the win. */

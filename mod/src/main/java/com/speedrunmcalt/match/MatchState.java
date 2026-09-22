@@ -25,6 +25,69 @@ public final class MatchState {
 	public static volatile int obsidianThisWindow = 0;
 	public static volatile int pearlsThisWindow = 0;
 
+	// What the world needs guaranteed, and where. Set by the matchmaker
+	// from the queue response, consumed once by MatchWorldSetup when the
+	// integrated server starts. Null seedType means no setup is pending,
+	// which is what stops a practice world being modified.
+	public static volatile String seedType = null;
+	public static volatile int structureX = 0;
+	public static volatile int structureZ = 0;
+	public static volatile long overworldSeed = 0;
+	public static volatile long netherSeed = 0;
+
+	// The bastion, so its chests can be topped up as the player nears
+	// it. Doing it at world creation cost 9 seconds of loading; doing
+	// it on portal entry would be the same 9 seconds mid-run. Waiting
+	// until the chunks are loaded naturally costs nothing.
+	// Set when a ruined portal had to be built because the seed's own
+	// one was missing or unusable. Null means vanilla's portal is being
+	// used, which is the majority case.
+	public static volatile net.minecraft.util.math.BlockPos placedPortal = null;
+
+	/**
+	 * The box around this seed's structure that is kept free of ambient
+	 * mobs and bats. Null in practice worlds, so spawning is untouched
+	 * there.
+	 *
+	 * Not for safety - for SOUND. Runners locate buried structures by
+	 * "pie-ray", reading the F3 pie chart for the entity and audio load
+	 * a nearby structure produces. Mobs rattling around inside one
+	 * pollute that reading, so a technique that should be precise turns
+	 * into guesswork - and whether it is noisy is luck of the seed.
+	 *
+	 * Built from the containers the loot pass actually found, NEVER
+	 * from the predicted structure box: prediction is exact in X and Z
+	 * and has been observed wrong in Y by fifty blocks. Using the
+	 * prediction gave a box hovering above the structure, which matched
+	 * nothing and silently cancelled nothing.
+	 */
+	public static volatile net.minecraft.util.math.BlockBox quietBox = null;
+
+	/**
+	 * The blacksmith's position on a village seed, or 0,0 if unknown.
+	 *
+	 * structureX/Z is the village's jigsaw ANCHOR, which is not the
+	 * building the player is going to. A village box can be 107 by 174
+	 * blocks; on one seed the smith was 54 blocks from the anchor and
+	 * the player, standing where they were sent, reported that the
+	 * village had no blacksmith at all.
+	 */
+	public static volatile int smithX = 0;
+	public static volatile int smithZ = 0;
+
+	public static volatile int bastionX = 0;
+	public static volatile int bastionZ = 0;
+	public static volatile boolean bastionLootApplied = false;
+
+	/**
+	 * The nether arrival check has run for this match.
+	 *
+	 * Reported from play: "really bad nether spawn - no terrain". A
+	 * runner who lands on a ledge over an open lava sea has no route,
+	 * and whether that happens is luck of where their portal linked.
+	 */
+	public static volatile boolean netherArrivalChecked = false;
+
 	// Identify the active match to the backend when reporting splits.
 	// Null when no ranked match is in progress, which is what
 	// SplitReporter checks before attempting any network call.
@@ -40,6 +103,12 @@ public final class MatchState {
 	public static final java.util.Map<String, Long> opponentSplits =
 			new java.util.concurrent.ConcurrentHashMap<>();
 	public static volatile String opponentUsername = null;
+	/**
+	 * The opponent has voted that this seed is unplayable and is waiting
+	 * on us. Set by the live poller, which is the only channel that
+	 * carries it - there is no push from the backend.
+	 */
+	public static volatile boolean opponentProposedBadSeed = false;
 
 	// Set when the match ends. Non-null freezes the HUD timer and swaps
 	// the header for the result, so a player who loses is actually told
@@ -47,7 +116,17 @@ public final class MatchState {
 	public static volatile String result = null;
 	public static volatile long resultAtMillis = 0;
 
+	/**
+	 * First write wins. Two paths can discover the same ending - a
+	 * forfeit and the live poller, or the poller and a split report -
+	 * and the run ended when the first of them noticed, not when the
+	 * last one got round to saying so. Overwriting would push the
+	 * frozen time forward by however long the second path took.
+	 */
 	public static void finish(String text) {
+		if (result != null) {
+			return;
+		}
 		resultAtMillis = System.currentTimeMillis();
 		result = text;
 	}
@@ -69,9 +148,27 @@ public final class MatchState {
 		pearlsThisWindow = 0;
 		matchId = null;
 		sessionToken = null;
+		seedType = null;
+		structureX = 0;
+		structureZ = 0;
+		overworldSeed = 0;
+		netherSeed = 0;
+		placedPortal = null;
+		quietBox = null;
+		smithX = 0;
+		smithZ = 0;
+		bastionX = 0;
+		bastionZ = 0;
+		bastionLootApplied = false;
+		netherArrivalChecked = false;
+		BarterSchedule.reset();
+		DropSchedule.reset();
+		MatchClock.reset();
 		mySplits.clear();
 		opponentSplits.clear();
 		opponentUsername = null;
+		opponentProposedBadSeed = false;
+		BadSeedVote.reset();
 		result = null;
 		resultAtMillis = 0;
 	}

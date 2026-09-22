@@ -10,10 +10,21 @@
 		"WorldRandomAccessor",
 		"SpawnerDeterminismMixin",
 		"SheepShearFairnessMixin",
-		"EndermiteFairnessMixin"
+		"EndermiteFairnessMixin",
+		"LootableContainerAccessor",
+		"WorldChunkAccessor",
+		"BlazeRodMixin",
+		"HoglinDropMixin",
+		"DrownedTridentMixin",
+		"SuspiciousStewMixin",
+		"WitherSkeletonCrowdMixin",
+		"GravelFlintMixin",
+		"TempleSpawnMixin"
 	],
 	"client": [
-		"TitleScreenMixin"
+		"TitleScreenMixin",
+		"GammaUnlockMixin",
+		"PauseMenuMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

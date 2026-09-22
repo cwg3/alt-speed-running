@@ -1,0 +1,108 @@
+package com.speedrunmcalt.match;
+
+import com.speedrunmcalt.SpeedrunMcAlt;
+import com.speedrunmcalt.net.BackendClient;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.minecraft.client.MinecraftClient;
+
+/**
+ * Starts the run timer when the player can actually play, once per run.
+ *
+ * Two requirements pull against each other here, and the history of
+ * this file is one of them being fixed at the other's expense.
+ *
+ * FAIRNESS. The clock used to start the moment the backend created the
+ * match, which charged the player for world generation, the mod's setup
+ * pass, and loading - a player arrived in the world with fifty seconds
+ * already gone. Loading time depends on hardware, so two players racing
+ * the same seed lose different amounts of run time to it and the faster
+ * machine wins ground that has nothing to do with skill.
+ *
+ * INTEGRITY. Fixing that by having the client mint its own start time
+ * on the first playable tick moved the authority onto the client, where
+ * it can simply be done again. Quitting to the title screen leaves the
+ * match pending, rejoining it minted a fresh 0:00 - on a seed whose
+ * structures you had already located. Free resets, unlimited, and the
+ * server's wall-clock check could not see it: that check only rejects
+ * claiming MORE elapsed time than has really passed, and a reset clock
+ * claims less.
+ *
+ * Both hold if the client chooses the MOMENT and the server owns the
+ * RECORD. The first playable tick still decides when the run starts, so
+ * nobody is charged for their loading; the server stores that instant
+ * once and returns it forever after, so nobody can claim it twice. A
+ * player who crashes and rejoins resumes the run they were on, which is
+ * the honest reading of a crash - it is a misfortune, not a reset.
+ */
+public final class MatchClock {
+	/**
+	 * Set while the claim request is in flight, so a request is not
+	 * fired on every tick of the round trip. Not a lock - it is only
+	 * ever touched from the client thread and the network thread's one
+	 * write at the end.
+	 */
+	private static volatile boolean claiming = false;
+
+	private MatchClock() {
+	}
+
+	public static void register() {
+		ClientTickEvents.END_CLIENT_TICK.register(MatchClock::tick);
+	}
+
+	/** Lets a new match claim a start after the previous one finished. */
+	public static void reset() {
+		claiming = false;
+	}
+
+	private static void tick(MinecraftClient client) {
+		// Only while a match is pending its start.
+		if (MatchState.matchId == null || MatchState.matchStartMillis > 0 || claiming) {
+			return;
+		}
+		if (client.player == null || client.world == null || client.isPaused()) {
+			return;
+		}
+
+		final String matchId = MatchState.matchId;
+		final String token = MatchState.sessionToken;
+		if (token == null) {
+			return;
+		}
+
+		claiming = true;
+
+		// Off the client thread. This is a network round trip, and
+		// blocking here would stall rendering at the exact moment the
+		// player expects to start moving.
+		Thread thread = new Thread(() -> {
+			long startMillis;
+			try {
+				startMillis = BackendClient.claimRunStart(token, matchId);
+			} catch (Exception e) {
+				// A run that cannot reach the backend still has to be
+				// playable. Falling back to a local start is the
+				// permissive choice, and it is the right one: the
+				// alternative is a player sitting in a world with no
+				// timer because of someone else's outage. The claim is
+				// still authoritative for anyone who can reach it, and
+				// the splits this client reports are checked against
+				// the server's own clock regardless.
+				SpeedrunMcAlt.LOGGER.warn(
+						"[speedrunmcalt] Could not claim run start - timing locally", e);
+				startMillis = System.currentTimeMillis();
+			}
+
+			// Do not resurrect the clock for a match that ended, or
+			// overwrite one that somehow already started, while the
+			// request was in flight.
+			if (matchId.equals(MatchState.matchId) && MatchState.matchStartMillis <= 0) {
+				MatchState.matchStartMillis = startMillis;
+				SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Run clock started");
+			}
+			claiming = false;
+		}, "speedrunmcalt-runstart");
+		thread.setDaemon(true);
+		thread.start();
+	}
+}
