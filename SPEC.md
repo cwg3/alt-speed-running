@@ -646,6 +646,11 @@ That is precisely the failure players had been reporting as "the
 bastion wasn't at the coords you gave me", and no tier below 4 could
 see it.
 
+Tier 4 was confirmed by hand on 2026-09-22: a player walked to the
+shipped bastion coordinate of pair 39c3b474 in a real match and found
+it, then bartered there. The harness and the product finally agree
+about the same world.
+
 **Measure generation, not the locator.** Tier 4's first version used
 `locateStructure` for ground truth and failed two good seeds. The
 locator walks outward through the structure region grid and returns the
