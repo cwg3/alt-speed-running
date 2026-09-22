@@ -38,6 +38,14 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 				String[] parts = new String(Files.readAllBytes(
 						Paths.get("netherlocate.txt")), "UTF-8").trim().split("\\s+");
 				String seed = parts[0];
+				// Hoisted so the CSV can carry them. The container count
+				// around the SHIPPED bastion coordinate is the whole
+				// point of this probe: a run of PASS rows proves the
+				// seeds are good, and proves nothing about whether the
+				// player is sent to the right place.
+				int probeX = Integer.MIN_VALUE;
+				int probeZ = Integer.MIN_VALUE;
+				int probeContainers = -1;
 				// "seed x z netherSeed": pretend to be a match world.
 				//
 				// A dedicated server has ONE seed, so every probe built
@@ -58,8 +66,10 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 				// point as well, to test whether a structure the locator
 				// missed is actually present there.
 				if (parts.length >= 3) {
-					int px = Integer.parseInt(parts[1]);
-					int pz = Integer.parseInt(parts[2]);
+					probeX = Integer.parseInt(parts[1]);
+					probeZ = Integer.parseInt(parts[2]);
+					int px = probeX;
+					int pz = probeZ;
 					ServerWorld nw = server.getWorld(World.NETHER);
 					net.minecraft.util.math.BlockBox probe =
 							new net.minecraft.util.math.BlockBox(
@@ -75,6 +85,7 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 								cp.getX(), cp.getY(), cp.getZ(), table);
 						if (++found >= 15) break;
 					}
+					probeContainers = found;
 					SpeedrunMcAlt.LOGGER.info("[netherprobe] {} containers within 48 blocks of {},{}",
 							found, px, pz);
 				}
@@ -112,6 +123,21 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 						fd < 0 ? "-" : String.valueOf(Math.round(fd)),
 						pass ? "PASS" : "FAIL");
 
+				// How far the coordinate we SHIP is from the bastion the
+				// game actually generated. This is the number a player
+				// experiences: -1 means no coordinate was probed, 0 means
+				// we sent them exactly right, and anything in the
+				// hundreds is the failure that was reported in play as
+				// "the bastion wasn't at the coords you gave me".
+				double shipErr = (probeX == Integer.MIN_VALUE || bastion == null) ? -1
+						: Math.hypot(bastion.getX() - probeX, bastion.getZ() - probeZ);
+
+				SpeedrunMcAlt.LOGGER.info(
+						"[netherlocate] shipped {},{} is {} blocks from the generated bastion, "
+								+ "{} containers found there",
+						probeX, probeZ,
+						shipErr < 0 ? "-" : String.valueOf(Math.round(shipErr)), probeContainers);
+
 				try (FileWriter out = new FileWriter("netherlocate.csv", true)) {
 					out.write(seed + ","
 							+ (bastion == null ? "" : bastion.getX()) + ","
@@ -119,7 +145,11 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 							+ (fortress == null ? "" : fortress.getX()) + ","
 							+ (fortress == null ? "" : fortress.getZ()) + ","
 							+ Math.round(bd) + "," + Math.round(fd) + ","
-							+ (pass ? "PASS" : "FAIL") + "\n");
+							+ (pass ? "PASS" : "FAIL") + ","
+							+ (probeX == Integer.MIN_VALUE ? "" : String.valueOf(probeX)) + ","
+							+ (probeZ == Integer.MIN_VALUE ? "" : String.valueOf(probeZ)) + ","
+							+ Math.round(shipErr) + ","
+							+ probeContainers + "\n");
 				}
 			} catch (Exception e) {
 				SpeedrunMcAlt.LOGGER.error("[netherlocate] failed", e);
