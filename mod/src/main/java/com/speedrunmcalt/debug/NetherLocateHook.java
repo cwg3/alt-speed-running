@@ -38,6 +38,22 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 				String[] parts = new String(Files.readAllBytes(
 						Paths.get("netherlocate.txt")), "UTF-8").trim().split("\\s+");
 				String seed = parts[0];
+				// "seed x z netherSeed": pretend to be a match world.
+				//
+				// A dedicated server has ONE seed, so every probe built
+				// with one could never reproduce the two-seed bug that
+				// put three bastions in the wrong place. Setting
+				// MatchState here makes the structure-seed mixin fire
+				// exactly as it does in a real match, so this harness
+				// finally has the shape of the product.
+				if (parts.length >= 4) {
+					com.speedrunmcalt.match.MatchState.netherSeed = Long.parseLong(parts[3]);
+					com.speedrunmcalt.match.MatchState.matchStartMillis = System.currentTimeMillis();
+					com.speedrunmcalt.match.MatchState.matchId = "probe";
+					SpeedrunMcAlt.LOGGER.info(
+							"[netherlocate] simulating a match world: world seed {}, nether seed {}",
+							seed, parts[3]);
+				}
 				// Optional "seed x z": scan for containers around that
 				// point as well, to test whether a structure the locator
 				// missed is actually present there.

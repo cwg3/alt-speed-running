@@ -367,41 +367,51 @@ it belongs in tier 3 - and it is the same class as every other gap
 found today: the filter proves a structure EXISTS and says nothing
 about whether a player can get to it.
 
-**cubiomes' nether positions are fine. `locateStructure` is not.**
-This was concluded backwards for a while and the record matters.
+**Nether structures were placed from the WRONG SEED.** This was the
+foundational defect, and it sat under everything else for days.
 
-A player walked to a shipped bastion coordinate and found nothing, so
-the positions were checked against `ServerWorld.locateStructure` - the
-call `/locate` uses - on the assumption that the game must be
-authoritative. It disagreed on 6 of 20 seeds, and that was written up
-as "cubiomes is wrong 30% of the time".
+A match world uses two seeds - overworld and nether - so that knowing
+one dimension cannot tell you the other. Biomes honoured that. Structures
+never did. `ChunkStatus.STRUCTURE_STARTS` calls
 
-It is the other way round. On seed 132890337480255:
+    generator.setStructureStarts(accessor, chunk, manager, world.getSeed())
 
-| source | bastion |
-|---|---|
-| cubiomes | 112,-208 |
-| Chunkbase | 88,-193 |
-| `locateStructure` | **-368,192** |
+and `world.getSeed()` is the WORLD seed, whichever dimension's generator
+is running. So every bastion and fortress in a match nether was laid out
+by `overworldSeed`, while every coordinate shipped to players came from
+`netherSeed`.
 
-A direct probe found **twelve bastion chests within 48 blocks of
-88,-193**, including `bastion_hoglin_stable` - the exact type the pool
-shipped. So cubiomes and Chunkbase name the real bastion, 237 blocks
-from origin, and `locateStructure` returned one 415 blocks away while
-ignoring it.
+The consequences were all silent and were misdiagnosed three times:
 
-The client-side "correction" built on that conclusion is **disabled**.
-Turning it on would have replaced correct coordinates with bad ones on
-a third of seeds.
+- players walked to three shipped bastion coordinates and found empty
+  nether;
+- the loot top-up scanned that emptiness and reported "no bastion
+  chests found" while working exactly as designed;
+- it was explained away first as an anchor-versus-centre offset, then
+  as cubiomes being wrong, then as `ServerWorld.locateStructure` being
+  wrong. A client-side "correction" was built on the second theory and
+  would have overwritten correct coordinates with bad ones.
 
-The lesson is not "cubiomes is trustworthy" - it is that *ask the game*
-only beats *ask a model* when the question is right.
-`locateStructure` answers something subtler than "where is the nearest
-bastion", and that was not checked before building on it.
+**Why it took so long: the harness never had the shape of the product.**
+Every probe generated a world from a SINGLE seed via `runServer`, and a
+single-seed world cannot reproduce a two-seed bug. The village and
+ravine checks were sound because those are overworld and single-seed;
+the nether was never once tested the way a match builds it. This is the
+same lesson already recorded here about Rosetta Java 8 versus the dev
+JVM - written down, then not applied where it mattered most.
 
-**Still unexplained:** the bastion top-up reported "no bastion chests
-found" in 23ms on that seed, while twelve chests sit inside the box it
-scanned. That is a real bug and it is not the coordinates.
+`NetherStructureSeedMixin` substitutes the nether generator's own seed,
+identified by its `MultiNoiseBiomeSource`. Verified in a match-shaped
+world: with the world seed set to the overworld's, the bastion now
+generates at the shipped coordinate with the shipped chest type.
+
+`debug/NetherLocateHook` takes an optional fourth argument to simulate
+a two-seed match world, so this class of bug is now reproducible
+offline.
+
+**The Divine Travel countermeasure works for the first time.** Until
+this fix the two dimensions were correlated, and the guarantee stated
+here was false.
 
 Vanilla baselines, for reference when building the remaining RNG work:
 ender pearls are ~2.13% per ingot bartered, obsidian ~8.53%, and blaze

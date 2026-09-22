@@ -19,6 +19,7 @@
 		"SuspiciousStewMixin",
 		"WitherSkeletonCrowdMixin",
 		"GravelFlintMixin",
+		"NetherStructureSeedMixin",
 		"TempleSpawnMixin"
 	],
 	"client": [

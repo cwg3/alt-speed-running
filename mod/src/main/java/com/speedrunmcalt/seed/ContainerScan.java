@@ -62,8 +62,15 @@ public final class ContainerScan {
 		int minChunkZ = (box.minZ >> 4) - CHUNK_MARGIN;
 		int maxChunkZ = (box.maxZ >> 4) + CHUNK_MARGIN;
 
+		int chunks = 0;
+		int candidates = 0;
+		int alreadyLoaded = 0;
 		for (int cx = minChunkX; cx <= maxChunkX; cx++) {
 			for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
+				chunks++;
+				if (world.getChunkManager().isChunkLoaded(cx, cz)) {
+					alreadyLoaded++;
+				}
 				// Generates the chunk if needed, which is what places the
 				// structure and its containers.
 				WorldChunk chunk = world.getChunk(cx, cz);
@@ -71,11 +78,12 @@ public final class ContainerScan {
 
 				// Union of built and not-yet-built block entities. A
 				// position can be in both, hence the set.
-				Set<BlockPos> candidates = new HashSet<>();
-				candidates.addAll(accessor.speedrunmcalt$getBlockEntities().keySet());
-				candidates.addAll(accessor.speedrunmcalt$getPendingBlockEntityTags().keySet());
+				Set<BlockPos> positions = new HashSet<>();
+				positions.addAll(accessor.speedrunmcalt$getBlockEntities().keySet());
+				positions.addAll(accessor.speedrunmcalt$getPendingBlockEntityTags().keySet());
+				candidates += positions.size();
 
-				for (BlockPos pos : candidates) {
+				for (BlockPos pos : positions) {
 					// IMMEDIATE builds the entity from its pending tag
 					// rather than returning null for one not yet made.
 					BlockEntity entity = chunk.getBlockEntity(pos, WorldChunk.CreationType.IMMEDIATE);
@@ -84,6 +92,17 @@ public final class ContainerScan {
 					}
 				}
 			}
+		}
+
+		// Diagnostic for the case that keeps happening: the scan returns
+		// nothing while the structure provably has chests. Distinguishes
+		// "no chunks", "chunks but no block entities" and "block
+		// entities but none lootable".
+		if (found.isEmpty()) {
+			com.speedrunmcalt.SpeedrunMcAlt.LOGGER.warn(
+					"[speedrunmcalt] ContainerScan found nothing: {} chunks visited, "
+							+ "{} already loaded, {} block entities seen",
+					chunks, alreadyLoaded, candidates);
 		}
 
 		Collections.sort(found, new Comparator<BlockPos>() {
