@@ -57,6 +57,17 @@ public final class LiveMatchPoller {
 				MatchState.opponentUsername = live.opponentUsername;
 				MatchState.opponentSplits.putAll(live.opponentSplits);
 
+				// Tells MatchClock this is a rejoin, so it does not show
+				// the planning countdown for a run already in progress.
+				// The first poll lands about three seconds in and world
+				// generation takes about twelve, so this is normally
+				// known well before the player reaches a playable tick -
+				// and if it is not, MatchClock closes the screen the
+				// moment it arrives.
+				if (live.yourRunHasStarted() && !MatchState.runAlreadyStarted) {
+					MatchState.runAlreadyStarted = true;
+				}
+
 				for (Map.Entry<String, Long> split : live.opponentSplits.entrySet()) {
 					if (reported.add(split.getKey())) {
 						SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] OPPONENT {} reached {} at {} ms",

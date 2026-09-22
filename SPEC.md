@@ -531,6 +531,25 @@ times (sub-5 theoretical), with much tighter distances — bastion within
 ZSG optimises a time attack, MCSR balances a race. Its `terrain_checker`
 idea is worth borrowing; its distances are not.
 
+**The countdown is shown once per run, not once per join.** A player who
+crashes out and rejoins is dropped straight back into the world with
+their clock still running. The ten seconds are planning time *before* a
+race; someone twelve minutes into one has already planned, and showing
+the screen again would take ten seconds off a run in progress.
+
+The client cannot work this out for itself. The countdown is shown on
+the first playable tick, and whether the run start is a fresh claim or a
+resume is only known when the claim is made - which happens deliberately
+*after* the countdown, so that nobody's loading is charged to their run.
+So the server says it: both the queue-join response and the live match
+poll carry `yourRunStartedAt`, and either one being present means skip.
+The queue-join answer arrives before the world is even created, so it
+normally beats the player to their first tick; the poll is the backstop,
+and closes the screen if it has already opened.
+
+Quitting *during* the countdown is not a rejoin by this rule - no run
+start was minted, so that player still gets their planning time.
+
 ## Disputes
 
 **Bad seed: both players, or nothing.** Either player can vote that a
@@ -655,13 +674,6 @@ explicit ERROR marker and the summary refuses to fold those in. That
 defence exists because 28 crashes were once counted as genuine zeroes
 and produced a confident, wrong "35 of 40 villages have no
 blacksmith". The contention itself is unfixed.
-
-**The seed-reveal countdown fires again on a rejoin.** A player who
-quits and comes back twelve minutes into a run is shown the ten-second
-planning screen a second time. Harmless - the clock correctly resumes
-rather than restarting - but they do not need to plan an opening they
-are already past, and it costs them ten seconds of a run in progress.
-Should be skipped when the run has already started.
 
 **The client explains every void as a bad-seed vote.** `LiveMatchPoller`
 prints "both players agreed the seed was unplayable" whenever it sees

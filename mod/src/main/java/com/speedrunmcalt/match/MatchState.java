@@ -98,6 +98,23 @@ public final class MatchState {
 	 */
 	public static volatile long countdownEndsAt = 0;
 
+	/**
+	 * The server says this player's run is already under way, so this is
+	 * a rejoin and the pre-race countdown must be skipped.
+	 *
+	 * Set by the live poller, which is the only thing that knows: the
+	 * countdown is shown on the first playable tick, and whether the run
+	 * start is a fresh claim or a resume is not known until the claim
+	 * itself - which deliberately happens AFTER the countdown, so that
+	 * nobody's loading is charged to their run.
+	 *
+	 * Seen in play: a player rejoined twelve minutes into a run and was
+	 * given ten seconds to plan an opening they were long past. The
+	 * clock correctly resumed, so those ten seconds came straight out of
+	 * a run in progress.
+	 */
+	public static volatile boolean runAlreadyStarted = false;
+
 	// Identify the active match to the backend when reporting splits.
 	// Null when no ranked match is in progress, which is what
 	// SplitReporter checks before attempting any network call.
@@ -172,6 +189,7 @@ public final class MatchState {
 		bastionLootApplied = false;
 		netherArrivalChecked = false;
 		countdownEndsAt = 0;
+		runAlreadyStarted = false;
 		BarterSchedule.reset();
 		DropSchedule.reset();
 		MatchClock.reset();

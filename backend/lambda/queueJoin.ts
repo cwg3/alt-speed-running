@@ -100,6 +100,14 @@ export const handler = async (
 					bastionZ: existing.Item.bastionZ ?? 0,
 					smithX: existing.Item.smithX ?? null,
 					smithZ: existing.Item.smithZ ?? null,
+					// Rejoining a match whose run has already begun. The
+					// client uses this to skip the ten-second seed-reveal
+					// countdown: it is planning time before a race, and
+					// this player's race is already running. Null when the
+					// match exists but they never got as far as starting -
+					// quitting during the countdown itself - and they do
+					// still get their planning time.
+					yourRunStartedAt: (existing.Item.runStarts ?? {})[uuid] ?? null,
 				}),
 			};
 		}

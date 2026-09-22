@@ -121,6 +121,12 @@ export const handler = async (
 			status: match.Item.status,
 			winnerUuid: match.Item.winnerUuid ?? null,
 			yourResult: results[you.uuid] ?? null,
+			// Whether THIS caller's run has already begun. The client
+			// uses it to skip the pre-race countdown on a rejoin: a
+			// player twelve minutes into a run does not need ten
+			// seconds to plan an opening they are long past, and
+			// showing it costs them that time from a run in progress.
+			yourRunStartedAt: (match.Item.runStarts ?? {})[you.uuid] ?? null,
 			badSeed: {
 				yours: Boolean(badSeedVotes[you.uuid]),
 				opponent: Boolean(opponentBadSeed),

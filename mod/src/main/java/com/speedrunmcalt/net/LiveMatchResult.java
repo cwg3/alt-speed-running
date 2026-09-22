@@ -17,10 +17,20 @@ public final class LiveMatchResult {
 	public final boolean badSeedOpponent;
 	/** What the opponent said was wrong with it, possibly empty. */
 	public final String badSeedReason;
+	/**
+	 * When THIS player's run began, in server-clock millis, or null if
+	 * it has not been claimed yet.
+	 *
+	 * Only its presence is used, not its value: it is how the client
+	 * knows it is rejoining a run already underway, and so must not
+	 * show the pre-race countdown again.
+	 */
+	public final Long yourRunStartedAt;
 
 	public LiveMatchResult(String status, String winnerUuid, String opponentUsername,
 			Map<String, Long> opponentSplits, Integer ratingDelta, Integer seasonPoints,
-			boolean badSeedYours, boolean badSeedOpponent, String badSeedReason) {
+			boolean badSeedYours, boolean badSeedOpponent, String badSeedReason,
+			Long yourRunStartedAt) {
 		this.status = status;
 		this.winnerUuid = winnerUuid;
 		this.opponentUsername = opponentUsername;
@@ -30,6 +40,12 @@ public final class LiveMatchResult {
 		this.badSeedYours = badSeedYours;
 		this.badSeedOpponent = badSeedOpponent;
 		this.badSeedReason = badSeedReason;
+		this.yourRunStartedAt = yourRunStartedAt;
+	}
+
+	/** This player's run is already underway on the server. */
+	public boolean yourRunHasStarted() {
+		return yourRunStartedAt != null;
 	}
 
 	public boolean isComplete() {

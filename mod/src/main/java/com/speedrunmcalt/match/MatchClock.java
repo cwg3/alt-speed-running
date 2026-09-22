@@ -83,7 +83,26 @@ public final class MatchClock {
 		// The screen pauses the game, which is what keeps the clock
 		// from starting - the isPaused() check below does the gating,
 		// and this needs no coordination with it.
-		if (MatchState.countdownEndsAt == 0) {
+		//
+		// Except on a rejoin. The countdown buys planning time before
+		// the race; a player who crashed out twelve minutes in has
+		// already planned, already run, and their clock is still going -
+		// ten seconds of the screen would be ten seconds taken off a run
+		// in progress. -1 marks it deliberately skipped, so this branch
+		// does not fire again on the next tick.
+		if (MatchState.runAlreadyStarted) {
+			if (MatchState.countdownEndsAt >= 0) {
+				MatchState.countdownEndsAt = -1;
+				SpeedrunMcAlt.LOGGER.info(
+						"[speedrunmcalt] Rejoining a run in progress - skipping the seed reveal");
+			}
+			// Close it if the player is already looking at it: the flag
+			// arrives from a poll, which can land after the screen has
+			// opened.
+			if (client.currentScreen instanceof SeedRevealScreen) {
+				client.openScreen(null);
+			}
+		} else if (MatchState.countdownEndsAt == 0) {
 			MatchState.countdownEndsAt = System.currentTimeMillis() + COUNTDOWN_MS;
 			SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Seed reveal: {} - race starts in {}s",
 					MatchState.seedType, COUNTDOWN_MS / 1000);

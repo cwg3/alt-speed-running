@@ -126,6 +126,11 @@ public final class Matchmaker {
 						MatchState.bastionZ = match.bastionZ;
 						MatchState.smithX = match.smithX;
 						MatchState.smithZ = match.smithZ;
+						// Must come after reset(), which clears it. Set
+						// before the world exists, so MatchClock knows
+						// not to show the planning countdown well before
+						// the first playable tick can ask.
+						MatchState.runAlreadyStarted = match.runAlreadyStarted;
 						MatchWorldCreator.createMatchWorld(client, "match-" + match.matchId,
 								match.overworldSeed, match.netherSeed);
 						LiveMatchPoller.start();

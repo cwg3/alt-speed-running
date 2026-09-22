@@ -33,11 +33,21 @@ public final class QueueJoinResult {
 	 */
 	public final int smithX;
 	public final int smithZ;
+	/**
+	 * This is a rejoin and the run is already under way.
+	 *
+	 * Carried here as well as on the live poll because this response
+	 * arrives BEFORE the world is created, while the poll's first result
+	 * lands a few seconds into it - so this is the one that reliably
+	 * beats the player to their first playable tick.
+	 */
+	public final boolean runAlreadyStarted;
 
 	private QueueJoinResult(boolean matched, String matchId, String opponentUsername,
 			long overworldSeed, long netherSeed, String seedType,
 			int structureX, int structureZ, String bastionType,
-			int bastionX, int bastionZ, int smithX, int smithZ) {
+			int bastionX, int bastionZ, int smithX, int smithZ,
+			boolean runAlreadyStarted) {
 		this.matched = matched;
 		this.matchId = matchId;
 		this.opponentUsername = opponentUsername;
@@ -51,18 +61,20 @@ public final class QueueJoinResult {
 		this.bastionZ = bastionZ;
 		this.smithX = smithX;
 		this.smithZ = smithZ;
+		this.runAlreadyStarted = runAlreadyStarted;
 	}
 
 	public static QueueJoinResult waiting() {
-		return new QueueJoinResult(false, null, null, 0, 0, null, 0, 0, null, 0, 0, 0, 0);
+		return new QueueJoinResult(false, null, null, 0, 0, null, 0, 0, null, 0, 0, 0, 0, false);
 	}
 
 	public static QueueJoinResult matched(String matchId, String opponentUsername,
 			long overworldSeed, long netherSeed, String seedType,
 			int structureX, int structureZ, String bastionType,
-			int bastionX, int bastionZ, int smithX, int smithZ) {
+			int bastionX, int bastionZ, int smithX, int smithZ,
+			boolean runAlreadyStarted) {
 		return new QueueJoinResult(true, matchId, opponentUsername, overworldSeed, netherSeed,
 				seedType, structureX, structureZ, bastionType, bastionX, bastionZ,
-				smithX, smithZ);
+				smithX, smithZ, runAlreadyStarted);
 	}
 }

@@ -54,7 +54,8 @@ public final class BackendClient {
 				optInt(resp, "bastionX", 0),
 				optInt(resp, "bastionZ", 0),
 				optInt(resp, "smithX", 0),
-				optInt(resp, "smithZ", 0));
+				optInt(resp, "smithZ", 0),
+				resp.has("yourRunStartedAt") && !resp.get("yourRunStartedAt").isJsonNull());
 	}
 
 	/** Tolerates a backend older than this client, and nulls in JSON. */
@@ -125,12 +126,21 @@ public final class BackendClient {
 			badReason = optString(bad, "opponentReason", null);
 		}
 
+		// Likewise absent on an older backend, which simply means the
+		// countdown keeps its old unconditional behaviour rather than
+		// the client guessing.
+		Long yourRunStartedAt = null;
+		if (resp.has("yourRunStartedAt") && !resp.get("yourRunStartedAt").isJsonNull()) {
+			yourRunStartedAt = resp.get("yourRunStartedAt").getAsLong();
+		}
+
 		return new LiveMatchResult(
 				resp.get("status").getAsString(),
 				winnerUuid,
 				opponent.get("username").getAsString(),
 				splits, ratingDelta, seasonPoints,
-				badYours, badOpponent, badReason);
+				badYours, badOpponent, badReason,
+				yourRunStartedAt);
 	}
 
 	/**
