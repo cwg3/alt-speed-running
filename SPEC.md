@@ -428,7 +428,7 @@ a match, which is why the standard pins all three.
 | Sheep shearing standardised | built |
 | Endermite spawn standardised | built |
 | Death: respawn and continue, inventory recoverable | built (vanilla behaviour, deliberately unchanged) |
-| Disconnect mid-match: rejoining resumes the same run | built — the server owns the run start, so a crash cannot reset the clock |
+| Disconnect mid-match: rejoining resumes the same run | built — **confirmed in play**: a rejoin resumed at 12:30, not 0:00 |
 | Disconnect mid-match: never rejoining | built — the opponent's next poll awards them the match after 10 min of silence |
 | Disconnect mid-match: BOTH players gone | built — voided by `scripts/sweepAbandoned.ts`, no rating change, seed returned |
 
@@ -655,6 +655,13 @@ explicit ERROR marker and the summary refuses to fold those in. That
 defence exists because 28 crashes were once counted as genuine zeroes
 and produced a confident, wrong "35 of 40 villages have no
 blacksmith". The contention itself is unfixed.
+
+**The seed-reveal countdown fires again on a rejoin.** A player who
+quits and comes back twelve minutes into a run is shown the ten-second
+planning screen a second time. Harmless - the clock correctly resumes
+rather than restarting - but they do not need to plan an opening they
+are already past, and it costs them ten seconds of a run in progress.
+Should be skipped when the run has already started.
 
 **The client explains every void as a bad-seed vote.** `LiveMatchPoller`
 prints "both players agreed the seed was unplayable" whenever it sees
