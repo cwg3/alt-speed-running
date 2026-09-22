@@ -693,6 +693,33 @@ Filter on `hasChildren()`: the map carries placeholder entries for
 features considered and not placed, and counting those would turn "no
 bastion here" into a confident wrong coordinate.
 
+5. **overworld opening** — runs the REAL `MatchWorldSetup` in a
+   generated match world and then asks whether the opening it was
+   supposed to create is actually there.
+   `seed-filter/verify-routes.sh`. Roughly 40 s per pair.
+
+Tier 5 exists because tier 4 verified the nether and nothing verified
+the overworld. The filter checks that a structure is PREDICTED near
+spawn and then trusts the runtime to supply everything a route needs -
+lava to cast a portal from, a portal that can be lit, chests with a
+floor under them. Nobody ever checked that the supplying WORKED, and
+twice it did not: `RuinedPortalPlacer.place` and `LavaPoolPlacer.place`
+both report failure through a return value that was discarded at the
+call site. The first shipped a player into open ocean with no portal
+and no lava.
+
+What tier 5 asserts, per type: `setupFailure` is null; a ruined portal
+seed has a usable portal, vanilla's or placed; village and desert
+temple have BUCKETABLE lava near the objective and containers at it;
+shipwreck and buried treasure have a usable magma ravine.
+
+**Count what a runner can reach.** The first version of the lava check
+counted any lava source between y4 and y80 and returned 1269 for a
+village - deep underground lava is nearly everywhere, and a check that
+passes everything is not a check. It now counts source blocks with air
+directly above, within 24 blocks of the surface: lava a player can
+actually put in a bucket. The same seeds then scored 17 to 64.
+
 Every tier past the first exists because a requirement was silently
 unchecked and shipped. Villages went out without blacksmiths until one
 turned up in a live match — twice, because the first fix verified a

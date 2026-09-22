@@ -284,7 +284,20 @@ public final class MatchWorldSetup {
 				// Both openings cast a portal from a lava pool, and
 				// lava lakes are terrain features rather than
 				// structures, so they cannot be filtered for.
-				LavaPoolPlacer.place(world, seed, x, z);
+				// The return value is how many pools were actually
+				// placed, and ignoring it was the same mistake made
+				// with the ruined portal placer: a guarantee that
+				// quietly failed and shipped anyway. Both openings cast
+				// a portal from lava, so no lava is no route.
+				int pools = LavaPoolPlacer.place(world, seed, x, z);
+				if (pools == 0) {
+					MatchState.setupFailure =
+							"no lava pool could be placed near the objective - "
+									+ "this opening casts its portal from lava";
+					SpeedrunMcAlt.LOGGER.error(
+							"[speedrunmcalt] GUARANTEE FAILED: {} (seed {} at {},{})",
+							MatchState.setupFailure, seed, x, z);
+				}
 				break;
 			case "ruined_portal": {
 				// Keep vanilla's portal when it is good; build one only
