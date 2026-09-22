@@ -18,3 +18,6 @@ clean:
 
 query: query.c cubiomes
 	$(CC) -O3 -o query query.c $(CUBIOMES)/libcubiomes.a -lm -lpthread
+
+seedtypes: seedtypes.c cubiomes
+	$(CC) -O3 -o seedtypes seedtypes.c $(CUBIOMES)/libcubiomes.a -lm -lpthread

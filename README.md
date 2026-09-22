@@ -142,3 +142,31 @@ be argued with.
 
 Clone with `--recurse-submodules`, or run
 `git submodule update --init` afterwards.
+
+
+## Recommended settings
+
+**Brightness: set `gamma:5.0` in `options.txt`.**
+
+Vanilla caps the brightness slider at 100% (`gamma:1.0`). Speedrun rules
+explicitly permit editing `options.txt` to `gamma:5.0` — 500% — and
+effectively every competitive player does, because dark underwater
+ravines and nether structures are otherwise very hard to read without
+burning time on torches.
+
+`alt` does not change lighting and does not set this for you: it is your
+config and your choice. But arriving on vanilla brightness puts you at a
+real disadvantage against anyone who knows to change it, so it is worth
+knowing that it is allowed rather than a grey area.
+
+Fullbright resource packs, or mods that push past 5.0 or alter shadow
+rendering, are NOT permitted.
+
+Where the file lives:
+
+- macOS: `~/Library/Application Support/minecraft/options.txt`
+- Windows: `%appdata%\.minecraft\options.txt`
+- Linux: `~/.minecraft/options.txt`
+
+Minecraft rewrites this file when it exits, so edit it with the game
+closed or the change will be lost.

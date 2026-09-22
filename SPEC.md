@@ -1,0 +1,625 @@
+# Match guarantees
+
+What `alt` promises about a match world, what it actually does today,
+and what it does not.
+
+This is the honest version. Anything marked **not built** is a promise
+the code does not currently keep — worth knowing before a stranger
+plays, because most of these were found only when a player hit them in
+a live match.
+
+**Some guarantees cannot be self-tested, and that is a third
+category.** "Never fired in play" means nobody has reached it yet. But
+a few promises are NEGATIVE or STATISTICAL, and no amount of playing
+by one person confirms them:
+
+- *Drowned never spawn holding a trident.* Not seeing an armed drowned
+  in a handful of runs is not evidence; tridents were always uncommon.
+- *Wither skeleton hordes never choke a corridor.* Choke hordes are
+  rare to begin with, and the thresholds here are invented rather than
+  measured.
+
+Both need many runs by people who know what the unmodified game feels
+like and would notice the absence. They are marked **needs runners**
+rather than left in the untested pile, because one more session of
+solo testing will not move them.
+
+**"Never fired in play" is its own category.** Those guarantees are
+written, compiled, and verified in a harness, but no real run has
+reached them. Today's record says that is not the same as working: a
+barter mixin that compiled and passed every check crashed the server
+thread at the first piglin, because mixin signatures are validated when
+the target class loads, not when the code builds.
+
+## The trade
+
+Match worlds are **not pure vanilla for their seed**. Some guarantees
+are found by filtering seeds; others are placed into the world after
+generation. The alternative — filter only — cannot reach comparable
+guarantees at any affordable cost, and a ladder meant to rank the best
+players needs runs that are comparable to each other.
+
+Every modification is listed here. That is the point: the objection to
+the incumbent is opacity, so anything we change has to be stated.
+
+Rows marked **[ours]** are deliberate departures from the established
+standard rather than implementations of it. They are choices, and they
+should be argued for rather than assumed.
+
+They are also **provisional**. They were set from first principles plus
+one runner's judgement, which is enough to build on and not enough to
+be confident about. Each should be put in front of experienced runners
+and revised on what they say, not defended because it is already in the
+code. Current departures:
+
+| | ours | standard |
+|---|---|---|
+| ruined portal iron | 27 nuggets (a full bucket) | 18 nuggets |
+| ruined portal obsidian | 2-4, varying by seed | unspecified |
+| ruined portal route | lava and water always available | 80/20 obsidian vs bucket |
+| seed type mix | even, 40 of each | unspecified |
+| wither skeleton crowding | max 4 within 12 blocks | unspecified |
+| nether arrival pad | built when <10% of nearby ground is standable | unspecified |
+
+The even type mix is the one most likely to be wrong. It means a
+quarter of matches open on buried treasure, which needs a technique
+not every runner has. That is either the ladder testing range, or it is
+a quarter of matches decided before anyone reaches the nether -
+and which of those it is cannot be settled from a spreadsheet.
+
+**Determinism is the hard constraint.** Both players race the same
+seed and must receive byte-identical worlds. Every placement derives
+from the match seed alone — never wall-clock, client state, or
+iteration order over an unordered collection. A difference would void
+the match and would do it intermittently.
+
+## Overworld
+
+### Seed types
+
+**Every spawn is runnable.** Vanilla can drop a player into open ocean
+or empty desert with no route at all; a filtered pool exists so that
+never happens and neither player loses to the spawn itself.
+
+A seed is good for exactly one opening route, never all of them.
+Requiring a village *and* a shipwreck *and* a desert temple near spawn
+drives the pass rate to nothing, so seeds are classified into one type
+and pooled separately.
+
+| Type | Distance from spawn | Status |
+|---|---|---|
+| Village | ≤ 7 chunks | built |
+| Desert temple | ≤ 5 chunks | built |
+| Ruined portal | ≤ 3 chunks | built |
+| Shipwreck | ≤ 4 chunks | built |
+| Buried treasure | ≤ 5 chunks | built |
+
+Distance is measured from the **actual world spawn**, not the origin.
+Minecraft searches outward for a valid spawn biome and routinely lands
+200–350 blocks from (0,0); measuring from the origin produced seeds
+whose "16 blocks from spawn" village was really 328 blocks away.
+
+**A wood source within 5 chunks of spawn — built (filter).** Reported
+from play: a desert temple seed with no tree within four or five
+chunks, which is unroutable rather than merely awkward — a desert
+village has oak buildings to fall back on, a temple has sandstone.
+
+The check is a **biome** check, not a tree check. It asks what biome
+each sampled column sits in, walking a 5-chunk radius from world spawn
+in 16-block steps. A forest with a bare patch at the sampled point
+still passes, and a lone oak in a savanna is still missed. What it
+reliably catches is the reported case: spawning with nothing wooded in
+range at all.
+
+The biome list is deliberately conservative, so the error runs toward
+**discarding good seeds rather than shipping unroutable ones**. It
+costs candidates — the filter reports how many matches it rejects on
+this rule, so a list or radius that has gone wrong is visible rather
+than silent.
+
+The honest version counts real logs in the generated world. That costs
+a world generation per candidate and would need the chunk-local
+treatment `ContainerScan` got, since the naive block scan is what
+killed the launcher's x86 JVM under Rosetta. Worth doing; it was not
+worth blocking this on.
+
+### Per type
+
+| Guarantee | Status |
+|---|---|
+| Village: blacksmith present | built — every village seed is now verified against a generated world (41% of jigsaw-passers actually qualify) |
+| Village: 3 iron in the smith's chest (+4 from the golem = 7) | built |
+| Village: **4 iron + 3 diamonds** as an alternative to the 7-iron threshold | built (verification) — the live pool predates it, see below |
+| Village: seed ships the blacksmith's position, not the village anchor | built |
+| Village: 3 lava pools ~2 chunks out | built (placed) |
+| Village + desert temple: river within 6 chunks (boat routing) | built (filter) |
+| Village: all five biome variants eligible (plains, desert, savanna, taiga, snowy) | built (filter) — the earlier taiga/snowy exclusion was **removed**, see below |
+| Desert temple: 7 iron, 13+ rotten flesh | built |
+| Desert temple: 3 lava pools | built (placed) |
+| Shipwreck / buried treasure: 7 iron equivalent, food | built |
+| Shipwreck / buried treasure: 2 magma ravines within 10 chunks, with bubble columns and kelp | built (world check) — matches the standard |
+| Ruined portal: 27 nuggets (= 3 ingots = one bucket) | built — **[ours]**, the standard is 18 nuggets |
+| Ruined portal: 2–4 obsidian, seed-varied | built — **[ours]**, not in the standard |
+| Ruined portal: light source | built |
+| Ruined portal: lava + water for the bucket route | built (placed) — **[ours]**; the standard splits obsidian/bucket 80/20 |
+| Ruined portal: above ground, not submerged, actually exists | built — checked at world creation, portal placed when vanilla's fails |
+| Unbroken shipwrecks: exactly 3 chests (supply, treasure, map) | built (placed) — verified against a real half-wreck that had 1 of 3 |
+| Shipwreck is reachable, not entombed in terrain | **not built** — found by a player vote, see below |
+| Flint drops mirrored between players (same gravel-break count) | built (2 per 20 breaks = vanilla 10%, flint guaranteed within 10) — never fired in play |
+| Villager trades locked and identical between worlds | **out of scope** — see below |
+| Drowned never spawn holding a trident | built — **needs runners**, not self-testable, see below |
+| No hostile mobs or bats inside desert temples (keeps pie-ray clean) | built — but see below, reported broken in play twice |
+| Suspicious stew never applies a harmful effect | built — never fired in play |
+| Craftable soups never poisonous | satisfied by vanilla — mushroom stew, rabbit stew and beetroot soup carry no effects at all |
+| Food guarantees count only food worth eating | built — rotten flesh counts at a desert temple and nowhere else |
+| Overworld structures stripped of entity noise that pollutes pie-ray | **not built — TBD**, scope undecided, see below |
+
+**Entity noise and pie-ray: not built, and deliberately left open.**
+The desert temple case is done — hostile mobs and bats are kept out of
+the temple's own box. What "other overworld structures" should mean is
+not settled, and the readings differ enough to matter:
+
+- Extending the same mob suppression to more structures is easy, but
+  for a **village** it stops being noise removal and becomes a
+  difficulty change: no zombies in the village is an advantage, not a
+  cleaner F3 chart.
+- Stripping non-mob decorative entities — item frames, armour stands,
+  paintings, boats — is balance-neutral, but 1.16 overworld structures
+  carry very few of them, so the real effect may be near zero.
+
+Left TBD rather than guessed at. It should be settled by someone who
+actually pie-rays, and the deciding question is which structure's
+entity load has thrown off a real reading.
+
+**Shipwrecks are not checked for reachability.** Reported by a
+bad-seed vote — "shipwreck buried above ground - didn't see any
+chests" — on seed seed#ed30, structure 192,160.
+
+All three chests existed and the normalisation correctly reported the
+wreck complete. They were at y62, y61 and y59, spread over sixteen
+blocks of x, at or below sea level with terrain on top.
+`ContainerScan` finds them because it reads chunk block-entity maps
+and does not care what is above them. The player cannot, because
+something is.
+
+This is the ruined portal rule with a different structure: *at least
+partly above ground, not entombed*. RP gets that check because two
+thirds of those seeds fail it; shipwrecks never got one, and vanilla
+buries them in seabed and beach quite happily.
+
+The fix mirrors `PortalVerify`: confirm at least one chest has a clear
+vertical path to open water or air. It needs the world generated, so
+it belongs in tier 3 alongside the magma ravine check that ocean seeds
+already pay for — which means it is close to free to add.
+
+**First bad seed found by the vote rather than by us.** That is the
+mechanism working as designed: a player hit something no test covered,
+said so in one line, and the line named the bug.
+
+**Villager trades are deliberately NOT normalised.** No competent
+runner trades with a villager the way a survival player does — the
+route does not pass through it — so locking trades would be work spent
+on a path nobody takes. Dropped rather than deferred: if this ever
+comes back it should be because a runner said it mattered, not because
+it was left on a list.
+
+**Villages: filtered by contents, not by biome.** All five vanilla
+village types are eligible. A village qualifies on what it holds:
+
+- a blacksmith — weaponsmith, toolsmith or armorer — with enough to
+  progress;
+- an iron threshold of 7 from structures plus the iron golem, **or**
+  4 iron and 3 diamonds;
+- a river biome and usable lava pools nearby (or enough obsidian in the
+  blacksmith chest to enter the nether).
+
+The **4 iron + 3 diamonds** branch is modelled. `VillageLoot` counts
+diamonds alongside iron, and `verify-villages.sh` accepts a village on
+either route: 7 iron from chests plus the golem's 4, or 4 iron and 3
+diamonds.
+
+The rule lives in exactly one place, and the verification writes out
+the seeds that pass it (`mod/run/village-qualified.txt`). The first
+time villages were selected, the rule was applied by hand on smith
+presence alone — which silently ignored the resource threshold
+entirely, and would have ignored the diamond branch too.
+
+**The live pool predates this.** Its 29 villages were chosen on "has a
+real smith chest", so every one is verified playable, but none was
+checked against either resource threshold. Re-verifying them is about
+seven minutes of world generation and has not been done.
+
+This replaces an exclusion of taiga and snowy villages on the grounds
+that they were the low-resource variants. That was the wrong
+mechanism: the standard constrains what a village CONTAINS, not which
+biome it sits in, and a cold village meeting the requirements is a
+legitimate seed. The exclusion also did not work — it sampled the
+biome at block resolution at the village position while the game picks
+the village variant from the quarter-scale noise grid at the chunk
+centre, so a taiga village reached a live match anyway.
+
+**Blacksmith: a piece name is not a chest.** The check asked whether
+the predicted structure contained a jigsaw piece whose name contained
+`armorer`, `weaponsmith` or `toolsmith`. A taiga village satisfied that
+and generated no smith chest at all: every container in it was
+`village_taiga_house` or an untagged workstation barrel. The iron
+guarantee landed in an ordinary house chest roughly a hundred blocks
+from the coordinate the player was given.
+
+Verification now generates the village and reads the real loot tables
+(`verify-villages.sh`, driving `LootVerifyHook`). It costs a world
+generation per candidate, which is why the cheap proxy existed. Two
+smithless villages reaching live matches settled that trade.
+
+Same failure as everywhere else in this document: **a proxy was
+checked instead of the thing itself.**
+
+**Temple mobs: the box was in the wrong place, twice.** The suppression
+mixin was correct from the start — it cancels natural and
+chunk-generation spawns for hostiles and bats inside the temple. What
+was wrong is where it thought the temple was.
+
+`MatchState.templeBox` was set from the *predicted* structure box. That
+prediction is exact in X and Z and unreliable in Y: one measured temple
+was predicted at y[64..78] with its chests at y53. So the mixin tested
+every mob against a box floating above the structure, matched nothing,
+and cancelled nothing. It reported success and changed the game not at
+all — which is why it was called fixed twice while a player kept
+finding mobs.
+
+The box is now built from the chests the loot pass actually found —
+X and Z from the prediction, which are trustworthy, and Y from real
+block entities. Loot top-up was never affected by this because
+`ContainerScan` reads whole chunk block-entity maps and ignores Y.
+
+Confirmed in play. A live desert temple reported `Temple quiet zone
+y[49..77] (chests at y53, predicted y[64..78])` — the predicted box
+started eleven blocks ABOVE the chests, which is precisely why the
+mixin had been cancelling nothing while reporting success.
+
+### Ruined portal
+
+cubiomes cannot predict whether a portal generates — the biome check
+runs after the portal's height is chosen, so it can silently fail — and
+measurement found only ~35% of otherwise-qualifying seeds usable: 20%
+have no portal at all, 45% generate underground.
+
+Rather than verifying and discarding two thirds of candidates, the mod
+checks at world creation (about 5ms) and **builds a portal when
+vanilla's is unusable**. Vanilla's own portal is kept wherever it is
+good — 6 of 20 in testing — so most RP seeds still show a real ruined
+portal with all its variety, and placement only touches the ones that
+would otherwise be dead.
+
+A placed frame is a correct minimum portal rather than a replica of
+vanilla's seven shapes: orientation, position, damage and the
+crying-obsidian rate all vary by seed, and it plays identically. Its
+chest is given the vanilla loot table so the normal guarantees apply to
+it with no special case.
+
+**This is the most visible thing the mod builds.** A placed portal is
+not at a vanilla-determined location, so "seed X has a portal at Y"
+stops being checkable against the game. It stays reproducible from the
+published algorithm — verifiable against this spec, not against
+Minecraft.
+
+## Nether
+
+Overworld and nether seeds are searched **independently** and paired
+afterwards. This deliberately breaks the correlation vanilla has
+between the two, which is what Divine Travel depends on.
+
+| Guarantee | Status |
+|---|---|
+| Independent overworld/nether seeds (Divine Travel broken) | built |
+| Bastion unambiguous: nearest, and 10 chunks clearer than any rival | built |
+| All four bastion types in the pool, recorded not filtered | built |
+| Piglin barters mirrored between players | built — confirmed in a live match |
+| Piglin barters: per 72 (8 gold blocks) — exactly 3 pearl trades, 6+ obsidian | built |
+| Piglin barters: baseline obsidian rate boosted ~35% above vanilla | built (8 trades per cycle, floor of 6) |
+| Bastion within **14 chunks** of nether spawn, and clearly closer than any rival | built (filter) |
+| Fortress within **16 chunks of that bastion** | built (filter) |
+| Open terrain paths between spawn, bastion and fortress | **not built** |
+| Nether arrival is not in Basalt Deltas | built (filter, ~4.4% of seeds rejected) |
+| Nether arrival has usable ground, not an open lava sea | built (checked on arrival, pad placed only when unrunnable) — **[ours]**; never fired in play |
+| Blaze rods: pity-capped and mirrored | built (6 per 12 kills, max 2-miss streak) — confirmed in a live match |
+| Bastion chests: 3 iron, 5 obsidian, 48–64 string, all four types | built — confirmed live on hoglin stable and bridge |
+| Hoglin porkchop drops normalised and mirrored | built — **player-credited kills only**, see below; still never fired in play |
+| Wither skeleton overcrowding ("choke" hordes) suppressed | built — **[ours]**, numbers invented; **needs runners**, see below |
+
+**Mirrored drops only apply to kills the game credits to a player.**
+Blaze rods, hoglin porkchops and flint all check `causedByPlayer`, and
+that is deliberate: the schedule is a QUEUE, and if ambient deaths
+consumed slots - a hoglin burning to death across the map, unseen -
+the two players' queues would drift apart and the mirroring would be
+worthless.
+
+The cost is a real hole. **Fire-cooking hoglins is a legitimate
+technique**, and a hoglin the player never damaged is not credited to
+them, so those kills fall through to vanilla RNG. A player who cooks
+gets vanilla variance; a player who melees gets the schedule. Reported
+from play: a hoglin killed with lava dropped vanilla loot and the
+schedule never built.
+
+Not obviously fixable without breaking the queue. Widening the test to
+"died anywhere near a player" would let distant deaths consume slots
+again. Worth putting to runners: does anyone actually cook hoglins
+often enough for the variance to matter?
+
+**The nether distance rules, corrected.** The standard is:
+
+- the intended bastion within **14 chunks of nether spawn**, and
+  significantly closer to the origin than any competing bastion;
+- the fortress within **16 chunks of that bastion** - not of spawn;
+- open terrain paths between spawn, bastion and fortress, so nobody is
+  walled off behind netherrack.
+
+This file previously measured both structures from spawn at 16 chunks.
+That was my own invention, introduced while "fixing" the rule and
+justified with the reasoning that a bastion-relative fortress could sit
+30 chunks from the origin. The reasoning was wrong: a runner goes
+spawn to bastion to fortress, and the leg that matters is the second
+one, not the distance back to a point nobody returns to. It was also
+strictly stricter, so it discarded seeds the standard accepts.
+
+**The open-path check is not built.** It needs the world generated, so
+it belongs in tier 3 - and it is the same class as every other gap
+found today: the filter proves a structure EXISTS and says nothing
+about whether a player can get to it.
+
+**cubiomes' nether positions are fine. `locateStructure` is not.**
+This was concluded backwards for a while and the record matters.
+
+A player walked to a shipped bastion coordinate and found nothing, so
+the positions were checked against `ServerWorld.locateStructure` - the
+call `/locate` uses - on the assumption that the game must be
+authoritative. It disagreed on 6 of 20 seeds, and that was written up
+as "cubiomes is wrong 30% of the time".
+
+It is the other way round. On seed 132890337480255:
+
+| source | bastion |
+|---|---|
+| cubiomes | 112,-208 |
+| Chunkbase | 88,-193 |
+| `locateStructure` | **-368,192** |
+
+A direct probe found **twelve bastion chests within 48 blocks of
+88,-193**, including `bastion_hoglin_stable` - the exact type the pool
+shipped. So cubiomes and Chunkbase name the real bastion, 237 blocks
+from origin, and `locateStructure` returned one 415 blocks away while
+ignoring it.
+
+The client-side "correction" built on that conclusion is **disabled**.
+Turning it on would have replaced correct coordinates with bad ones on
+a third of seeds.
+
+The lesson is not "cubiomes is trustworthy" - it is that *ask the game*
+only beats *ask a model* when the question is right.
+`locateStructure` answers something subtler than "where is the nearest
+bastion", and that was not checked before building on it.
+
+**Still unexplained:** the bastion top-up reported "no bastion chests
+found" in 23ms on that seed, while twelve chests sit inside the box it
+scanned. That is a real bug and it is not the coordinates.
+
+Vanilla baselines, for reference when building the remaining RNG work:
+ender pearls are ~2.13% per ingot bartered, obsidian ~8.53%, and blaze
+rods a flat 50% per blaze. Each of those is a coin-flip that can decide
+a match, which is why the standard pins all three.
+
+## Mechanics
+
+| Guarantee | Status |
+|---|---|
+| Difficulty starts Easy and is never locked | built |
+| Eye of ender throws standardised | built |
+| Spawner RNG standardised | built |
+| Sheep shearing standardised | built |
+| Endermite spawn standardised | built |
+| Death: respawn and continue, inventory recoverable | built (vanilla behaviour, deliberately unchanged) |
+| Disconnect mid-match: rejoining resumes the same run | built — the server owns the run start, so a crash cannot reset the clock |
+| Disconnect mid-match: never rejoining | built — the opponent's next poll awards them the match after 10 min of silence |
+| Disconnect mid-match: BOTH players gone | built — voided by `scripts/sweepAbandoned.ts`, no rating change, seed returned |
+
+Difficulty toggling is a legitimate technique and must never be
+restricted: Hard spreads fire faster when woodlighting a portal, and
+widens piglin aggro range for a bartering pit. Runners flip to Hard and
+straight back.
+
+### Nether arrival terrain
+
+Biome is filtered; terrain is not. A seed can pass every check and
+still drop the runner onto a sliver of netherrack over an open lava
+sea, which happened in testing.
+
+cubiomes cannot see terrain, so checking it means generating the nether
+spawn chunks for every candidate - a cost every type would pay, not
+just the ocean ones that already generate worlds. The alternative,
+consistent with how lava pools and portals are handled, is to place a
+small platform when the arrival point has nothing usable. Neither is
+built.
+
+**Predicted structure Y is not usable, and the code now says so.**
+A structure's start is built before terrain exists, so its X and Z are
+exact while its Y is where the structure would sit on flat ground.
+Real generation then moves it. Measured on this project:
+
+| structure | predicted | actual |
+|---|---|---|
+| desert temple | y[64..78] | chests at y53 |
+| shipwreck | y[90..98] | chest at y39 |
+
+Three separate features trusted it and quietly did nothing: a
+mob-suppression box hovering above its temple, a chest scan looking in
+empty air, and a loot verifier returning confident false negatives.
+Each reported success.
+
+The field is now named `predictedBox`, so using it is a decision, and
+`xzBox()` returns the footprint with Y replaced by the full column.
+Everything that only needs the footprint uses `xzBox()`; `ContainerScan`
+ignores Y and reads chunk block-entity maps, so that costs nothing.
+Anything needing a real vertical bound derives it from what it FINDS -
+the way the temple quiet zone is now built from its chests.
+
+**Abandonment resolves itself.** A match left pending forever used to
+need a human to clean it up, and it held a seed out of the pool while
+it sat there.
+
+The live poll is the heartbeat — a client asking for match state is
+demonstrably still playing — so no scheduler is needed for the common
+case. If one player has been silent for **10 minutes** while the other
+is polling, the one still there is awarded the match. Splits count as
+proof of life too, or a client that reports progress without polling
+would look abandoned and hand away a match it was winning.
+
+Abandoning has to cost the match. If it did not, quitting would be a
+way to deny an opponent a win they were about to earn — a stalemate on
+demand. Forfeiting is the honest version and is one click away.
+
+Ten minutes is deliberately generous: a player who crashes and
+relaunches is back well inside it, and rejoining resumes the same run
+rather than starting a new one. The cost of waiting is that an
+abandoned match lingers; the cost of being hasty is handing someone a
+loss while their game is still loading.
+
+When **both** players vanish nobody polls, so nothing fires. Those are
+swept out of band and **voided** — neither player was there, so there
+is nobody to award a win to and nobody who deserves a loss. The seed
+goes back to the pool, since nothing was wrong with it.
+
+## Disputes
+
+**Bad seed: both players, or nothing.** Either player can vote that a
+match's seed is unplayable. Nothing happens until the opponent agrees.
+When they do, the match is voided — no winner, and **neither rating
+moves** — and the seed is pulled from the pool permanently.
+
+| Guarantee | Status |
+|---|---|
+| Either player may raise a bad-seed vote | built |
+| A vote does nothing until the opponent agrees | built |
+| A voided match changes no ratings for either player | built |
+| The seed is quarantined, never dealt again | built |
+| Quarantined seeds are kept, with who voided and why, for review | built |
+| Never fired in a real match | — |
+
+The single-player version of this is an obvious exploit: someone losing
+a perfectly good run calls it bad and escapes without the rating loss.
+Requiring both is what makes it safe. Two opponents actively racing
+each other have no shared interest in lying, which makes their
+agreement a stronger signal than any check the pool build could run —
+and it needs no moderator, which is the entire point of this project.
+The rule is mechanical and its outcome is visible to both sides.
+
+**No timeout, deliberately.** If the opponent never agrees, the match
+simply carries on. A proposal that expired into a void would hand back
+the same exploit: raise it, disconnect, escape.
+
+Seeds pulled this way are flagged in place rather than deleted, and
+reviewed by the maintainers — never surfaced to players — via
+`scripts/reviewBadSeeds.ts`. Every row is a filter bug with evidence
+attached, and a cluster in one seed type points straight at that type's
+filter stage. A pool that silently shrinks teaches nothing.
+
+## Pool
+
+**189 seeds**, one quarantined by a bad-seed vote:
+
+| type | count |
+|---|---|
+| desert temple | 40 |
+| ruined portal | 40 |
+| shipwreck | 40 |
+| buried treasure | 40 |
+| village | 29 |
+
+Villages are short because they are the only type verified against a
+generated world: 130 candidates, 70 passed the cheap jigsaw check, and
+29 of those actually had a blacksmith chest. The other four types are
+filtered but not chest-verified, so their counts are round numbers and
+the village count is an honest one.
+
+For scale: the incumbent draws from roughly a million pre-vetted
+worlds. Ours is a test pool, not a production one — at this size seeds
+repeat quickly under real traffic, and did: one seed came up eight
+times in a row before the draw was made random.
+
+Built by `seed-filter/build-pool.sh` in three tiers of increasing cost:
+
+1. **cubiomes** — structures, distances, biomes, bastion type, wood
+   near spawn. Microseconds per seed.
+2. **jigsaw** — a cheap blacksmith PRE-filter. Needs Minecraft's
+   generator but no chunks, ~66 ms per seed. It tests a piece *name*,
+   which over-reports badly: 70 candidates passed here and only 29
+   survived tier 3.
+3. **generated world** — magma ravines for the ocean types, and real
+   blacksmith chests plus the iron/diamond threshold for villages.
+   Carvers and loot tables are both invisible to cubiomes, so the
+   world must be built and inspected. Roughly 12 s per seed, and the
+   reason a pool build takes half an hour.
+
+Every tier past the first exists because a requirement was silently
+unchecked and shipped. Villages went out without blacksmiths until one
+turned up in a live match — twice, because the first fix verified a
+piece name rather than a chest.
+
+**Parallel verification does not work.** Serial runs are reliable;
+four workers fail about 70% of the time, and a failed worker once got
+counted as a genuine result — turning 28 crashes into a reported "35
+of 40 villages have no blacksmith". The scripts now write an explicit
+ERROR marker so a failure can never be read as a zero, but the
+underlying contention is unfixed.
+
+## To do
+
+Engineering debt that is not itself a match guarantee, kept here so it
+lives in one place rather than in somebody's memory.
+
+**Parallel seed verification.** Tier 3 of the pool build runs serially
+because four workers fail roughly 70% of the time. Serial is reliable
+but slow: 70 village seeds is about 15 minutes, and a full rebuild
+including ocean ravines is hours. Fixing it would cut that around 4x.
+
+Cause never established. The likely candidate is several concurrent
+first-compiles contending on the shared Gradle cache — a worker copy
+has no build output until its first run. Two untried fixes:
+
+1. Pre-warm each worker copy with one serial build before fanning out.
+2. Give each worker its own `GRADLE_USER_HOME` so nothing is shared.
+   Heavier on disk, but removes the suspected cause outright.
+
+The consequence is already guarded: a crashed worker writes an
+explicit ERROR marker and the summary refuses to fold those in. That
+defence exists because 28 crashes were once counted as genuine zeroes
+and produced a confident, wrong "35 of 40 villages have no
+blacksmith". The contention itself is unfixed.
+
+**The client explains every void as a bad-seed vote.** `LiveMatchPoller`
+prints "both players agreed the seed was unplayable" whenever it sees
+`status: voided`, but the match row carries a `voidReason` and there
+is more than one. A match voided by the abandonment sweep reads
+`abandoned by both players` server-side and would still tell the
+player their seed was voted unplayable. Same class as the forfeit log
+below: the client asserting something the server did not say.
+
+**The client reports a forfeit it did not achieve.** `Forfeit` logs
+`Forfeited match <id>` when its request is sent, not when the backend
+accepts it. A forfeit racing a bad-seed void has already been refused
+server-side while the client logged success. Harmless today — the
+outcome was better for the player either way — but it means the client
+log is not evidence of what happened.
+
+**The pool's villages predate the resource rule.** Its 29 villages
+were selected on "has a real smith chest" alone, before the iron and
+diamond thresholds were wired into verification. Every one is verified
+playable; none has been checked against either threshold. Re-verifying
+is about seven minutes.
+
+**Seven guarantees have never run in a live match.** Flint mirroring,
+hoglin drops, drowned tridents, suspicious stew, wither skeleton
+crowding, the nether arrival pad, and shipwreck chest normalisation —
+the last verified in a generated world but not in a match. Today's
+record is that this category is where the real bugs are: a barter
+mixin that compiled and passed every harness check crashed the server
+thread at the first piglin.
