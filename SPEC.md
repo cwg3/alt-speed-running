@@ -550,6 +550,15 @@ and closes the screen if it has already opened.
 Quitting *during* the countdown is not a rejoin by this rule - no run
 start was minted, so that player still gets their planning time.
 
+Confirmed in play 2026-09-22. A player 20:46 into a run quit to title
+and re-queued: the match response arrived at 14:17:23, the skip was
+decided at 14:17:25 and the clock resumed at 20:46 with no reveal
+screen. Two seconds is the queue-join path, not the three-second poll,
+so the primary channel is the one that fired - the backstop was not
+needed. Fresh matches in the same session still showed the countdown
+normally, so the skip is scoped to rejoins rather than disabling the
+screen.
+
 ## Disputes
 
 **Bad seed: both players, or nothing.** Either player can vote that a
