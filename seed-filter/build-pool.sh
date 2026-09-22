@@ -85,6 +85,29 @@ rm -rf run/world
 rm -f run/smithbatch.txt
 
 echo
+echo
+echo "=== stage 2b: blacksmith VERIFICATION (generated worlds, ~15s each) ==="
+# The jigsaw check above is a PRE-FILTER, not an answer. It matches a
+# piece NAME containing armorer/weaponsmith/toolsmith, and a taiga
+# village satisfied that while generating no smith chest at all - every
+# container a village_taiga_house or an untagged workstation barrel.
+# Two smithless villages reached live matches that way.
+#
+# Measured: 40 raw -> 16 pass the jigsaw -> 5 have a real smith chest.
+# The pre-filter still earns its place (65ms to reject 60% beats 15s
+# each), but it cannot be the last word.
+python3 -c "
+import json, csv
+d = json.load(open('$ROOT/seed-filter/output/overworld_by_type.json'))
+coords = {str(r['seed']): (r['structure']['x'], r['structure']['z']) for r in d['village']}
+passed = [r[0] for r in csv.reader(open('$ROOT/mod/run/smith.csv')) if len(r) > 1 and r[1] == 'true']
+for s in passed:
+    x, z = coords[s]
+    print(s, x, z)
+" > run/village-candidates.txt
+bash "$ROOT/seed-filter/verify-villages.sh" run/village-candidates.txt 1
+
+echo
 echo "=== stage 3: magma ravine check (generated worlds, ~12s each) ==="
 # One world per seed. Stops as soon as PER_TYPE have passed, so a type
 # with a high pass rate costs proportionally less.
@@ -128,15 +151,20 @@ data = json.load(open(path))
 # Fail loudly on a missing result file rather than quietly shipping an
 # unfiltered pool - an unchecked village pool is what put a smithless
 # village into a live match.
+# village-qualified.txt comes from stage 2b, which GENERATES each
+# village and reads its real loot tables. smith.csv is only the cheap
+# pre-filter and must never be the thing that decides the pool - it
+# over-reports by about 3x.
 try:
-    smith = {r[0]: r[1] == 'true' for r in csv.reader(open(f'{root}/mod/run/smith.csv'))}
+    verified = {l.strip() for l in open(f'{root}/mod/run/village-qualified.txt') if l.strip()}
 except FileNotFoundError:
-    sys.exit('ERROR: no smith.csv - the blacksmith stage did not run. '
-             'Refusing to load an unfiltered village pool.')
+    sys.exit('ERROR: no village-qualified.txt - the blacksmith VERIFICATION '
+             '(stage 2b) did not run. Refusing to load a village pool checked '
+             'only by jigsaw piece name; that shipped smithless villages twice.')
 
 before = len(data['village'])
-data['village'] = [v for v in data['village'] if smith.get(str(v['seed']), False)][:per_type]
-print(f"village: {before} -> {len(data['village'])} with a blacksmith")
+data['village'] = [v for v in data['village'] if str(v['seed']) in verified][:per_type]
+print(f"village: {before} -> {len(data['village'])} with a verified smith chest")
 if len(data['village']) < per_type:
     print(f"  WARNING: only {len(data['village'])} of {per_type} - raise CANDIDATES")
 

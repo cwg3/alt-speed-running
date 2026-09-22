@@ -545,14 +545,23 @@ worlds. Ours is a test pool, not a production one — at this size seeds
 repeat quickly under real traffic, and did: one seed came up eight
 times in a row before the draw was made random.
 
-Built by `seed-filter/build-pool.sh` in three tiers of increasing cost:
+**The pool is rebuildable from this repo, but not reproducible.**
+`seedtypes` picks a random start seed on each run, so a rebuild
+produces a different, equally valid set - not the same seeds. The
+candidate JSON in `seed-filter/output/` is gitignored, so the exact
+21 seeds currently live exist only in DynamoDB. Commit that directory
+deliberately if a specific pool ever needs to be reproducible.
+
+Built by `seed-filter/build-pool.sh` in tiers of increasing cost:
 
 1. **cubiomes** — structures, distances, biomes, bastion type, wood
    near spawn. Microseconds per seed.
 2. **jigsaw** — a cheap blacksmith PRE-filter. Needs Minecraft's
    generator but no chunks, ~66 ms per seed. It tests a piece *name*,
-   which over-reports badly: 70 candidates passed here and only 29
-   survived tier 3.
+   which over-reports by roughly 3x: in the last build 40 raw
+   candidates gave 16 jigsaw passes and 5 real smith chests. It is a
+   pre-filter and never the thing that decides the pool — stage 4
+   refuses to load if the verification output is missing.
 3. **generated world** — magma ravines for the ocean types, and real
    blacksmith chests plus the iron/diamond threshold for villages.
    Carvers and loot tables are both invisible to cubiomes, so the
