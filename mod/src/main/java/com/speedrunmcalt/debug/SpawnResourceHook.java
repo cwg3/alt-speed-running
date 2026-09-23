@@ -44,8 +44,21 @@ import java.nio.file.Paths;
  * Row: seed,PASS|FAIL,detail
  */
 public class SpawnResourceHook implements DedicatedServerModInitializer {
-	/** How far a runner may reasonably go for their first wood. */
-	private static final int WOOD_RADIUS = 80;
+	/**
+	 * How far a runner may reasonably go for their first wood.
+	 *
+	 * 128 blocks, not the 80 the old cubiomes check used. 80 was
+	 * inherited without asking whether it was right, and it rejected a
+	 * desert temple seed whose nearest tree was 83 blocks out - four
+	 * blocks past the line, with 470 logs inside 160. That is a
+	 * five-second walk, not a dead seed.
+	 *
+	 * The case this filter exists for is not a slightly longer walk; it
+	 * is an ocean spawn with no usable wood at any distance, where the
+	 * only logs were a sunken hull. Widening the radius keeps that
+	 * rejection and stops punishing a jog.
+	 */
+	private static final int WOOD_RADIUS = 128;
 
 	/** Logs below this are in a ravine or a sunken wreck, not a forest. */
 	private static final int MIN_WOOD_Y = 60;
@@ -134,7 +147,22 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 		});
 	}
 
-	/** Real, reachable logs: above sea level and outside the structure. */
+	/**
+	 * Real, reachable logs: above sea level and not under water.
+	 *
+	 * This deliberately does NOT exclude the structure's bounding box.
+	 * The first version did, to stop a sunken shipwreck's hull counting
+	 * as firewood - and a village box is about 107 by 174 blocks, so it
+	 * swallowed every tree near the village AND the village's own logs,
+	 * which runners break for wood as a matter of course. It reported 0
+	 * logs for a seed with 235 within 80 blocks, nearest 11 blocks out,
+	 * on a seed that had already been played successfully.
+	 *
+	 * The exclusion was never needed. The hull that started this was at
+	 * y51, already below the sea-level cutoff. Height and standing water
+	 * are what separate a tree from a wreck; which structure a block
+	 * belongs to is the wrong question.
+	 */
 	private static int countLogs(ServerWorld world, BlockPos spawn, BlockBox exclude) {
 		int found = 0;
 		BlockPos.Mutable pos = new BlockPos.Mutable();
@@ -148,14 +176,16 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 				int top = world.getTopY(net.minecraft.world.Heightmap.Type.WORLD_SURFACE, x, z);
 				for (int y = Math.max(MIN_WOOD_Y, top - 24); y <= top + 8; y++) {
 					pos.set(x, y, z);
-					if (exclude != null && exclude.contains(pos)) {
+					Block b = world.getBlockState(pos).getBlock();
+					if (!b.getTranslationKey().contains("_log")
+							&& !b.getTranslationKey().endsWith("_wood")) {
 						continue;
 					}
-					Block b = world.getBlockState(pos).getBlock();
-					if (b.getTranslationKey().contains("_log")
-							|| b.getTranslationKey().endsWith("_wood")) {
-						found++;
+					// Submerged wood is a wreck, not a tree.
+					if (!world.getFluidState(pos).isEmpty()) {
+						continue;
 					}
+					found++;
 				}
 			}
 		}
