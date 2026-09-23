@@ -574,6 +574,14 @@ restricted: Hard spreads fire faster when woodlighting a portal, and
 widens piglin aggro range for a bartering pit. Runners flip to Hard and
 straight back.
 
+**Shipwreck confirmed in play 2026-09-23**, on seed seed#e116 -
+the seed whose supply chest rolls TWO hunger points, the worst measured
+anywhere including eleven of the incumbent's. Player report: "loot &
+food = perfect, trees = perfect, magma ravine = perfect". That
+validates three separate guarantees at once, each of which had failed a
+player earlier the same day: real wood at spawn, 88 hunger points in
+the supply chest, and two magma ravines within 10 chunks.
+
 **Confirmed in play 2026-09-22, by type.** Village: smith, bastion and
 fortress all walked. Ruined portal: the first filtered seed, after five
 distinct defects the same day. Desert temple: three lava pools placed
