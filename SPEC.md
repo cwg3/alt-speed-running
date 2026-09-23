@@ -878,6 +878,27 @@ of 40 villages have no blacksmith". The scripts now write an explicit
 ERROR marker so a failure can never be read as a zero, but the
 underlying contention is unfixed.
 
+**The wood check tests a BIOME, not a tree.** `woodNearby` in
+`seedtypes.c` samples biome ids every 16 blocks within 5 chunks of
+spawn and passes if any one of them is wooded. A biome is not a tree.
+
+Found in play 2026-09-22 on shipwreck seed seed#bf7f: spawn at
+-256,63,-23 in open ocean, 47,000 water blocks at spawn height, a
+jungle biome clipping the sample radius - and the only logs within 80
+blocks were the SHIPWRECK'S OWN HULL, 61 blocks out and 12 blocks under
+water. The player had no wood, so no crafting table, so no run.
+
+This is the same mistake as every other tier in this file: a piece name
+instead of a chest, an obsidian count instead of a frame, "a portal
+exists" instead of "it can be lit". The cheap check is a pre-filter and
+must never be the thing that decides the pool.
+
+The fix is a generated-world stage that counts actual `*_log` blocks
+above sea level within reach of spawn, EXCLUDING any inside a structure
+bounding box - a shipwreck's hull is wood the filter must not count.
+Ocean types need it most, because their spawns are the ones where a
+wooded biome can be technically nearby and practically unreachable.
+
 ## To do
 
 Engineering debt that is not itself a match guarantee, kept here so it
