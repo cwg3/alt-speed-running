@@ -741,6 +741,13 @@ That is precisely the failure players had been reporting as "the
 bastion wasn't at the coords you gave me", and no tier below 4 could
 see it.
 
+The FORTRESS leg was confirmed in play on 2026-09-22, on pair
+7be07d50: fortress at 176,64, 229 blocks from the bastion, reached in
+under two minutes from the portal (nether 5:14, fortress 7:09). This
+mattered because no fortress coordinate is shipped to the player -
+tier 4 measures the distance and the runner finds it the real way - so
+"findable at that range" had been assumption, not evidence.
+
 Tier 4 was confirmed by hand on 2026-09-22: a player walked to the
 shipped bastion coordinate of pair 39c3b474 in a real match and found
 it, then bartered there. The harness and the product finally agree

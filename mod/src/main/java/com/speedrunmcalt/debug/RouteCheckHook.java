@@ -178,8 +178,14 @@ public class RouteCheckHook implements DedicatedServerModInitializer {
 				// verifier, it is a wrong one - and it fails seeds in a
 				// way that looks exactly like a real defect.
 				MagmaRavine.Result r = MagmaRavine.find(world, sx, sz, RAVINE_RADIUS);
+				// WHERE, not just how far. A distance tells a verifier
+				// the rule holds; it does not tell a player where to
+				// swim.
 				extra = "ravine=" + r.ravine + " magma=" + r.magmaBlocks
-						+ " nearest=" + r.nearestDistance;
+						+ " nearest=" + r.nearestDistance
+						+ (r.nearestPos == null ? ""
+								: " at " + r.nearestPos.getX() + ";" + r.nearestPos.getY()
+										+ ";" + r.nearestPos.getZ());
 				chests = countChests(world, sx, sz, CHEST_RADIUS);
 				if (!r.usable() && "PASS".equals(verdict)) {
 					verdict = "FAIL";
