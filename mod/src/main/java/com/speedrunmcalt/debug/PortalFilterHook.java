@@ -84,7 +84,21 @@ public class PortalFilterHook implements DedicatedServerModInitializer {
 					// passed the frame check and then failed in the
 					// route verifier with "no containers to top up",
 					// which is this, found one stage too late.
-					int chests = ContainerScan.find(world, box).size();
+					// Containers AT THE PORTAL, not merely in its chunks.
+					//
+					// ContainerScan.find takes whole chunks at every Y -
+					// a 48x48 column here - so counting its results let
+					// a DUNGEON chest 50 blocks below satisfy "the
+					// portal has a chest". One such seed passed the
+					// filter and then failed downstream with "no
+					// containers to top up", which is this.
+					int chests = 0;
+					if (frame.exists && frame.topY != Integer.MIN_VALUE) {
+						BlockBox near = new BlockBox(
+								frame.minX - 8, frame.minY - 4, frame.minZ - 8,
+								frame.maxX + 8, frame.topY + 4, frame.maxZ + 8);
+						chests = ContainerScan.findWithin(world, near).size();
+					}
 					boolean lightable = hasIgniterOrIron(world, box);
 					detail = frame + " chests=" + chests + " chestCanLight=" + lightable;
 					if (frame.usable() && chests > 0) {

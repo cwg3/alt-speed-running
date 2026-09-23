@@ -62,6 +62,8 @@ public final class PortalFrame {
 		/** Highest frame block, and the terrain it has to clear. */
 		public final int topY;
 		public int terrainY = Integer.MIN_VALUE;
+		/** Where the frame actually is, so callers can look AT it. */
+		public int minX = 0, maxX = 0, minZ = 0, maxZ = 0, minY = 0;
 
 		Result(boolean exists, int width, int height, int missing,
 				int cryingInFrame, boolean vertical, int topY) {
@@ -194,11 +196,21 @@ public final class PortalFrame {
 			}
 		}
 		int topY = Integer.MIN_VALUE;
+		int mnX = Integer.MAX_VALUE, mxX = Integer.MIN_VALUE;
+		int mnZ = Integer.MAX_VALUE, mxZ = Integer.MIN_VALUE;
+		int mnY = Integer.MAX_VALUE;
 		for (BlockPos p : plane) {
 			if (p.getY() > topY) {
 				topY = p.getY();
 			}
+			mnX = Math.min(mnX, p.getX());
+			mxX = Math.max(mxX, p.getX());
+			mnZ = Math.min(mnZ, p.getZ());
+			mxZ = Math.max(mxZ, p.getZ());
+			mnY = Math.min(mnY, p.getY());
 		}
-		return new Result(true, width, height, missing, cryingInFrame, vertical, topY);
+		Result r = new Result(true, width, height, missing, cryingInFrame, vertical, topY);
+		r.minX = mnX; r.maxX = mxX; r.minZ = mnZ; r.maxZ = mxZ; r.minY = mnY;
+		return r;
 	}
 }
