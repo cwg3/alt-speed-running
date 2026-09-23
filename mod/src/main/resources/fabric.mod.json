@@ -20,6 +20,7 @@
 		"server": [
 			"com.speedrunmcalt.debug.NetherLocateHook",
 			"com.speedrunmcalt.debug.RouteCheckHook",
+			"com.speedrunmcalt.debug.PortalFilterHook",
 			"com.speedrunmcalt.debug.LootVerifyHook",
 			"com.speedrunmcalt.debug.SmithCheckHook",
 			"com.speedrunmcalt.debug.DiagHook",

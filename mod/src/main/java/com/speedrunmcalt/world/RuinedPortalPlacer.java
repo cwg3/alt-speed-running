@@ -49,15 +49,32 @@ public final class RuinedPortalPlacer {
 	private static final int INNER_HEIGHT = 3;
 
 	/**
-	 * How often the frame gets crying obsidian, forcing the bucket
-	 * route rather than completion with chest obsidian.
+	 * NO CRYING OBSIDIAN IN THE FRAME. Every placed portal is
+	 * completable from the obsidian in its own chest.
 	 *
-	 * Matches the published 80/20 split. Crying obsidian cannot form a
-	 * portal frame and needs a diamond pickaxe to clear, so those
-	 * frames are a write-off by design - the lava and water placed
-	 * alongside are what makes them runnable.
+	 * One in five frames used to get crying obsidian, which cannot form
+	 * a portal and needs a diamond pickaxe to clear - the frame was a
+	 * write-off by design, and the player was expected to walk to the
+	 * lava and water placed nearby and cast a new portal instead. That
+	 * was justified as matching vanilla's 80/20 split, and vanilla is
+	 * the wrong thing to match here.
+	 *
+	 * Measured off an MCSR Ranked install: three ruined portal worlds,
+	 * 0, 1 and 0 crying obsidian, every frame exactly two real obsidian
+	 * short of complete. They filter for completable frames, so every
+	 * player on an RP seed runs the SAME opening.
+	 *
+	 * Ours did not. Vanilla's variety is worth keeping where it does
+	 * not change the route - shape, orientation, position, which
+	 * corners are missing. Crying obsidian changes the route outright,
+	 * from "place two obsidian" to "find lava, find water, cast a
+	 * portal", and two players on two RP seeds were running materially
+	 * different openings. On a ranked ladder that is a fairness bug
+	 * wearing a flavour costume.
+	 *
+	 * Reported from play at 1:01 into a match, on a frame that was
+	 * almost entirely crying obsidian.
 	 */
-	private static final double CRYING_CHANCE = 0.20;
 
 	/**
 	 * Frame blocks removed on a clean portal.
@@ -90,7 +107,7 @@ public final class RuinedPortalPlacer {
 	public static BlockPos place(ServerWorld world, long seed, int nearX, int nearZ) {
 		Random random = new Random(seed ^ SALT ^ ((long) nearX << 32) ^ nearZ);
 
-		boolean crying = random.nextDouble() < CRYING_CHANCE;
+		// Always a clean, completable frame - see above.
 		boolean alongX = random.nextBoolean();
 
 		for (int attempt = 0; attempt < MAX_CANDIDATES; attempt++) {
@@ -107,12 +124,12 @@ public final class RuinedPortalPlacer {
 			}
 
 			BlockPos base = new BlockPos(x, ground, z);
-			build(world, base, alongX, crying, random);
+			build(world, base, alongX, random);
 			SpeedrunMcAlt.LOGGER.info(
 					"[speedrunmcalt] Placed ruined portal at {},{},{} ({}, {})",
 					base.getX(), base.getY(), base.getZ(),
 					alongX ? "x-aligned" : "z-aligned",
-					crying ? "crying - bucket route" : "clean - completable");
+					"clean - completable");
 			return base;
 		}
 
@@ -169,17 +186,15 @@ public final class RuinedPortalPlacer {
 	}
 
 	private static void build(ServerWorld world, BlockPos base, boolean alongX,
-			boolean crying, Random random) {
+			Random random) {
 		int width = INNER_WIDTH + 2;
 		int height = INNER_HEIGHT + 2;
 
 		// Frame positions: the full rectangle outline. Corners are not
 		// required for a portal to light, which is what makes them the
 		// safe blocks to damage.
-		int gapsAllowed = crying
-				? 1 + random.nextInt(3)
-				: random.nextInt(MAX_CLEAN_GAPS + 1);
-		int cryingCount = crying ? 1 + random.nextInt(2) : 0;
+		// Never more gaps than the chest's obsidian floor can fill.
+		int gapsAllowed = random.nextInt(MAX_CLEAN_GAPS + 1);
 
 		for (int u = 0; u < width; u++) {
 			for (int v = 0; v < height; v++) {
@@ -198,9 +213,6 @@ public final class RuinedPortalPlacer {
 				if (corner) {
 					// Corners are cosmetic; damage lands here first.
 					block = random.nextBoolean() ? Blocks.OBSIDIAN : Blocks.AIR;
-				} else if (cryingCount > 0 && random.nextInt(6) == 0) {
-					block = Blocks.CRYING_OBSIDIAN;
-					cryingCount--;
 				} else if (gapsAllowed > 0 && random.nextInt(8) == 0) {
 					block = Blocks.AIR;
 					gapsAllowed--;

@@ -300,44 +300,30 @@ public final class MatchWorldSetup {
 				}
 				break;
 			case "ruined_portal": {
-				// ALWAYS place. Vanilla's portal is never kept.
+				// NOTHING IS BUILT. The pool filter guarantees this
+				// seed's own vanilla ruined portal is a vertical frame
+				// at most two real obsidian short of complete, which is
+				// what the chest's obsidian floor covers.
 				//
-				// The old rule was "keep vanilla's when it is good".
-				// Measured against the standard the incumbent actually
-				// filters for - a vertical 4x5 frame, no crying obsidian
-				// in the frame, at most two blocks missing - our three
-				// kept-vanilla seeds needed 6, 7 and "not a frame at
-				// all" against the 2 to 4 obsidian we supply. Nought for
-				// three. One of them reached a player, who spent the
-				// seed's iron on a bucket because the portal was twelve
-				// obsidian lying flat on the ground.
+				// This replaced always-placing, which replaced
+				// keep-vanilla-when-good, in one day. The short version:
+				// the keep-or-place DECISION was unfixable, so it was
+				// removed and everything was placed - and then placing
+				// turned out to owe a faithful reconstruction of the
+				// whole structure, because a real ruined portal is 168
+				// netherrack, 13 magma blocks, a stone-brick debris
+				// palette and FOUR GOLD BLOCKS, and the last of those is
+				// bartering material a placed frame silently withheld.
 				//
-				// That branch could not be repaired into something
-				// useful: a correct check would reject essentially every
-				// candidate, because a near-complete vanilla portal is a
-				// rare tail that only a million-seed pool can afford to
-				// select for. So it is gone, along with the class of
-				// bugs that lived in deciding which portal a player got.
+				// Filtering costs 3 minutes of pool build per accepted
+				// seed at the measured 22% pass rate. The ravine filter
+				// has run at 3% since it was written. That is the whole
+				// argument: the cheap resource is build time, and it
+				// buys a portal that IS vanilla rather than one that
+				// imitates it.
 				//
-				// The cost is honest and published: an RP match world
-				// never contains its seed's own ruined portal, it
-				// contains ours, built to a fixed completable spec.
-				BlockPos placed = RuinedPortalPlacer.place(world, seed, x, z);
-				if (placed != null) {
-					// Loot top-up works off the structure box, which a
-					// placed portal does not have, so point it at the
-					// new one.
-					MatchState.placedPortal = placed;
-				} else {
-					// Nowhere to build. This used to be a WARN and
-					// nothing else, so the race started on a seed with
-					// no route at all - see MatchState.setupFailure.
-					MatchState.setupFailure =
-							"no ruined portal could be placed - there was nowhere to build one";
-					SpeedrunMcAlt.LOGGER.error(
-							"[speedrunmcalt] GUARANTEE FAILED: {} (seed {} at {},{})",
-							MatchState.setupFailure, seed, x, z);
-				}
+				// The loot top-up still runs below, so the two missing
+				// obsidian and a light source are guaranteed.
 				LavaPoolPlacer.placePortalAccess(world, seed, x, z);
 				break;
 			}
