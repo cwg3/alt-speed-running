@@ -279,19 +279,44 @@ mixin had been cancelling nothing while reporting success.
 
 ### Ruined portal
 
-cubiomes cannot predict whether a portal generates — the biome check
-runs after the portal's height is chosen, so it can silently fail — and
-measurement found only ~35% of otherwise-qualifying seeds usable: 20%
-have no portal at all, 45% generate underground.
+**A match world never contains its seed's own ruined portal. It
+contains ours, built to a fixed completable spec.** This is the
+largest deliberate deviation in the project and it is stated first
+because a player cannot see it from inside the game.
 
-Rather than verifying and discarding two thirds of candidates, the mod
-checks at world creation (about 5ms) and **builds a portal when
-vanilla's is unusable**. Vanilla's own portal is kept wherever it is
-good — 6 of 20 in testing — so most RP seeds still show a real ruined
-portal with all its variety, and placement only touches the ones that
-would otherwise be dead.
+The rule until 2026-09-22 was "keep vanilla's portal when it is good,
+build one otherwise". That was measured against what the incumbent
+actually ships and did not survive it.
 
-A placed frame is a correct minimum portal rather than a replica of
+Reading 3 ruined-portal worlds out of an MCSR Ranked install, and
+generating the same seeds unmodified, gives a precise standard - and
+0 blocks differ between their save and vanilla generation, so they
+filter rather than build:
+
+| | obsidian | crying | frame | missing |
+|---|---|---|---|---|
+| MCSR x3 | 11, 10, 11 | 0, 1, 0 | 4w x 5h | **2, 2, 2** |
+| ours x3 | 13, 7, 12 | 2, 4, 0 | 4x6, 4x5, **4x2** | **6, 7, not a frame** |
+
+Every seed our check had passed was unplayable: needing 6 and 7
+obsidian against the 2-4 the seed ships, and one that was twelve
+obsidian lying FLAT on the ground - a legitimate vanilla variant, and
+not a portal frame at all. It reached a player, who spent the seed's
+iron on a bucket.
+
+`PortalVerify` counted obsidian and checked it was above ground and not
+submerged. It never checked the blocks formed a VERTICAL FRAME, and it
+counted crying obsidian - which cannot form a frame - toward the total.
+
+The branch was removed rather than repaired. A correct check rejects
+nearly every candidate: a near-complete vanilla portal is a rare tail
+that only a pool of a million seeds can afford to select for. Keeping
+the branch would have meant maintaining a verification surface that
+fires approximately never, having already cost one match.
+
+So placement is unconditional, and the deviation is uniform and
+publishable instead of depending on a check we twice got wrong. A
+placed frame is a correct minimum portal rather than a replica of
 vanilla's seven shapes: orientation, position, damage and the
 crying-obsidian rate all vary by seed, and it plays identically. Its
 chest is given the vanilla loot table so the normal guarantees apply to

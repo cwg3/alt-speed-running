@@ -4,7 +4,6 @@ import com.speedrunmcalt.SpeedrunMcAlt;
 import com.speedrunmcalt.match.MatchState;
 import com.speedrunmcalt.seed.ContainerScan;
 import com.speedrunmcalt.seed.MagmaRavine;
-import com.speedrunmcalt.seed.PortalVerify;
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.block.Blocks;
@@ -121,17 +120,15 @@ public class RouteCheckHook implements DedicatedServerModInitializer {
 			int chests = -1;
 			String extra = "";
 			if ("ruined_portal".equals(seedType)) {
+				// A placed portal is now the ONLY acceptable outcome -
+				// the keep-vanilla branch is gone, so its absence means
+				// placement failed rather than that vanilla's was good.
 				if (MatchState.placedPortal != null) {
 					extra = "portal=placed@" + MatchState.placedPortal.getX()
 							+ "," + MatchState.placedPortal.getZ();
-				} else {
-					PortalVerify.Result r = PortalVerify.check(world,
-							server.getStructureManager(), MatchState.overworldSeed, sx, sz);
-					extra = "portal=vanilla(" + r + ")";
-					if (!r.usable() && "PASS".equals(verdict)) {
-						verdict = "FAIL";
-						detail = "no usable portal and none placed";
-					}
+				} else if ("PASS".equals(verdict)) {
+					verdict = "FAIL";
+					detail = "no portal was placed";
 				}
 				chests = countChests(world, sx, sz, CHEST_RADIUS);
 

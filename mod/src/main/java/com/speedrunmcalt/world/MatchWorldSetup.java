@@ -300,33 +300,43 @@ public final class MatchWorldSetup {
 				}
 				break;
 			case "ruined_portal": {
-				// Keep vanilla's portal when it is good; build one only
-				// when it is missing, buried or underwater. Two thirds
-				// of ruined portal seeds fail one of those.
-				com.speedrunmcalt.seed.PortalVerify.Result portal =
-						com.speedrunmcalt.seed.PortalVerify.check(
-								world, world.getServer().getStructureManager(), seed, x, z);
-				if (!portal.usable()) {
-					SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Vanilla portal unusable ({}), placing one",
-							portal);
-					BlockPos placed = RuinedPortalPlacer.place(world, seed, x, z);
-					if (placed != null) {
-						// Loot top-up works off the structure box, which
-						// a placed portal does not have, so point it at
-						// the new one.
-						MatchState.placedPortal = placed;
-					} else {
-						// Nowhere dry to build. This used to be a WARN
-						// and nothing else, so the race started on a
-						// seed with no route at all - see
-						// MatchState.setupFailure.
-						MatchState.setupFailure =
-								"no usable ruined portal - vanilla's is submerged and "
-										+ "there was nowhere to place one";
-						SpeedrunMcAlt.LOGGER.error(
-								"[speedrunmcalt] GUARANTEE FAILED: {} (seed {} at {},{})",
-								MatchState.setupFailure, seed, x, z);
-					}
+				// ALWAYS place. Vanilla's portal is never kept.
+				//
+				// The old rule was "keep vanilla's when it is good".
+				// Measured against the standard the incumbent actually
+				// filters for - a vertical 4x5 frame, no crying obsidian
+				// in the frame, at most two blocks missing - our three
+				// kept-vanilla seeds needed 6, 7 and "not a frame at
+				// all" against the 2 to 4 obsidian we supply. Nought for
+				// three. One of them reached a player, who spent the
+				// seed's iron on a bucket because the portal was twelve
+				// obsidian lying flat on the ground.
+				//
+				// That branch could not be repaired into something
+				// useful: a correct check would reject essentially every
+				// candidate, because a near-complete vanilla portal is a
+				// rare tail that only a million-seed pool can afford to
+				// select for. So it is gone, along with the class of
+				// bugs that lived in deciding which portal a player got.
+				//
+				// The cost is honest and published: an RP match world
+				// never contains its seed's own ruined portal, it
+				// contains ours, built to a fixed completable spec.
+				BlockPos placed = RuinedPortalPlacer.place(world, seed, x, z);
+				if (placed != null) {
+					// Loot top-up works off the structure box, which a
+					// placed portal does not have, so point it at the
+					// new one.
+					MatchState.placedPortal = placed;
+				} else {
+					// Nowhere to build. This used to be a WARN and
+					// nothing else, so the race started on a seed with
+					// no route at all - see MatchState.setupFailure.
+					MatchState.setupFailure =
+							"no ruined portal could be placed - there was nowhere to build one";
+					SpeedrunMcAlt.LOGGER.error(
+							"[speedrunmcalt] GUARANTEE FAILED: {} (seed {} at {},{})",
+							MatchState.setupFailure, seed, x, z);
 				}
 				LavaPoolPlacer.placePortalAccess(world, seed, x, z);
 				break;

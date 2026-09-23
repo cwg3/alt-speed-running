@@ -14,6 +14,23 @@ import net.minecraft.world.gen.feature.StructureFeature;
 /**
  * Is a seed's ruined portal actually usable?
  *
+ * NO LONGER DECIDES ANYTHING. Kept for the debug hooks that measure
+ * portal statistics; MatchWorldSetup always places a portal now and
+ * never consults this.
+ *
+ * It was the keep-or-place decision until 2026-09-22, and it was not
+ * equal to the job. It counts obsidian blocks and checks they are above
+ * ground and not underwater - never that they form a VERTICAL FRAME, or
+ * that the gaps can be filled with the 2 to 4 obsidian the seed ships.
+ * Measured against the standard the incumbent filters for, the three
+ * seeds it had passed needed 6, 7 and "not a frame at all". One reached
+ * a player, whose portal was twelve obsidian lying flat on the ground.
+ *
+ * Repairing it was not worth doing: a correct check rejects nearly
+ * every candidate, because a near-complete vanilla portal is a rare
+ * tail that only a pool of a million seeds can afford to select for.
+ * So the decision was removed rather than fixed.
+ *
  * This type needs checking in the world in a way the others do not.
  * cubiomes documents that portal presence cannot be predicted - the
  * biome check runs after the portal's type and height are chosen, so a
