@@ -21,7 +21,14 @@
 #      shippedX,shippedZ,shipError,containersAtShipped,
 #      secondBastionDist,bastionCount
 set -u
-read -r OW NS BX BZ PAIR TYPE <<< "$1"
+# CASTX/CASTZ are optional: the OVERWORLD point the player casts their
+# portal from. For land types that is the objective, within tens of
+# blocks of spawn, so omitting them (link = origin) is right. For ocean
+# types it is the MAGMA RAVINE, which can be hundreds of blocks further
+# out - and measuring those from the origin understates the nether walk.
+read -r OW NS BX BZ PAIR TYPE CASTX CASTZ <<< "$1"
+CASTX="${CASTX:-}"
+CASTZ="${CASTZ:-}"
 POOL="/tmp/pair-workers"
 WORKERS=$(cat "$POOL/worker_count" 2>/dev/null || echo 1)
 
@@ -46,7 +53,11 @@ printf 'level-seed=%s\nlevel-type=default\nonline-mode=false\nmax-tick-time=-1\n
   "$OW" "$PORT" > "$DIR/run/server.properties"
 # Four arguments: the fourth is what makes this a MATCH world rather
 # than another single-seed probe.
-printf '%s %s %s %s\n' "$OW" "$BX" "$BZ" "$NS" > "$DIR/run/netherlocate.txt"
+if [ -n "$CASTX" ] && [ -n "$CASTZ" ]; then
+  printf '%s %s %s %s %s %s\n' "$OW" "$BX" "$BZ" "$NS" "$CASTX" "$CASTZ" > "$DIR/run/netherlocate.txt"
+else
+  printf '%s %s %s %s\n' "$OW" "$BX" "$BZ" "$NS" > "$DIR/run/netherlocate.txt"
+fi
 rm -rf "$DIR/run/world"
 rm -f "$DIR/run/netherlocate.csv"
 

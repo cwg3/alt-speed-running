@@ -461,6 +461,28 @@ ender pearls are ~2.13% per ingot bartered, obsidian ~8.53%, and blaze
 rods a flat 50% per blaze. Each of those is a coin-flip that can decide
 a match, which is why the standard pins all three.
 
+**Measure from the link point, not the origin.** "Bastion within 14
+chunks of nether spawn" quietly assumes the player arrives at 0,0,
+which is true only while the portal is cast near overworld spawn.
+
+Village, desert temple and ruined portal seeds cast at the objective, a
+few hundred blocks out, so the link lands within tens of blocks of the
+origin - measured across all 21 land pairs, every one passes from its
+own cast point, so the assumption held for them.
+
+Ocean seeds break it. The portal is cast at the MAGMA RAVINE, which can
+be hundreds of blocks past the structure. A buried treasure seed whose
+ravine sat at 283,-293 linked to roughly 35,-37, putting a bastion 192
+blocks from the origin 230 blocks from where the player actually stood:
+14.4 chunks, over the rule, on a seed this harness had passed. Caught
+mid-run by working it out from the player's F3 coordinates, then
+confirmed by re-measuring all ten ocean pairs from their ravines - one
+failed, the rest moved closer, because a ravine link often lands nearer
+the bastion than the origin does.
+
+The harness now takes an optional cast point and defaults to the
+origin, so land seeds measure exactly as before.
+
 **Bastion and fortress pairing.** The intended bastion is the nearest
 viable one to the origin, and it must beat its closest rival by
 `BASTION_ISOLATION` - a runner who cannot tell which bastion was meant

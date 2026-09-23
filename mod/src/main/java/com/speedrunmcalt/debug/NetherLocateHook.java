@@ -46,6 +46,10 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 				int probeX = Integer.MIN_VALUE;
 				int probeZ = Integer.MIN_VALUE;
 				int probeContainers = -1;
+				// Where the player's portal LINKS, which is where they
+				// actually arrive - not the origin.
+				int linkX = 0;
+				int linkZ = 0;
 				// "seed x z netherSeed": pretend to be a match world.
 				//
 				// A dedicated server has ONE seed, so every probe built
@@ -62,6 +66,21 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 							"[netherlocate] simulating a match world: world seed {}, nether seed {}",
 							seed, parts[3]);
 				}
+				// Optional 5th and 6th arguments: the OVERWORLD point
+				// the player casts their portal from. Divided by 8 it
+				// gives the nether link, which is where the distance
+				// rules should be measured from. Omitted, the link stays
+				// at the origin.
+				if (parts.length >= 6) {
+					int castX = Integer.parseInt(parts[4]);
+					int castZ = Integer.parseInt(parts[5]);
+					linkX = castX / 8;
+					linkZ = castZ / 8;
+					SpeedrunMcAlt.LOGGER.info(
+							"[netherlocate] cast at overworld {},{} -> nether link {},{}",
+							castX, castZ, linkX, linkZ);
+				}
+
 				// Optional "seed x z": scan for containers around that
 				// point as well, to test whether a structure the locator
 				// missed is actually present there.
@@ -106,16 +125,38 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 				// Generating each chunk to STRUCTURE_STARTS is cheap - no
 				// terrain, no features - and it is ground truth: it is the same
 				// pass that decides where the structure really goes.
-				java.util.List<BlockPos> bastions =
-						startsWithin(nether, 0, 0, 20, StructureFeature.BASTION_REMNANT);
+				// Measured from the LINK POINT, not the origin.
+				//
+				// "Within 14 chunks of nether spawn" assumes the player
+				// arrives at the origin, which holds only while the
+				// overworld structure is near overworld spawn. Village
+				// and desert temple seeds are: their portals are cast at
+				// the objective, a few hundred blocks out, so the link
+				// lands within tens of blocks of 0,0.
+				//
+				// Ocean seeds are not. The portal is cast at the MAGMA
+				// RAVINE, which can be hundreds of blocks past the
+				// structure. Measured in play: a buried treasure seed
+				// whose ravine sat at 283,-293 linked to roughly 35,-37,
+				// putting a bastion that is 192 blocks from the origin
+				// 230 blocks from where the player actually stood - 14.4
+				// chunks, over the rule, on a seed this harness had
+				// passed.
+				//
+				// The link point defaults to the origin, so land seeds
+				// are measured exactly as before.
+				java.util.List<BlockPos> bastions = startsWithin(
+						nether, linkX, linkZ, 20, StructureFeature.BASTION_REMNANT);
 
 				BlockPos bastion = bastions.isEmpty() ? null : bastions.get(0);
-				double bd = bastion == null ? -1 : Math.hypot(bastion.getX(), bastion.getZ());
+				double bd = bastion == null ? -1
+						: Math.hypot(bastion.getX() - linkX, bastion.getZ() - linkZ);
 				// The rule is not only "close" but "significantly closer than
 				// any other competing bastion" - a runner who cannot tell which
 				// one was intended has no route, only a guess.
 				double bd2 = bastions.size() < 2 ? -1
-						: Math.hypot(bastions.get(1).getX(), bastions.get(1).getZ());
+						: Math.hypot(bastions.get(1).getX() - linkX,
+								bastions.get(1).getZ() - linkZ);
 
 				// Fortress measured FROM THE BASTION, per the rule. Measuring
 				// from spawn instead produced a 90% failure rate that was an
