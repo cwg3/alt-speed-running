@@ -59,15 +59,34 @@ public final class PortalFrame {
 		/** Crying obsidian sitting in frame slots - unfillable. */
 		public final int cryingInFrame;
 		public final boolean vertical;
+		/** Highest frame block, and the terrain it has to clear. */
+		public final int topY;
+		public int terrainY = Integer.MIN_VALUE;
 
 		Result(boolean exists, int width, int height, int missing,
-				int cryingInFrame, boolean vertical) {
+				int cryingInFrame, boolean vertical, int topY) {
 			this.exists = exists;
 			this.width = width;
 			this.height = height;
 			this.missing = missing;
 			this.cryingInFrame = cryingInFrame;
 			this.vertical = vertical;
+			this.topY = topY;
+		}
+
+		/**
+		 * Above ground. NOT optional, and its absence is how a portal
+		 * buried under twelve blocks of stone reached a player: a
+		 * correct 4x5 frame with a chest and two gold blocks, at y57
+		 * under terrain at y75.
+		 *
+		 * The check that this replaced had this and not the frame
+		 * geometry; replacing it kept the wrong half. Both are needed:
+		 * a frame you cannot see is as unplayable as rubble you cannot
+		 * build on.
+		 */
+		public boolean aboveGround() {
+			return terrainY == Integer.MIN_VALUE || topY >= terrainY - 1;
 		}
 
 		/**
@@ -78,14 +97,16 @@ public final class PortalFrame {
 		 * a runner does not have at the portal.
 		 */
 		public boolean usable() {
-			return exists && vertical && cryingInFrame == 0 && missing <= MAX_MISSING;
+			return exists && vertical && cryingInFrame == 0
+					&& missing <= MAX_MISSING && aboveGround();
 		}
 
 		@Override
 		public String toString() {
 			return "exists=" + exists + " " + width + "wx" + height + "h"
 					+ " missing=" + missing + " cryingInFrame=" + cryingInFrame
-					+ " vertical=" + vertical + " usable=" + usable();
+					+ " vertical=" + vertical + " topY=" + topY + " terrainY=" + terrainY
+					+ " aboveGround=" + aboveGround() + " usable=" + usable();
 		}
 	}
 
@@ -106,12 +127,12 @@ public final class PortalFrame {
 			}
 		}
 		if (obsidian.isEmpty()) {
-			return new Result(false, 0, 0, 0, 0, false);
+			return new Result(false, 0, 0, 0, 0, false, Integer.MIN_VALUE);
 		}
 
 		// A frame is a vertical plane, so it varies in exactly one of x
 		// or z. Try both and keep whichever holds more blocks.
-		Result best = new Result(true, 0, 0, Integer.MAX_VALUE, 0, false);
+		Result best = new Result(true, 0, 0, Integer.MAX_VALUE, 0, false, Integer.MIN_VALUE);
 		for (int axis = 0; axis < 2; axis++) {
 			Map<Integer, List<BlockPos>> planes = new HashMap<>();
 			for (BlockPos p : obsidian.keySet()) {
@@ -172,6 +193,12 @@ public final class PortalFrame {
 				}
 			}
 		}
-		return new Result(true, width, height, missing, cryingInFrame, vertical);
+		int topY = Integer.MIN_VALUE;
+		for (BlockPos p : plane) {
+			if (p.getY() > topY) {
+				topY = p.getY();
+			}
+		}
+		return new Result(true, width, height, missing, cryingInFrame, vertical, topY);
 	}
 }

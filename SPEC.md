@@ -292,13 +292,22 @@ ship vanilla and filter for it. All three have the same shape:
     a vertical frame, 4 wide by 5 tall, of real obsidian,
     exactly 2 non-corner blocks missing, and a chest.
 
-`PortalFrame` enforces that: vertical, at least 4x5, at most 2 missing
-non-corner slots, **no crying obsidian in a frame slot**, and **at
-least one chest**. Both of those last clauses were learned the hard
-way. Crying obsidian in a required slot cannot be filled at all -
+`PortalFrame` enforces that: **above ground**, vertical, at least 4x5,
+at most 2 missing non-corner slots, **no crying obsidian in a frame
+slot**, and **at least one chest**. Each of those clauses was learned the hard way, in
+play, one death at a time. Crying obsidian in a required slot cannot be filled at all -
 clearing it needs a diamond pickaxe - and a portal with no chest can
 never be made playable, because the two missing obsidian, the light
 source and the iron are all guaranteed INTO that chest.
+
+Above-ground is the one that got away. `PortalVerify` checked it and
+`PortalFrame` initially did not - replacing a check kept the half it
+got wrong and dropped the half it got right. A correct 4x5 frame with a
+chest and two gold blocks, buried at y57 under terrain at y75, was
+dealt to a player who stood on top of it and saw grass. Terrain height
+comes from the generator's noise, never the heightmap at the portal's
+own column: the heightmap counts the portal's obsidian and would call a
+fully buried portal above ground.
 
 Measured pass rate: 12.5% on frame alone, about 7% including the chest.
 The buried treasure ravine filter runs at 3%, so this is well inside

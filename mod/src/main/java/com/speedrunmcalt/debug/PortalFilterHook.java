@@ -67,6 +67,17 @@ public class PortalFilterHook implements DedicatedServerModInitializer {
 						}
 					}
 					PortalFrame.Result frame = PortalFrame.check(world, box);
+					// Terrain from the generator's own noise, not the
+					// heightmap at the portal's column - the heightmap
+					// counts the portal's own obsidian and would call a
+					// fully buried portal above ground.
+					if (frame.exists && frame.topY != Integer.MIN_VALUE) {
+						net.minecraft.world.gen.chunk.SurfaceChunkGenerator gen =
+								net.minecraft.world.gen.GeneratorOptions.createOverworldGenerator(
+										Long.parseLong(seed));
+						frame.terrainY = gen.getHeight(sx, sz,
+								net.minecraft.world.Heightmap.Type.WORLD_SURFACE_WG);
+					}
 					// A portal with no chest can never be made playable:
 					// the two missing obsidian, the light source and the
 					// iron are all guaranteed INTO that chest. Two seeds
