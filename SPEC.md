@@ -309,6 +309,13 @@ comes from the generator's noise, never the heightmap at the portal's
 own column: the heightmap counts the portal's obsidian and would call a
 fully buried portal above ground.
 
+**Confirmed in play 2026-09-22.** Seed seed#9796, the first
+filtered ruined portal ever dealt: the player reported "the RP was
+good". Frame top y67 against terrain y64, two obsidian to place, chest
+present - and vanilla's own loot roll gave no igniter on that seed, so
+the flint and steel came from the top-up, which is the guarantee that
+had failed silently the same morning.
+
 Measured pass rate: 12.5% on frame alone, about 7% including the chest.
 The buried treasure ravine filter runs at 3%, so this is well inside
 what the pipeline already tolerates - roughly 5 minutes of build time
