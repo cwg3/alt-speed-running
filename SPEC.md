@@ -279,48 +279,49 @@ mixin had been cancelling nothing while reporting success.
 
 ### Ruined portal
 
-**A match world never contains its seed's own ruined portal. It
-contains ours, built to a fixed completable spec.** This is the
-largest deliberate deviation in the project and it is stated first
-because a player cannot see it from inside the game.
+**Ruined portal seeds are FILTERED, not built.** A match world contains
+the seed's own vanilla ruined portal, unmodified - real debris, real
+magma, real gold blocks - and the pool only admits seeds whose portal a
+runner can actually finish.
 
-The rule until 2026-09-22 was "keep vanilla's portal when it is good,
-build one otherwise". That was measured against what the incumbent
-actually ships and did not survive it.
+The standard is measured off the incumbent, not invented. Three ruined
+portal worlds read out of an MCSR Ranked install, with the same seeds
+regenerated unmodified for comparison: **0 blocks differ**, so they
+ship vanilla and filter for it. All three have the same shape:
 
-Reading 3 ruined-portal worlds out of an MCSR Ranked install, and
-generating the same seeds unmodified, gives a precise standard - and
-0 blocks differ between their save and vanilla generation, so they
-filter rather than build:
+    a vertical frame, 4 wide by 5 tall, of real obsidian,
+    exactly 2 non-corner blocks missing, and a chest.
 
-| | obsidian | crying | frame | missing |
-|---|---|---|---|---|
-| MCSR x3 | 11, 10, 11 | 0, 1, 0 | 4w x 5h | **2, 2, 2** |
-| ours x3 | 13, 7, 12 | 2, 4, 0 | 4x6, 4x5, **4x2** | **6, 7, not a frame** |
+`PortalFrame` enforces that: vertical, at least 4x5, at most 2 missing
+non-corner slots, **no crying obsidian in a frame slot**, and **at
+least one chest**. Both of those last clauses were learned the hard
+way. Crying obsidian in a required slot cannot be filled at all -
+clearing it needs a diamond pickaxe - and a portal with no chest can
+never be made playable, because the two missing obsidian, the light
+source and the iron are all guaranteed INTO that chest.
 
-Every seed our check had passed was unplayable: needing 6 and 7
-obsidian against the 2-4 the seed ships, and one that was twelve
-obsidian lying FLAT on the ground - a legitimate vanilla variant, and
-not a portal frame at all. It reached a player, who spent the seed's
-iron on a bucket.
+Measured pass rate: 12.5% on frame alone, about 7% including the chest.
+The buried treasure ravine filter runs at 3%, so this is well inside
+what the pipeline already tolerates - roughly 5 minutes of build time
+per accepted seed, and build time is the cheap resource.
 
-`PortalVerify` counted obsidian and checked it was above ground and not
-submerged. It never checked the blocks formed a VERTICAL FRAME, and it
-counted crying obsidian - which cannot form a frame - toward the total.
+**This replaced two earlier answers in one day, and the reasoning is
+worth keeping.** The original rule was "keep vanilla's portal when it
+is good, build one otherwise". That decision was made by a check that
+counted obsidian without asking whether it formed a frame: all three
+seeds it passed were unplayable, and one reached a player as twelve
+obsidian lying flat on the ground.
 
-The branch was removed rather than repaired. A correct check rejects
-nearly every candidate: a near-complete vanilla portal is a rare tail
-that only a pool of a million seeds can afford to select for. Keeping
-the branch would have meant maintaining a verification surface that
-fires approximately never, having already cost one match.
+The first fix was to always build. That lasted an hour, until the
+question "what does a real ruined portal contain?" was actually
+measured: 168 netherrack, 13 magma blocks, a stone-brick debris
+palette, and **four gold blocks**. Gold is bartering material, so a
+built frame was silently withholding a resource the opening is supposed
+to provide - and matching vanilla properly meant reconstructing the
+whole structure, to imitate something vanilla already does perfectly.
 
-So placement is unconditional, and the deviation is uniform and
-publishable instead of depending on a check we twice got wrong. A
-placed frame is a correct minimum portal rather than a replica of
-vanilla's seven shapes: orientation, position, damage and the
-crying-obsidian rate all vary by seed, and it plays identically. Its
-chest is given the vanilla loot table so the normal guarantees apply to
-it with no special case.
+Filtering costs build time and gets the real thing. That is the trade,
+and it only looked unaffordable while the pass rate was a guess.
 
 **Placement can fail, and failure must not ship.** Found in play
 2026-09-22: a seed whose vanilla portal was submerged in open ocean.

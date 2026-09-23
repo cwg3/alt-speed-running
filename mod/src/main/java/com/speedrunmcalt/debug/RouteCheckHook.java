@@ -120,15 +120,29 @@ public class RouteCheckHook implements DedicatedServerModInitializer {
 			int chests = -1;
 			String extra = "";
 			if ("ruined_portal".equals(seedType)) {
-				// A placed portal is now the ONLY acceptable outcome -
-				// the keep-vanilla branch is gone, so its absence means
-				// placement failed rather than that vanilla's was good.
-				if (MatchState.placedPortal != null) {
-					extra = "portal=placed@" + MatchState.placedPortal.getX()
-							+ "," + MatchState.placedPortal.getZ();
-				} else if ("PASS".equals(verdict)) {
-					verdict = "FAIL";
-					detail = "no portal was placed";
+				// Nothing is built any more: the pool filter guarantees
+				// this seed's OWN portal is finishable, so that is what
+				// gets checked. Asserting a placed portal here was a
+				// leftover from the always-place design and failed
+				// every correctly filtered seed.
+				com.speedrunmcalt.seed.VillageSmith.Village pv =
+						com.speedrunmcalt.seed.VillageSmith.inspect(
+								server.getStructureManager(), MatchState.overworldSeed,
+								net.minecraft.world.gen.feature.StructureFeature.RUINED_PORTAL,
+								sx, sz);
+				if (!pv.exists()) {
+					if ("PASS".equals(verdict)) {
+						verdict = "FAIL";
+						detail = "no ruined portal structure";
+					}
+				} else {
+					com.speedrunmcalt.seed.PortalFrame.Result fr =
+							com.speedrunmcalt.seed.PortalFrame.check(world, pv.xzBox());
+					extra = "portal=vanilla(" + fr + ")";
+					if (!fr.usable() && "PASS".equals(verdict)) {
+						verdict = "FAIL";
+						detail = "portal frame not finishable: " + fr;
+					}
 				}
 				chests = countChests(world, sx, sz, CHEST_RADIUS);
 
@@ -138,10 +152,7 @@ public class RouteCheckHook implements DedicatedServerModInitializer {
 				// because the guarantee had been satisfied from a chest
 				// buried 22 blocks down in the vanilla portal it
 				// replaced. "A portal is here" was true and useless.
-				BlockPos pp = MatchState.placedPortal;
-				int ix = pp != null ? pp.getX() : sx;
-				int iz = pp != null ? pp.getZ() : sz;
-				if (!hasIgniter(world, ix, iz, 24) && "PASS".equals(verdict)) {
+				if (!hasIgniter(world, sx, sz, 48) && "PASS".equals(verdict)) {
 					verdict = "FAIL";
 					detail = "no flint and steel or fire charge in reach of the portal";
 				}

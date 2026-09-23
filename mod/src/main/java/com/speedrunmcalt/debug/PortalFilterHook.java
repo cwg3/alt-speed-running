@@ -67,9 +67,16 @@ public class PortalFilterHook implements DedicatedServerModInitializer {
 						}
 					}
 					PortalFrame.Result frame = PortalFrame.check(world, box);
+					// A portal with no chest can never be made playable:
+					// the two missing obsidian, the light source and the
+					// iron are all guaranteed INTO that chest. Two seeds
+					// passed the frame check and then failed in the
+					// route verifier with "no containers to top up",
+					// which is this, found one stage too late.
+					int chests = ContainerScan.find(world, box).size();
 					boolean lightable = hasIgniterOrIron(world, box);
-					detail = frame + " chestCanLight=" + lightable;
-					if (frame.usable()) {
+					detail = frame + " chests=" + chests + " chestCanLight=" + lightable;
+					if (frame.usable() && chests > 0) {
 						verdict = "PASS";
 					}
 				}
