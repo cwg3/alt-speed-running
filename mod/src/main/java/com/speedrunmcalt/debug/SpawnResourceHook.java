@@ -66,6 +66,15 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 	/** Enough to make a table and the tools that follow. */
 	private static final int MIN_LOGS = 8;
 
+	/**
+	 * Solid blocks allowed directly above ANY of the wreck's chests.
+	 *
+	 * One, because a shipwreck's own deck plank or slab sits above a
+	 * chest in the ordinary case and that is not burial. Anything more
+	 * is sand and stone, and the wreck is sunk into the seabed.
+	 */
+	private static final int MAX_COVER = 1;
+
 	@Override
 	public void onInitializeServer() {
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
@@ -103,30 +112,57 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 				boolean ok = woodOk;
 
 				if ("shipwreck".equals(type) && exclude != null) {
-					int chests = 0;
+					// Identify the WRECK'S OWN chests by loot table, not
+					// by proximity.
+					//
+					// ContainerScan takes whole chunks, so "is there a
+					// food chest" was answered once by an ocean ruin's
+					// chest 75 blocks away, while the wreck's own supply
+					// chest sat under seven blocks of stone. Reading the
+					// loot table id settles which chest belongs to what,
+					// and it has to be read BEFORE the inventory,
+					// because reading the inventory rolls the loot and
+					// clears the tag.
+					int wreckChests = 0;
 					boolean food = false;
+					int worstCover = -1;
 					for (BlockPos cp : ContainerScan.find(world, exclude)) {
 						net.minecraft.block.entity.BlockEntity be = world.getBlockEntity(cp);
-						if (!(be instanceof net.minecraft.inventory.Inventory)) {
+						if (!(be instanceof net.minecraft.block.entity.LootableContainerBlockEntity)) {
 							continue;
 						}
-						chests++;
-						net.minecraft.inventory.Inventory inv =
-								(net.minecraft.inventory.Inventory) be;
-						for (int i = 0; i < inv.size(); i++) {
-							ItemStack st = inv.getStack(i);
-							Item item = st.getItem();
-							if (item.isFood() && item != net.minecraft.item.Items.ROTTEN_FLESH
-									&& item != net.minecraft.item.Items.PUFFERFISH) {
-								food = true;
+						net.minecraft.util.Identifier table =
+								((com.speedrunmcalt.mixin.LootableContainerAccessor) be)
+										.speedrunmcalt$getLootTableId();
+						if (table == null || !table.getPath().contains("shipwreck")) {
+							continue;   // somebody else's chest
+						}
+						wreckChests++;
+						int cover = coverAbove(world, cp);
+						worstCover = Math.max(worstCover, cover);
+						SpeedrunMcAlt.LOGGER.info("[spawncheck]   {} at {},{},{} cover={}",
+								table.getPath(), cp.getX(), cp.getY(), cp.getZ(), cover);
+						if (table.getPath().contains("supply")) {
+							net.minecraft.inventory.Inventory inv =
+									(net.minecraft.inventory.Inventory) be;
+							for (int i = 0; i < inv.size(); i++) {
+								Item item = inv.getStack(i).getItem();
+								if (item.isFood()
+										&& item != net.minecraft.item.Items.ROTTEN_FLESH
+										&& item != net.minecraft.item.Items.PUFFERFISH) {
+									food = true;
+								}
 							}
 						}
 					}
-					detail += " chests=" + chests + " food=" + food;
-					// Three chests AND real food, which is what the
-					// incumbent filters for. Rotten flesh is not food a
-					// runner will eat at full hunger.
-					ok = ok && chests >= 3 && food;
+					detail += " wreckChests=" + wreckChests + " food=" + food
+							+ " worstCover=" + worstCover;
+					// THE WRECK MUST NOT BE BURIED AT ALL. Not "the food
+					// is reachable with some digging" - a buried wreck is
+					// a different and slower opening, and two players on
+					// two shipwreck seeds should be running the same one.
+					ok = ok && wreckChests >= 3 && food
+							&& worstCover >= 0 && worstCover <= MAX_COVER;
 				}
 
 				SpeedrunMcAlt.LOGGER.info("[spawncheck] {} {} {}",
@@ -190,6 +226,33 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 			}
 		}
 		return found;
+	}
+
+	/**
+	 * Solid blocks stacked directly above a position, up to 12.
+	 *
+	 * Solidity is the test, NOT the absence of fluid. The first version
+	 * stopped counting at anything with a fluid state, and a shipwreck's
+	 * own deck hatch is a WATERLOGGED TRAPDOOR - solid, obstructing, and
+	 * full of water. It reported cover=1 on a chest with seven blocks of
+	 * stone and sand above it, because the trapdoor at the second block
+	 * looked like open water.
+	 *
+	 * A block you must break is a block you must break, whether or not
+	 * it is wet.
+	 */
+	private static int coverAbove(ServerWorld world, BlockPos pos) {
+		int n = 0;
+		BlockPos.Mutable p = new BlockPos.Mutable();
+		for (int dy = 1; dy <= 12; dy++) {
+			p.set(pos.getX(), pos.getY() + dy, pos.getZ());
+			net.minecraft.block.BlockState st = world.getBlockState(p);
+			if (!st.getMaterial().isSolid()) {
+				break;   // air or open water - you are through
+			}
+			n++;
+		}
+		return n;
 	}
 
 	private static StructureFeature<?> featureFor(String type) {
