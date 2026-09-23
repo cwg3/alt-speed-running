@@ -52,18 +52,44 @@ public final class LootTopUp {
 		// A village's iron golem is a guaranteed 4 on top of this, which
 		// is why the chest floor is 3 rather than 7.
 		VILLAGE(3, IronUnit.INGOTS, 0, "minecraft:chests/village/", false, false),
-		DESERT_TEMPLE(7, IronUnit.INGOTS, 13, "minecraft:chests/desert_pyramid", false, false),
+		DESERT_TEMPLE(7, IronUnit.INGOTS, 52, "minecraft:chests/desert_pyramid", false, false),
 		// 27 nuggets is exactly three ingots, which is exactly a bucket -
 		// see the note on the bucket route below.
 		RUINED_PORTAL(27, IronUnit.NUGGETS, 0, "minecraft:chests/ruined_portal",
 				true, true),
-		SHIPWRECK(7, IronUnit.INGOT_EQUIVALENT, 4, "minecraft:chests/shipwreck", false, false),
-		BURIED_TREASURE(7, IronUnit.INGOT_EQUIVALENT, 4, "minecraft:chests/buried_treasure",
+		SHIPWRECK(7, IronUnit.INGOT_EQUIVALENT, 88, "minecraft:chests/shipwreck", false, false),
+		BURIED_TREASURE(7, IronUnit.INGOT_EQUIVALENT, 88, "minecraft:chests/buried_treasure",
 				false, false);
 
 		public final int minIron;
 		public final IronUnit unit;
-		/** Minimum food items; 0 where the route does not depend on chest food. */
+		/**
+		 * Minimum food in HUNGER POINTS, not items; 0 where the route
+		 * does not depend on chest food.
+		 *
+		 * 88 for the ocean types, which is the MEASURED AVERAGE of what
+		 * the incumbent's shipwreck supply chests actually hold.
+		 *
+		 * Eleven MCSR Ranked supply chests were rolled from the loot
+		 * seeds stored in their own save files: 139, 127, 105, 98, 91,
+		 * 89, 88, 85, 64, 56, 27 hunger points. Mean 88, median 89,
+		 * worst 27. Wheat and rotten flesh carry almost all of it -
+		 * typically 17 to 20 wheat and 13 to 21 rotten flesh, with the
+		 * carrots and potatoes as garnish.
+		 *
+		 * They do not top up food at all. Vanilla's shipwreck_supply
+		 * table is generous and they simply filter out the rare blank
+		 * roll. Matching their average rather than their minimum means
+		 * our chests are never the reason a run starves.
+		 *
+		 * This was 4 ITEMS until a player reported it as not quite
+		 * enough. Four carrots is twelve points and four cooked cod is
+		 * twenty - the same promise buying wildly different runs, and
+		 * they drew the bad end. The first replacement was 20 points,
+		 * which the measurement then showed to be below the incumbent's
+		 * WORST case. Desert temple is 52, preserving its original
+		 * intent of 13 rotten flesh exactly.
+		 */
 		public final int minFood;
 		/**
 		 * Loot tables that belong to this structure.
@@ -154,6 +180,76 @@ public final class LootTopUp {
 	}
 
 	/** Food item used to make up a shortfall, chosen to suit the route. */
+	/** Salt so the food mix does not track any other seeded decision. */
+	private static final long FOOD_SALT = 0xF00D_5EEDL;
+
+	/**
+	 * Makes up a hunger-point shortfall with food a shipwreck would
+	 * plausibly hold.
+	 *
+	 * The first version inserted the whole deficit as cooked cod, which
+	 * meant eighteen cod in a chest vanilla would never fill that way.
+	 * Measured against eleven MCSR Ranked supply chests, the real
+	 * composition is bulk wheat and rotten flesh - typically 17 to 20
+	 * wheat and 13 to 21 flesh - with suspicious stew in about a third
+	 * of chests and cooked fish occasionally. Those proportions are
+	 * what this reproduces.
+	 *
+	 * Wheat is counted at three to a loaf, so it is food only after a
+	 * crafting table. That is true of the incumbent's chests too, and
+	 * it is why the flesh is the larger share here: the guarantee has
+	 * to feed a runner who has not stopped to craft.
+	 *
+	 * DETERMINISTIC from the match seed. Both players race the same
+	 * world, so both must find the same chest.
+	 */
+	private static boolean insertFood(ServerWorld world, List<BlockPos> containers,
+			SeedType type, int deficitPoints, long seed) {
+		if (type == SeedType.DESERT_TEMPLE) {
+			// A temple has no wheat or fish in it; flesh is its food.
+			int n = (deficitPoints + 3) / 4;
+			return insert(world, containers, Items.ROTTEN_FLESH, n);
+		}
+
+		Random random = new Random(seed ^ FOOD_SALT);
+		boolean ok = true;
+		int remaining = deficitPoints;
+
+		// Suspicious stew in roughly a third of chests, as measured.
+		// Safe to rely on: SuspiciousStewMixin strips its effects for
+		// the duration of a match.
+		if (random.nextInt(3) == 0) {
+			int stews = 1 + random.nextInt(2);
+			ok &= insert(world, containers, Items.SUSPICIOUS_STEW, stews);
+			remaining -= stews * 6;
+		}
+
+		// Cooked fish sometimes - the only part a runner can eat with
+		// no preparation at all.
+		if (remaining > 0 && random.nextInt(2) == 0) {
+			Item fish = random.nextBoolean() ? Items.COOKED_COD : Items.COOKED_SALMON;
+			int fc = fish == Items.COOKED_COD ? 5 : 6;
+			int n = 2 + random.nextInt(4);
+			ok &= insert(world, containers, fish, n);
+			remaining -= n * fc;
+		}
+
+		// The bulk: rotten flesh first, because it needs no crafting.
+        if (remaining > 0) {
+			int fleshPoints = (int) Math.ceil(remaining * 0.6);
+			int flesh = (fleshPoints + 3) / 4;
+			ok &= insert(world, containers, Items.ROTTEN_FLESH, flesh);
+			remaining -= flesh * 4;
+		}
+
+		// Then wheat, three to a loaf, for whatever is left.
+		if (remaining > 0) {
+			int loaves = (remaining + 4) / 5;
+			ok &= insert(world, containers, Items.WHEAT, loaves * 3);
+		}
+		return ok;
+	}
+
 	private static Item foodFor(SeedType type) {
 		switch (type) {
 			case DESERT_TEMPLE:
@@ -181,20 +277,52 @@ public final class LootTopUp {
 	 * 13 to 30 of it. Everywhere else it is a trap: eating it costs
 	 * hunger and health.
 	 */
-	private static boolean countsAsFood(SeedType type, ItemStack stack) {
+	/**
+	 * How much hunger a stack is worth to a runner, in hunger points.
+	 *
+	 * Counting ITEMS was the wrong unit. Four carrots is twelve hunger
+	 * points and four cooked cod is twenty, so a guarantee of "4 food"
+	 * meant wildly different things depending on the roll - and a player
+	 * who got the minimum reported it as not quite enough.
+	 *
+	 * Two things vanilla does not call food are counted here, because
+	 * the incumbent's shipwreck chests use both:
+	 *
+	 *   HAY BALE   nine wheat, so three bread, so fifteen points
+	 *   WHEAT      three to a loaf, five points a loaf
+	 *
+	 * Rotten flesh counts everywhere now, not only in a desert temple.
+	 * It is unpleasant and it is food; MCSR Ranked ships it as a
+	 * shipwreck food source, and a runner at zero hunger eats it.
+	 *
+	 * Suspicious stew counts too. We already strip its harmful effects
+	 * for the duration of a match - see SuspiciousStewMixin - so
+	 * refusing to count it was incoherent: the mod made it safe and then
+	 * pretended it was not there.
+	 *
+	 * Hunger values come from the item's own FoodComponent rather than a
+	 * table typed out here, so they cannot drift from the game's.
+	 */
+	private static int hungerPoints(SeedType type, ItemStack stack) {
 		Item item = stack.getItem();
+		int count = stack.getCount();
+
+		if (item == Items.HAY_BLOCK) {
+			return count * 15;      // 9 wheat -> 3 bread -> 15
+		}
+		if (item == Items.WHEAT) {
+			return (count / 3) * 5; // 3 wheat -> 1 bread -> 5
+		}
 		if (!item.isFood()) {
-			return false;
+			return 0;
 		}
-		if (item == Items.POISONOUS_POTATO || item == Items.SPIDER_EYE
-				|| item == Items.PUFFERFISH || item == Items.CHICKEN
-				|| item == Items.SUSPICIOUS_STEW) {
-			return false; // poison or raw - not something to rely on
+		// Raw chicken and pufferfish are a net loss to eat.
+		if (item == Items.CHICKEN || item == Items.PUFFERFISH
+				|| item == Items.POISONOUS_POTATO || item == Items.SPIDER_EYE) {
+			return 0;
 		}
-		if (item == Items.ROTTEN_FLESH) {
-			return type == SeedType.DESERT_TEMPLE;
-		}
-		return true;
+		net.minecraft.item.FoodComponent food = item.getFoodComponent();
+		return food == null ? 0 : food.getHunger() * count;
 	}
 
 	/**
@@ -254,6 +382,7 @@ public final class LootTopUp {
 		// of them: rolling clears the loot table id, so the evidence of
 		// which structure a container belongs to is gone afterwards.
 		List<BlockPos> containers = new java.util.ArrayList<>();
+		java.util.Map<BlockPos, String> tableOf = new java.util.HashMap<>();
 		for (BlockPos pos : (strictBox
 				? ContainerScan.findWithin(world, box)
 				: ContainerScan.find(world, box))) {
@@ -266,6 +395,14 @@ public final class LootTopUp {
 					((LootableContainerAccessor) container).speedrunmcalt$getLootTableId();
 			if (table != null && table.toString().startsWith(type.tablePrefix)) {
 				containers.add(pos);
+				// Remember WHICH table, now, while it still exists.
+				// Everything below reads inventories, and the first read
+				// rolls the loot and clears this tag - so a later
+				// question like "which of these is the supply chest?"
+				// has no evidence left to answer with. Routing the food
+				// guarantee failed exactly this way once, putting 86
+				// hunger points into a shipwreck's TREASURE chest.
+				tableOf.put(pos, table.getPath());
 			}
 		}
 		if (containers.isEmpty()) {
@@ -323,9 +460,7 @@ public final class LootTopUp {
 						|| stack.getItem() == Items.FIRE_CHARGE) {
 					hasLight = true;
 				}
-				if (countsAsFood(type, stack)) {
-					foodItems += stack.getCount();
-				}
+				foodItems += hungerPoints(type, stack);
 			}
 		}
 
@@ -350,7 +485,12 @@ public final class LootTopUp {
 		boolean ok = true;
 		if (have < type.minIron) {
 			int deficit = type.minIron - have;
-			if (!insert(world, containers, ironItem, deficit)) {
+			// Vanilla puts a wreck's iron in the treasure chest.
+			List<BlockPos> ironChests =
+					(type == SeedType.SHIPWRECK || type == SeedType.BURIED_TREASURE)
+							? chestsFor(tableOf, containers, "treasure")
+							: containers;
+			if (!insert(world, ironChests, ironItem, deficit)) {
 				ok = false;
 			}
 			SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] {} iron {}->{} {} (+{})",
@@ -377,12 +517,14 @@ public final class LootTopUp {
 		}
 
 		if (type.minFood > 0 && foodItems < type.minFood) {
-			int deficit = type.minFood - foodItems;
-			if (!insert(world, containers, foodFor(type), deficit)) {
+			int deficitPoints = type.minFood - foodItems;
+			if (!insertFood(world, chestsFor(tableOf, containers, "supply"),
+					type, deficitPoints, seed)) {
 				ok = false;
 			}
-			SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] {} food {}->{} (+{})",
-					type, foodItems, type.minFood, deficit);
+			SpeedrunMcAlt.LOGGER.info(
+					"[speedrunmcalt] {} food {}->{} hunger points (+{})",
+					type, foodItems, type.minFood, deficitPoints);
 		}
 		return ok;
 	}
@@ -422,6 +564,40 @@ public final class LootTopUp {
 	 * Adds items to the first container with room, taking containers in
 	 * sorted order so the destination is the same on both machines.
 	 */
+	/**
+	 * The containers whose loot table name contains `kind`, or all of
+	 * them if none does.
+	 *
+	 * Vanilla separates a shipwreck's loot completely: food only ever
+	 * appears in shipwreck_supply, iron only in shipwreck_treasure, and
+	 * paper and maps only in shipwreck_map. Measured across twelve of
+	 * the incumbent's treasure and map chests - zero hunger points in
+	 * every one.
+	 *
+	 * Our top-up used to fill whichever container the scan returned
+	 * first, and on one seed that put 86 hunger points of food into the
+	 * TREASURE chest. The guarantee fired, vanilla would never put food
+	 * there, and a runner who opened the supply chest found the three
+	 * poisonous potatoes we were compensating for. A guarantee met
+	 * somewhere the player will not look is not met.
+	 *
+	 * The loot table id has to be read BEFORE anything reads the
+	 * inventory: reading it rolls the loot and clears the tag.
+	 */
+	private static List<BlockPos> chestsFor(java.util.Map<BlockPos, String> tableOf,
+			List<BlockPos> containers, String kind) {
+		List<BlockPos> matching = new java.util.ArrayList<>();
+		for (BlockPos pos : containers) {
+			String table = tableOf.get(pos);
+			if (table != null && table.contains(kind)) {
+				matching.add(pos);
+			}
+		}
+		// A structure with one relevant chest, or tags already gone,
+		// behaves exactly as before.
+		return matching.isEmpty() ? containers : matching;
+	}
+
 	private static boolean insert(ServerWorld world, List<BlockPos> containers,
 			Item item, int count) {
 		int remaining = count;
