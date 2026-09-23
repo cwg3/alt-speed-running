@@ -67,13 +67,13 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 	private static final int MIN_LOGS = 8;
 
 	/**
-	 * Solid blocks allowed directly above ANY of the wreck's chests.
+	 * Blocks of SEABED allowed above any of the wreck's chests: none.
 	 *
-	 * One, because a shipwreck's own deck plank or slab sits above a
-	 * chest in the ordinary case and that is not burial. Anything more
-	 * is sand and stone, and the wreck is sunk into the seabed.
+	 * Submerged is fine and expected; buried is not. The wreck's own
+	 * timber above a chest is an ordinary deck and does not count, so
+	 * this is zero rather than a tolerance.
 	 */
-	private static final int MAX_COVER = 1;
+	private static final int MAX_COVER = 0;
 
 	@Override
 	public void onInitializeServer() {
@@ -138,9 +138,9 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 							continue;   // somebody else's chest
 						}
 						wreckChests++;
-						int cover = coverAbove(world, cp);
+						int cover = solidDirectlyAbove(world, cp);
 						worstCover = Math.max(worstCover, cover);
-						SpeedrunMcAlt.LOGGER.info("[spawncheck]   {} at {},{},{} cover={}",
+						SpeedrunMcAlt.LOGGER.info("[spawncheck]   {} at {},{},{} blockedAbove={}",
 								table.getPath(), cp.getX(), cp.getY(), cp.getZ(), cover);
 						if (table.getPath().contains("supply")) {
 							net.minecraft.inventory.Inventory inv =
@@ -156,7 +156,7 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 						}
 					}
 					detail += " wreckChests=" + wreckChests + " food=" + food
-							+ " worstCover=" + worstCover;
+							+ " chestsBlocked=" + worstCover;
 					// THE WRECK MUST NOT BE BURIED AT ALL. Not "the food
 					// is reachable with some digging" - a buried wreck is
 					// a different and slower opening, and two players on
@@ -229,30 +229,30 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 	}
 
 	/**
-	 * Solid blocks stacked directly above a position, up to 12.
+	 * Is the block DIRECTLY above this chest solid?
 	 *
-	 * Solidity is the test, NOT the absence of fluid. The first version
-	 * stopped counting at anything with a fluid state, and a shipwreck's
-	 * own deck hatch is a WATERLOGGED TRAPDOOR - solid, obstructing, and
-	 * full of water. It reported cover=1 on a chest with seven blocks of
-	 * stone and sand above it, because the trapdoor at the second block
-	 * looked like open water.
+	 * Nothing may sit on a shipwreck chest - not terrain, not the
+	 * wreck's own planking. Reaching these chests is already a swim
+	 * down on one breath, and they carry the iron, gold and food the
+	 * opening depends on; a block to break on top of that is time the
+	 * route cannot spare, whatever the block is made of.
 	 *
-	 * A block you must break is a block you must break, whether or not
-	 * it is wet.
+	 * This matches what the incumbent ships. Across five MCSR Ranked
+	 * wrecks, thirteen of fifteen chests have WATER directly above
+	 * them, with the deck planks and stairs sitting a block or two
+	 * higher rather than on the chest. The two exceptions - gravel over
+	 * a map chest, granite over a supply chest - are the only ones in
+	 * the sample, and neither was ever opened.
+	 *
+	 * Earlier versions of this counted blocks, then counted only
+	 * terrain, then counted only terrain needing a tool. Each was a
+	 * proxy for "can you open it quickly", and each let something
+	 * through. The block on top either exists or it does not.
 	 */
-	private static int coverAbove(ServerWorld world, BlockPos pos) {
-		int n = 0;
-		BlockPos.Mutable p = new BlockPos.Mutable();
-		for (int dy = 1; dy <= 12; dy++) {
-			p.set(pos.getX(), pos.getY() + dy, pos.getZ());
-			net.minecraft.block.BlockState st = world.getBlockState(p);
-			if (!st.getMaterial().isSolid()) {
-				break;   // air or open water - you are through
-			}
-			n++;
-		}
-		return n;
+	private static int solidDirectlyAbove(ServerWorld world, BlockPos pos) {
+		BlockPos above = pos.up();
+		net.minecraft.block.BlockState st = world.getBlockState(above);
+		return st.getMaterial().isSolid() ? 1 : 0;
 	}
 
 	private static StructureFeature<?> featureFor(String type) {

@@ -17,6 +17,8 @@ done
 trap 'rmdir "$CLAIM" 2>/dev/null' EXIT
 
 PORT=$((26000 + ${DIR##*w}))
+STALE=$(lsof -nP -iTCP:$PORT -sTCP:LISTEN -t 2>/dev/null)
+if [ -n "$STALE" ]; then kill -9 $STALE 2>/dev/null; sleep 2; fi
 printf 'level-seed=%s\nlevel-type=default\nonline-mode=false\nmax-tick-time=-1\nsync-chunk-writes=false\nserver-port=%s\n' "$SEED" "$PORT" > "$DIR/run/server.properties"
 printf '%s %s %s\n' "$SEED" "$SX" "$SZ" > "$DIR/run/portalfilter.txt"
 rm -rf "$DIR/run/world"; rm -f "$DIR/run/portalfilter.csv"

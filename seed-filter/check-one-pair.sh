@@ -48,6 +48,8 @@ trap 'rmdir "$CLAIM" 2>/dev/null' EXIT
 # how the parallel village harness lost 28 of 40 workers and published a
 # confident wrong answer built out of their zeroes.
 PORT=$((25700 + ${DIR##*w}))
+STALE=$(lsof -nP -iTCP:$PORT -sTCP:LISTEN -t 2>/dev/null)
+if [ -n "$STALE" ]; then kill -9 $STALE 2>/dev/null; sleep 2; fi
 
 printf 'level-seed=%s\nlevel-type=default\nonline-mode=false\nmax-tick-time=-1\nsync-chunk-writes=false\nserver-port=%s\n' \
   "$OW" "$PORT" > "$DIR/run/server.properties"
