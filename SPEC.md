@@ -574,6 +574,16 @@ restricted: Hard spreads fire faster when woodlighting a portal, and
 widens piglin aggro range for a bartering pit. Runners flip to Hard and
 straight back.
 
+**Confirmed in play 2026-09-22, by type.** Village: smith, bastion and
+fortress all walked. Ruined portal: the first filtered seed, after five
+distinct defects the same day. Desert temple: three lava pools placed
+and a portal cast from one of them, bastion in sight at the shipped
+coordinate - the lava guarantee's failure path had been silent until
+that afternoon, so this was its first run since. Buried treasure: the
+magma ravine found within 3 blocks of its predicted position, though
+that seed was later quarantined for the link-point rule. Shipwreck
+remains untested against the current code.
+
 ### Nether arrival terrain
 
 Biome is filtered; terrain is not. A seed can pass every check and
