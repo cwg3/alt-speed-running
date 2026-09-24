@@ -63,20 +63,24 @@ public final class Cues {
 	}
 
 	/**
-	 * The player death sound - the "oof".
+	 * The burning sizzle - random/fizz.
 	 *
 	 * Asked for as "the loop that happens when PLAYER tried to swim in
-	 * lava". There is no sound attached to a death MESSAGE; what a
-	 * runner hears going into lava is the burning sizzle
-	 * (entity.player.hurt_on_fire) repeating while they cook, then
-	 * entity.player.death at the moment the message appears. This is
-	 * that last one - the sound that lands exactly when the death text
-	 * does, and the one every player already reads as "the run is
-	 * over". Pitched down slightly so it reads as final rather than as
-	 * an ordinary death mid-run.
+	 * lava". Nothing is attached to a death MESSAGE, so the question is
+	 * which FILE that moment sounds like, and the asset index answers
+	 * it: entity.generic.burn plays random/fizz, the hiss that repeats
+	 * the whole time a player is cooking. That is the loop.
+	 *
+	 * The previous attempt was entity.player.death, on the reasoning
+	 * that it lands when the death text does. It does - but the index
+	 * shows entity.player.death and entity.player.hurt resolve to the
+	 * SAME three files (damage/hit1-3). There is no distinct death
+	 * sound in Java Edition, so a defeat cue built on it is a damage
+	 * sound, which is what it was heard as. Guessing from the event
+	 * NAME was the mistake; the files are what a player hears.
 	 */
 	public static void defeat() {
-		play(SoundEvents.ENTITY_PLAYER_DEATH, 0.9f);
+		play(SoundEvents.ENTITY_GENERIC_BURN, 1.0f);
 	}
 
 	/**
