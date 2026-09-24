@@ -12,7 +12,28 @@ import net.minecraft.client.util.math.MatrixStack;
  */
 public final class Palette {
 	public static final int CYAN = 0x22D3EE;
-	public static final int PURPLE = 0x7B2FF7;
+	/**
+	 * Royal purple, lightened from 0x7B2FF7.
+	 *
+	 * The original was by far the dimmest thing in the palette and it
+	 * looked it next to the others. Relative luminance:
+	 *
+	 *   purple (old)  0.130     magenta  0.248
+	 *   orange        0.316     cyan     0.531
+	 *   yellow        0.683     phosphor 0.739
+	 *
+	 * Half the brightness of the next dimmest and a quarter of cyan.
+	 * That is not a taste problem, it is where purple's light sits: it
+	 * is almost entirely blue, and blue contributes about 7% of
+	 * perceived brightness against green's 72%. A saturated royal
+	 * purple is physically dim however vivid it looks on its own.
+	 *
+	 * This one is 0.298 - just above magenta, so it belongs to the same
+	 * family as the rest. Matching the palette's MEDIAN would have
+	 * meant something near 0xD4B8FF, which is lavender and stops
+	 * reading as royal purple at all.
+	 */
+	public static final int PURPLE = 0xA97BFF;
 	public static final int MAGENTA = 0xEC4899;
 	public static final int ORANGE = 0xFF6A00;
 	public static final int YELLOW = 0xFFD400;
