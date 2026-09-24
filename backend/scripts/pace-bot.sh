@@ -64,8 +64,17 @@ now=$(date +%s); now_ms=$((now*1000)); exp=$((now+7200))
 
 # Refresh the bot's player row and session each run. Rating is pinned to
 # 1500 so the skill-range matcher always considers it a fair pairing.
-aws dynamodb put-item --region "$REGION" --table-name "$PLAYERS" --item \
-  "{\"uuid\":{\"S\":\"$UUID\"},\"username\":{\"S\":\"$NAME\"},\"skillRating\":{\"N\":\"1500\"},\"seasonPoints\":{\"N\":\"0\"},\"createdAt\":{\"N\":\"$now_ms\"},\"lastLoginAt\":{\"N\":\"$now_ms\"}}" >/dev/null
+# update-item, not put-item. put-item REPLACES the row, and the bot's
+# row now carries seenSeeds - the set of pairs it has already played.
+# Overwriting it reset the bot to having seen nothing every run, which
+# quietly made it useless as a test partner: the draw is supposed to
+# exclude seeds EITHER player has seen, and a bot with an empty set
+# never constrains it. Mirrors what verifySession does for real
+# players, which was always an update and was never affected.
+aws dynamodb update-item --region "$REGION" --table-name "$PLAYERS" \
+  --key "{\"uuid\":{\"S\":\"$UUID\"}}" \
+  --update-expression "SET username = :n, lastLoginAt = :t, createdAt = if_not_exists(createdAt, :t), skillRating = if_not_exists(skillRating, :r), seasonPoints = if_not_exists(seasonPoints, :z)" \
+  --expression-attribute-values "{\":n\":{\"S\":\"$NAME\"},\":t\":{\"N\":\"$now_ms\"},\":r\":{\"N\":\"1500\"},\":z\":{\"N\":\"0\"}}" >/dev/null
 aws dynamodb put-item --region "$REGION" --table-name "$SESSIONS" --item \
   "{\"token\":{\"S\":\"$TOK\"},\"uuid\":{\"S\":\"$UUID\"},\"createdAt\":{\"N\":\"$now_ms\"},\"expiresAt\":{\"N\":\"$exp\"}}" >/dev/null
 
