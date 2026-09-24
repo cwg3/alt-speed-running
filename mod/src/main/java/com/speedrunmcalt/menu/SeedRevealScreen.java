@@ -23,9 +23,9 @@ import net.minecraft.text.LiteralText;
  * from something merely uncharged into the planning window itself.
  */
 public class SeedRevealScreen extends Screen {
-	private static final int PHOSPHOR = 0x56FF42;
-	private static final int DIM = 0x8AA894;
-	private static final int ALERT = 0xFFC65B;
+	private static final int PHOSPHOR = Palette.CYAN;
+	private static final int DIM = Palette.DIM;
+	private static final int ALERT = Palette.YELLOW;
 
 	public SeedRevealScreen() {
 		super(new LiteralText("Seed"));

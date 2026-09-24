@@ -14,9 +14,9 @@ import net.minecraft.text.LiteralText;
  * mid-run. Cancel is the default focus.
  */
 public class ForfeitConfirmScreen extends Screen {
-	private static final int PHOSPHOR = 0x56FF42;
-	private static final int DIM = 0x8AA894;
-	private static final int ALERT = 0xFF6B5B;
+	private static final int PHOSPHOR = Palette.CYAN;
+	private static final int DIM = Palette.DIM;
+	private static final int ALERT = Palette.ORANGE;
 
 	private final Screen parent;
 

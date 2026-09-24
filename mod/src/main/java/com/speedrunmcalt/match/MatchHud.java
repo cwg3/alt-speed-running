@@ -14,10 +14,10 @@ import net.minecraft.client.util.math.MatrixStack;
  * health, effects).
  */
 public final class MatchHud {
-	private static final int PHOSPHOR = 0x56FF42;
-	private static final int DIM = 0x8AA894;
-	private static final int AHEAD = 0x6BFF6B;
-	private static final int BEHIND = 0xFF8A6B;
+	private static final int PHOSPHOR = com.speedrunmcalt.menu.Palette.CYAN;
+	private static final int DIM = com.speedrunmcalt.menu.Palette.DIM;
+	private static final int AHEAD = com.speedrunmcalt.menu.Palette.CYAN;
+	private static final int BEHIND = com.speedrunmcalt.menu.Palette.MAGENTA;
 
 	private static final int X = 6;
 	private static final int Y = 6;
@@ -64,7 +64,11 @@ public final class MatchHud {
 		int y = Y;
 		long elapsed = MatchState.elapsedMillis();
 		String outcome = MatchState.result;
-		drawShadowed(matrices, client, "alt  " + MatchState.formatTime(elapsed), X, y, PHOSPHOR);
+		// "alt" keeps its brand colour here too, so the HUD and the
+		// menu read as the same product.
+		drawShadowed(matrices, client, "alt", X, y, com.speedrunmcalt.menu.Palette.ORANGE);
+		drawShadowed(matrices, client, MatchState.formatTime(elapsed),
+				X + client.textRenderer.getWidth("alt  "), y, PHOSPHOR);
 		y += LINE;
 
 		if (outcome != null) {

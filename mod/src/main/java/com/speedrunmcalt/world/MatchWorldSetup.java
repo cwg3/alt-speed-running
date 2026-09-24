@@ -322,8 +322,25 @@ public final class MatchWorldSetup {
 				// buys a portal that IS vanilla rather than one that
 				// imitates it.
 				//
-				// The loot top-up still runs below, so the two missing
-				// obsidian and a light source are guaranteed.
+				// Measure the gap so the chest can cover it. The frame
+				// may be missing two blocks or nine; either is fine as
+				// long as the obsidian to finish it is in the chest.
+				try {
+					com.speedrunmcalt.seed.VillageSmith.Village pv =
+							com.speedrunmcalt.seed.VillageSmith.inspect(
+									world.getServer().getStructureManager(), seed,
+									StructureFeature.RUINED_PORTAL, x, z);
+					if (pv.exists()) {
+						com.speedrunmcalt.seed.PortalFrame.Result fr =
+								com.speedrunmcalt.seed.PortalFrame.check(world, pv.xzBox());
+						MatchState.portalObsidianNeeded = fr.missing;
+						SpeedrunMcAlt.LOGGER.info(
+								"[speedrunmcalt] Portal frame needs {} obsidian to finish",
+								fr.missing);
+					}
+				} catch (Exception e) {
+					SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] Could not measure portal frame", e);
+				}
 				LavaPoolPlacer.placePortalAccess(world, seed, x, z);
 				break;
 			}

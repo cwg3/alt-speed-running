@@ -134,6 +134,18 @@ public final class MatchState {
 	 */
 	public static volatile String setupFailure = null;
 
+	/**
+	 * How many obsidian this seed's ruined portal frame is short.
+	 *
+	 * The chest guarantee is sized from this rather than a fixed 2-4.
+	 * The old fixed amount was not a property of the seed, it was our
+	 * supply - and it forced the pool filter to reject any frame
+	 * missing more than two blocks, discarding seeds that were
+	 * perfectly playable if the chest simply held enough to finish
+	 * them.
+	 */
+	public static volatile int portalObsidianNeeded = 0;
+
 	// Identify the active match to the backend when reporting splits.
 	// Null when no ranked match is in progress, which is what
 	// SplitReporter checks before attempting any network call.
@@ -210,6 +222,7 @@ public final class MatchState {
 		countdownEndsAt = 0;
 		runAlreadyStarted = false;
 		setupFailure = null;
+		portalObsidianNeeded = 0;
 		BarterSchedule.reset();
 		DropSchedule.reset();
 		MatchClock.reset();

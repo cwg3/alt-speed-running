@@ -498,7 +498,12 @@ public final class LootTopUp {
 		}
 
 		if (type.needsObsidian) {
-			int target = obsidianFor(seed);
+			// Enough to FINISH THIS FRAME, plus vanilla's spare. A
+			// fixed 2-4 was our supply masquerading as a rule, and it
+			// made the pool filter throw away any portal missing more
+			// than two blocks.
+			int needed = com.speedrunmcalt.match.MatchState.portalObsidianNeeded;
+			int target = Math.max(obsidianFor(seed), needed + 1);
 			if (obsidian < target) {
 				int deficit = target - obsidian;
 				if (!insert(world, containers, Items.OBSIDIAN, deficit)) {

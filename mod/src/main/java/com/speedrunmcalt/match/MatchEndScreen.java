@@ -15,10 +15,10 @@ import net.minecraft.text.LiteralText;
  * stop - so neither is buried behind the title screen.
  */
 public class MatchEndScreen extends Screen {
-	private static final int PHOSPHOR = 0x56FF42;
-	private static final int DIM = 0x8AA894;
-	private static final int WIN = 0x6BFF6B;
-	private static final int LOSS = 0xFF8A6B;
+	private static final int PHOSPHOR = com.speedrunmcalt.menu.Palette.CYAN;
+	private static final int DIM = com.speedrunmcalt.menu.Palette.DIM;
+	private static final int WIN = com.speedrunmcalt.menu.Palette.CYAN;
+	private static final int LOSS = com.speedrunmcalt.menu.Palette.MAGENTA;
 
 	private final boolean won;
 	private final String opponent;

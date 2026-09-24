@@ -24,9 +24,9 @@ import net.minecraft.text.LiteralText;
  * forfeit.
  */
 public class BadSeedScreen extends Screen {
-	private static final int PHOSPHOR = 0x56FF42;
-	private static final int DIM = 0x8AA894;
-	private static final int ALERT = 0xFFC65B;
+	private static final int PHOSPHOR = Palette.CYAN;
+	private static final int DIM = Palette.DIM;
+	private static final int ALERT = Palette.YELLOW;
 
 	private final Screen parent;
 	/** True when the opponent raised it first and we are agreeing. */

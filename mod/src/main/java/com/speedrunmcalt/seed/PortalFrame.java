@@ -44,8 +44,25 @@ public final class PortalFrame {
 	private static final int MIN_WIDTH = 4;
 	private static final int MIN_HEIGHT = 5;
 
-	/** What the chest's obsidian floor can fill. See LootTopUp. */
-	public static final int MAX_MISSING = 2;
+	/**
+	 * Most blocks a runner should have to place to finish a frame.
+	 *
+	 * This is NOT a feasibility limit any more. It used to be 2, which
+	 * was the chest's fixed obsidian floor - our supply pretending to be
+	 * a rule, and it discarded seeds whose frames were perfectly
+	 * playable if the chest simply held enough. The chest is now sized
+	 * to whatever the frame is short, so any gap can be completed.
+	 *
+	 * What remains is FAIRNESS: placing nine obsidian is slower than
+	 * placing two, and two players on two ruined portal seeds should be
+	 * running comparable openings. Six is half a frame's non-corner
+	 * slots - a real range of variety, without one seed costing four
+	 * times the placements of another.
+	 *
+	 * Crying obsidian in a frame slot is still fatal and always will
+	 * be: no amount of chest loot clears it without a diamond pickaxe.
+	 */
+	public static final int MAX_MISSING = 6;
 
 	private PortalFrame() {
 	}

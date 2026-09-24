@@ -8,9 +8,9 @@ import net.minecraft.text.LiteralText;
 /** The lobby: connection state, profile, and queue controls. */
 public class AltMenuScreen extends Screen {
 	// Phosphor green from the wordmark, so the screen and the brand match.
-	private static final int PHOSPHOR = 0x56FF42;
-	private static final int DIM = 0x2E8F3A;
-	private static final int ALERT = 0xFF6B5B;
+	private static final int PHOSPHOR = Palette.CYAN;
+	private static final int DIM = Palette.DIM;
+	private static final int ALERT = Palette.ALERT;
 
 	private final Screen parent;
 	private ButtonWidget actionButton;
@@ -63,9 +63,11 @@ public class AltMenuScreen extends Screen {
 		int cx = this.width / 2;
 		int top = this.height / 2 - 70;
 
-		drawCenteredText(matrices, this.textRenderer, new LiteralText("alt"), cx, top, PHOSPHOR);
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("speed-running"), cx, top + 12, DIM);
+		drawCenteredText(matrices, this.textRenderer, new LiteralText("alt"),
+				cx, top, Palette.ORANGE);
+		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, top + 12,
+				new String[] { "speed", "-", "running" },
+				new int[] { Palette.PURPLE, Palette.MAGENTA, Palette.CYAN });
 
 		String status;
 		String detail = null;
@@ -88,6 +90,7 @@ public class AltMenuScreen extends Screen {
 			case READY:
 			default:
 				status = AltSession.username();
+				statusColor = Palette.YELLOW;
 				detail = AltSession.skillRating() + " elo  -  "
 						+ AltSession.seasonPoints() + " season points";
 				break;
@@ -95,7 +98,20 @@ public class AltMenuScreen extends Screen {
 
 		drawCenteredText(matrices, this.textRenderer, new LiteralText(status), cx, top + 34, statusColor);
 		if (detail != null) {
-			drawCenteredText(matrices, this.textRenderer, new LiteralText(fit(detail)), cx, top + 46, DIM);
+			if (AltSession.state() == AltSession.State.READY) {
+				// Elo and season points are different currencies and
+				// read as one number when they share a colour.
+				Palette.drawCenteredSegments(matrices, this.textRenderer, cx, top + 46,
+						new String[] {
+							AltSession.skillRating() + " elo",
+							"  -  ",
+							AltSession.seasonPoints() + " season points",
+						},
+						new int[] { Palette.CYAN, Palette.DIM, Palette.MAGENTA });
+			} else {
+				drawCenteredText(matrices, this.textRenderer,
+						new LiteralText(fit(detail)), cx, top + 46, Palette.DIM);
+			}
 		}
 
 		// Queue state sits below the profile so both stay visible while
