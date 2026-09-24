@@ -47,7 +47,7 @@ public final class MatchEnd {
 	 */
 	public static void complete(boolean won, String opponentName,
 			Integer ratingDelta, Integer seasonPoints, String hudMessage, long lingerMs) {
-		if (ending || !MatchState.inMatch()) {
+		if (ending || !MatchState.inMatch() || MatchState.replayMode) {
 			return;
 		}
 		ending = true;

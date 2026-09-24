@@ -31,9 +31,23 @@ public abstract class PauseMenuMixin extends Screen {
 		super(null);
 	}
 
+	/**
+	 * In a replay, Escape is the timeline rather than the pause menu.
+	 *
+	 * Escape is where a viewer already reaches for playback controls,
+	 * and the vanilla pause menu offers nothing useful while watching -
+	 * "Save and quit" and "Options" over a world that is not a save.
+	 */
+	@Inject(method = "init", at = @At("TAIL"))
+	private void speedrunmcalt$replayTimeline(CallbackInfo ci) {
+		if (com.speedrunmcalt.replay.ReplayPlayback.active()) {
+			this.client.openScreen(new com.speedrunmcalt.replay.ReplayTimelineScreen());
+		}
+	}
+
 	@Inject(method = "initWidgets", at = @At("TAIL"))
 	private void speedrunmcalt$addForfeit(CallbackInfo ci) {
-		if (!MatchState.inMatch()) {
+		if (!MatchState.inMatch() || MatchState.replayMode) {
 			return;
 		}
 		// Below the vanilla buttons, clear of them. The pause menu's own

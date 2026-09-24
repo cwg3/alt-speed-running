@@ -268,6 +268,43 @@ public final class BackendClient {
 		return o.has(key) && !o.get(key).isJsonNull() ? o.get(key).getAsInt() : 0;
 	}
 
+	/** Both players' traces for a finished match, with the seeds to rebuild it. */
+	public static ReplayData getReplay(String sessionToken, String matchId) throws IOException {
+		JsonObject resp = get(API_BASE + "/matches/" + matchId + "/replay", sessionToken);
+
+		java.util.Map<String, ReplayData.Track> tracks = new java.util.LinkedHashMap<>();
+		JsonObject tracksJson = resp.getAsJsonObject("traces");
+		for (java.util.Map.Entry<String, com.google.gson.JsonElement> e : tracksJson.entrySet()) {
+			JsonObject t = e.getValue().getAsJsonObject();
+			java.util.List<ReplayData.Sample> samples = null;
+			if (t.has("samples") && !t.get("samples").isJsonNull()) {
+				samples = new java.util.ArrayList<>();
+				for (com.google.gson.JsonElement rowEl : t.getAsJsonArray("samples")) {
+					JsonArray row = rowEl.getAsJsonArray();
+					// 5-wide rows come from before rotation was
+					// recorded. They still play, just facing forward -
+					// better than refusing to show an old match at all.
+					float yaw = row.size() > 5 ? row.get(5).getAsFloat() : 0f;
+					float pitch = row.size() > 6 ? row.get(6).getAsFloat() : 0f;
+					samples.add(new ReplayData.Sample(
+							row.get(0).getAsLong(), row.get(1).getAsInt(),
+							row.get(2).getAsDouble(), row.get(3).getAsDouble(),
+							row.get(4).getAsDouble(), yaw, pitch));
+				}
+			}
+			tracks.put(e.getKey(), new ReplayData.Track(
+					t.has("username") ? t.get("username").getAsString() : "player", samples));
+		}
+
+		return new ReplayData(
+				resp.get("matchId").getAsString(),
+				resp.get("overworldSeed").getAsLong(),
+				resp.get("netherSeed").getAsLong(),
+				str(resp, "seedType", "unknown"),
+				num(resp, "worldSetupVersion"),
+				tracks);
+	}
+
 	public static void forfeit(String sessionToken, String matchId) throws IOException {
 		JsonObject body = new JsonObject();
 		body.addProperty("matchId", matchId);

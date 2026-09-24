@@ -31,6 +31,10 @@ public class MatchHistoryScreen extends Screen {
 	private volatile List<MatchHistoryEntry> entries = new ArrayList<>();
 	private volatile String error;
 	private volatile boolean loading = true;
+	/** Where the rows were drawn, so a click can find which one. */
+	private int rowsLeft;
+	private int rowsTop;
+
 	/** completedAt to page from; 0 asks for the newest. */
 	private volatile long before = 0;
 	/** Absent next page: the oldest row is already shown. */
@@ -118,6 +122,22 @@ public class MatchHistoryScreen extends Screen {
 	}
 
 	@Override
+	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		if (!loading && error == null && !entries.isEmpty()) {
+			int index = (int) ((mouseY - rowsTop) / ROW_HEIGHT);
+			if (index >= 0 && index < entries.size()
+					&& mouseX >= rowsLeft && mouseX <= rowsLeft + 300) {
+				MatchHistoryEntry e = entries.get(index);
+				com.speedrunmcalt.replay.ReplayLauncher.clearError();
+				com.speedrunmcalt.replay.ReplayLauncher.open(
+						this.client, e.matchId, AltSession.uuid());
+				return true;
+			}
+		}
+		return super.mouseClicked(mouseX, mouseY, button);
+	}
+
+	@Override
 	public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
 		this.renderBackground(matrices);
 		int cx = this.width / 2;
@@ -148,6 +168,8 @@ public class MatchHistoryScreen extends Screen {
 		// the eye can run down result, opponent and rating without
 		// following a ragged margin.
 		int left = cx - 150;
+		rowsLeft = left;
+		rowsTop = 40;
 		int y = 40;
 		for (MatchHistoryEntry e : entries) {
 			this.textRenderer.drawWithShadow(matrices, e.won ? "WON" : "LOST",
@@ -169,9 +191,23 @@ public class MatchHistoryScreen extends Screen {
 			y += ROW_HEIGHT;
 		}
 
+		// The launcher's state, not this screen's: loading a replay is
+		// its own operation and can fail in its own way - most often by
+		// refusing a match built under different rules.
+		String replayNote = com.speedrunmcalt.replay.ReplayLauncher.loading()
+				? "loading replay..."
+				: com.speedrunmcalt.replay.ReplayLauncher.error();
+		if (replayNote != null) {
+			drawCenteredText(matrices, this.textRenderer,
+					new LiteralText(replayNote), cx, this.height - 58,
+					com.speedrunmcalt.replay.ReplayLauncher.error() != null
+							? Palette.ALERT : Palette.DIM);
+		}
+
 		String page = before == 0 ? "newest" : "older";
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText(page + (atEnd ? " - end of history" : "")),
+				new LiteralText(page + (atEnd ? " - end of history" : "")
+						+ "   -   click a match to watch it"),
 				cx, this.height - 44, Palette.DIM);
 
 		super.render(matrices, mouseX, mouseY, delta);

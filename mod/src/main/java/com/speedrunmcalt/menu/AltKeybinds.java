@@ -25,7 +25,8 @@ public final class AltKeybinds {
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			while (forfeitKey.wasPressed()) {
-				if (MatchState.inMatch() && client.currentScreen == null) {
+				if (MatchState.inMatch() && !MatchState.replayMode
+						&& client.currentScreen == null) {
 					client.openScreen(new ForfeitConfirmScreen(null));
 				}
 			}

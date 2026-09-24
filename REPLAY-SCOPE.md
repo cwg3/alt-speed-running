@@ -108,6 +108,15 @@ player keeps their best games and worst losses. That is a better
 answer than the downsampling idea below, because it puts the choice
 with the person who knows which matches mattered.
 
+## Decided
+
+**Forfeited matches keep their replay.** Everything up to the moment
+of the forfeit was recorded exactly as any other match, and it is
+worth keeping for three reasons: reviewing where the time was lost,
+scouting the opponent's routing up to that point, and - the one that
+settles it - dispute resolution. A forfeit is precisely when a result
+gets questioned, so discarding that trace would be backwards.
+
 ## Decisions needed before building
 
 **Who can watch?** Participants only is safe: under the seen-seeds rule

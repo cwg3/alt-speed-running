@@ -162,6 +162,23 @@ public final class MatchState {
 	public static final java.util.Map<String, Long> opponentSplits =
 			new java.util.concurrent.ConcurrentHashMap<>();
 	public static volatile String opponentUsername = null;
+
+	/**
+	 * True while watching a replay rather than playing a match.
+	 *
+	 * inMatch() stays TRUE during a replay on purpose: the world has to
+	 * be rebuilt exactly, and both MatchWorldSetup and the nether-seed
+	 * redirect key off it. Everything that acts on a LIVE match must
+	 * stand down instead - the recorder above all, which would
+	 * otherwise record a replay of the replay and upload it over the
+	 * original.
+	 *
+	 * Suppressed by this: ReplayRecorder, MatchHud, MatchEnd, the pause
+	 * menu's forfeit, and the bad-seed keybind. Left running: the
+	 * placement mixins and MatchWorldSetup, because a world built
+	 * differently is not the world that was played.
+	 */
+	public static volatile boolean replayMode = false;
 	/**
 	 * The opponent has voted that this seed is unplayable and is waiting
 	 * on us. Set by the live poller, which is the only channel that

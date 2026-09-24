@@ -70,7 +70,7 @@ public final class MatchHud {
 		// away from. Without it there is no way to tell a live search
 		// from one that silently died, and no reminder that a match is
 		// coming.
-		if (!MatchState.inMatch()) {
+		if (!MatchState.inMatch() || MatchState.replayMode) {
 			if (com.speedrunmcalt.menu.Matchmaker.state()
 					== com.speedrunmcalt.menu.Matchmaker.State.SEARCHING) {
 				drawShadowed(matrices, client, "alt", X, Y,

@@ -103,7 +103,9 @@ public final class ReplayRecorder {
 	}
 
 	private static void tick(MinecraftClient client) {
-		if (!MatchState.inMatch()) {
+		// Never record a replay of a replay - it would overwrite the
+		// original trace with a recording of watching it.
+		if (!MatchState.inMatch() || MatchState.replayMode) {
 			return;
 		}
 		ClientPlayerEntity player = client.player;
