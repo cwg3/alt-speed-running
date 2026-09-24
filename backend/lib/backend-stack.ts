@@ -353,6 +353,33 @@ export class BackendStack extends cdk.Stack {
 			integration: new HttpLambdaIntegration('MatchHistoryIntegration', matchHistoryFn),
 		});
 
+		const getReplayFn = new NodejsFunction(this, 'GetReplayFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'getReplay.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			timeout: cdk.Duration.seconds(30),
+			// Two traces of tens of thousands of samples are decompressed
+			// and re-serialised here, so this needs more room than a
+			// table read.
+			memorySize: 1024,
+			environment: {
+				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				MATCHES_TABLE_NAME: matchesTable.tableName,
+				REPLAY_BUCKET: replayBucket.bucketName,
+			},
+		});
+		sessionsTable.grantReadData(getReplayFn);
+		matchesTable.grantReadData(getReplayFn);
+		// The bucket had grantPut and nothing else - there was no read
+		// path at all until now, which is why no replay could be played.
+		replayBucket.grantRead(getReplayFn);
+
+		api.addRoutes({
+			path: '/matches/{matchId}/replay',
+			methods: [HttpMethod.GET],
+			integration: new HttpLambdaIntegration('GetReplayIntegration', getReplayFn),
+		});
+
 		new cdk.CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
 		new cdk.CfnOutput(this, 'MatchHistoryTableName', { value: matchHistoryTable.tableName });
 		new cdk.CfnOutput(this, 'ReplayBucketName', { value: replayBucket.bucketName });
