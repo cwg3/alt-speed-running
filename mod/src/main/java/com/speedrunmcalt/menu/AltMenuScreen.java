@@ -64,7 +64,7 @@ public class AltMenuScreen extends Screen {
 		int top = this.height / 2 - 70;
 
 		drawCenteredText(matrices, this.textRenderer, new LiteralText("alt"),
-				cx, top, Palette.ORANGE);
+				cx, top, Palette.PHOSPHOR);
 		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, top + 12,
 				new String[] { "speed", "-", "running" },
 				new int[] { Palette.PURPLE, Palette.MAGENTA, Palette.CYAN });

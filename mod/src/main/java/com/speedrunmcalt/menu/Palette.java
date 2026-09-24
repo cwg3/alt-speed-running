@@ -17,6 +17,14 @@ public final class Palette {
 	public static final int ORANGE = 0xFF6A00;
 	public static final int YELLOW = 0xFFD400;
 
+	/**
+	 * The original phosphor green, kept as a palette colour rather than
+	 * replaced. It is the wordmark's colour - "alt" was green before
+	 * any of the rest existed, and a brand mark is the one thing a
+	 * restyle should leave alone.
+	 */
+	public static final int PHOSPHOR = 0x56FF42;
+
 	/** Secondary text: present, but not competing with the palette. */
 	public static final int DIM = 0x6B7280;
 	/** Something went wrong. */

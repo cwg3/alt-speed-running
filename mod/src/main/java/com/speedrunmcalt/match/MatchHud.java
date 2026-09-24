@@ -66,7 +66,7 @@ public final class MatchHud {
 		String outcome = MatchState.result;
 		// "alt" keeps its brand colour here too, so the HUD and the
 		// menu read as the same product.
-		drawShadowed(matrices, client, "alt", X, y, com.speedrunmcalt.menu.Palette.ORANGE);
+		drawShadowed(matrices, client, "alt", X, y, com.speedrunmcalt.menu.Palette.PHOSPHOR);
 		drawShadowed(matrices, client, MatchState.formatTime(elapsed),
 				X + client.textRenderer.getWidth("alt  "), y, PHOSPHOR);
 		y += LINE;
