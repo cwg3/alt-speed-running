@@ -217,7 +217,40 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 	 * are what separate a tree from a wreck; which structure a block
 	 * belongs to is the wrong question.
 	 */
+	/**
+	 * Bring the whole scan area to FULL before reading a single block.
+	 *
+	 * Without this the log count is not reproducible. The same seed
+	 * checked seven times gave 2613, 2624, 2631, 2641, 2660, 2681 and
+	 * 2690 - three of those from inside one container, back to back, so
+	 * it is world generation and not the environment.
+	 *
+	 * The cause is that trees are placed during a chunk's FEATURES
+	 * stage and a trunk near an edge puts logs into its NEIGHBOUR. If
+	 * the scan reads a chunk before the neighbour has been populated,
+	 * that overhang has not been written yet. Letting getBlockState
+	 * generate chunks as the scan wanders means the order - and so the
+	 * count - depends on where the scan happens to go first. The spread
+	 * is about one tree, which is nothing against 2600 and decisive
+	 * against MIN_LOGS.
+	 *
+	 * One chunk of margin beyond the scan area, so chunks at the very
+	 * edge also have their populated neighbours.
+	 */
+	private static void generateScanArea(ServerWorld world, BlockPos spawn) {
+		int cx0 = ((spawn.getX() - WOOD_RADIUS) >> 4) - 1;
+		int cx1 = ((spawn.getX() + WOOD_RADIUS) >> 4) + 1;
+		int cz0 = ((spawn.getZ() - WOOD_RADIUS) >> 4) - 1;
+		int cz1 = ((spawn.getZ() + WOOD_RADIUS) >> 4) + 1;
+		for (int cx = cx0; cx <= cx1; cx++) {
+			for (int cz = cz0; cz <= cz1; cz++) {
+				world.getChunk(cx, cz, net.minecraft.world.chunk.ChunkStatus.FULL, true);
+			}
+		}
+	}
+
 	private static int countLogs(ServerWorld world, BlockPos spawn, BlockBox exclude) {
+		generateScanArea(world, spawn);
 		int found = 0;
 		BlockPos.Mutable pos = new BlockPos.Mutable();
 		for (int dx = -WOOD_RADIUS; dx <= WOOD_RADIUS; dx++) {
