@@ -927,6 +927,32 @@ bounding box - a shipwreck's hull is wood the filter must not count.
 Ocean types need it most, because their spawns are the ones where a
 wooded biome can be technically nearby and practically unreachable.
 
+**Bastion burial was investigated and is NOT a problem.** A player got
+lost in a bastion on 2026-09-23, found one chest, could not dig out to
+orient themselves, and reported it as "partially buried". Three
+measurements say otherwise:
+
+| | that bastion | six MCSR bastions |
+|---|---|---|
+| roof exposure | 64.9% | 7.1 - 29.8% |
+| solid blocks above its chests | 0 | 0 (median, all six) |
+| structure size | 1,859 top blocks | 1,483 - 2,366 |
+
+It is more exposed than any bastion the incumbent ships, its chests
+have open air directly above them, and it is normally sized. The chest
+count differs - 3 against their 4 to 12 - but chest count varies by
+bastion type and that one was a bridge.
+
+So no filter was added. Writing one would have rejected seeds for a
+property MCSR does not filter on either, which is the same mistake as
+the zero-burial shipwreck rule that would have thrown out one of their
+own seeds. What the player hit was a sprawling variant and the ordinary
+difficulty of navigating it.
+
+Recorded because the alternative is re-investigating it: the first two
+metrics tried here - fill fraction and roof exposure - both measured
+something other than the reported experience.
+
 ## To do
 
 Engineering debt that is not itself a match guarantee, kept here so it
