@@ -65,7 +65,27 @@ public class LoadingScreenLogoMixin {
 	private static final int FINISHED = 0xFFFFFFFF;
 
 	/**
-	 * The tile, behind the grid and exactly its size.
+	 * The tile, behind the grid and sized to the CENTRE region.
+	 *
+	 * Not the whole grid, which was the first attempt and left the
+	 * outer edges of the wordmark permanently masked - at 100% the
+	 * 'a' and the 't' were still clipped. The tracker has two sizes
+	 * and they are not the same box:
+	 *
+	 *   centerSize = radius * 2 + 1
+	 *   size       = (radius + ChunkStatus.getMaxTargetGenerationRadius())
+	 *                * 2 + 1
+	 *
+	 * The extra ring exists only to SUPPORT generating the centre -
+	 * those chunks stop at intermediate statuses and never reach FULL,
+	 * so they never turn white and never reveal anything. The
+	 * percentage is computed over the centre alone, which is what
+	 * makes the centre the right box: the reveal finishes exactly when
+	 * the number reaches 100.
+	 *
+	 * This is also vanilla's own 'o' - the extent it uses for the
+	 * border it draws around the centre when the gap argument is
+	 * non-zero.
 	 *
 	 * The three lines of arithmetic are vanilla's own, from the top of
 	 * drawChunkMap: cell pitch, grid extent, top-left corner. They are
@@ -84,7 +104,7 @@ public class LoadingScreenLogoMixin {
 			return;
 		}
 		int pitch = pixelSize + gap;
-		int extent = tracker.getSize() * pitch - gap;
+		int extent = tracker.getCenterSize() * pitch - gap;
 		if (extent <= 0) {
 			return;
 		}
