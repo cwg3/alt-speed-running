@@ -28,6 +28,14 @@ async function main() {
 	const matchesTable = process.argv[2];
 	const poolTable = process.argv[3];
 	const dryRun = process.argv.includes('--dry-run');
+	// --match <id> voids one named match regardless of how long it has
+	// been quiet. Testing restarts the client constantly, and every
+	// restart leaves a live match that the client rejoins on launch -
+	// so the queue is blocked for ABANDON_MS with no way out but
+	// forfeiting in game. Three test runs were lost to that before this
+	// existed.
+	const matchFlag = process.argv.indexOf('--match');
+	const onlyMatch = matchFlag >= 0 ? process.argv[matchFlag + 1] : null;
 	if (!matchesTable || !poolTable) {
 		console.error('usage: npx tsx scripts/sweepAbandoned.ts <matches-table> <seed-pool-table> [--dry-run]');
 		process.exit(1);
@@ -62,7 +70,10 @@ async function main() {
 		const newest = stamps.length ? Math.max(...stamps) : 0;
 		const silentFor = now - newest;
 
-		if (silentFor <= ABANDON_MS) {
+		if (onlyMatch && match.matchId !== onlyMatch) {
+			continue;
+		}
+		if (!onlyMatch && silentFor <= ABANDON_MS) {
 			live++;
 			continue;
 		}

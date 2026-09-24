@@ -16,6 +16,9 @@ public class SpeedrunMcAltClient implements ClientModInitializer {
 		MatchClock.register();
 		ReplayRecorder.register();
 		AltKeybinds.register();
+		// Drives the handoff from "matched" to "in the match world".
+		// Must be a tick rather than a queued task - see Matchmaker.
+		com.speedrunmcalt.menu.Matchmaker.init();
 
 		// Everything else is driven from the title screen button added by
 		// TitleScreenMixin - nothing touches the network until the player

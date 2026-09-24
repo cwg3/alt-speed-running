@@ -32,6 +32,89 @@ public final class Matchmaker {
 	private Matchmaker() {
 	}
 
+	/**
+	 * A match found but not yet entered.
+	 *
+	 * Handed to a client TICK rather than to client.execute(), and that
+	 * distinction is the whole reason this exists.
+	 *
+	 * Players queue and then practise in another world instead of
+	 * sitting on a menu, so a match is normally found with an
+	 * integrated server already running and the client has to leave it
+	 * first. MinecraftClient.disconnect() begins with cancelTasks() -
+	 * it CLEARS the client task queue - and then spins
+	 * `while (!server.isStopping()) render(false)`, a nested render
+	 * loop. Called from inside a queued task, as this used to be, it
+	 * wipes the queue it is running from (taking the follow-up world
+	 * creation with it) and re-enters render from within the render
+	 * loop's own task drain. The client hangs on a black screen with no
+	 * exception and cannot recover.
+	 *
+	 * A tick handler runs outside that drain, which is the same place
+	 * vanilla's own "save and quit to title" ends up, so disconnect
+	 * behaves the way it was written to.
+	 */
+	private static volatile QueueJoinResult pending;
+	private static volatile String pendingToken;
+
+	/** Registered once, from the client initializer. */
+	public static void init() {
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
+				.END_CLIENT_TICK.register(Matchmaker::tick);
+	}
+
+	private static void tick(MinecraftClient client) {
+		QueueJoinResult match = pending;
+		if (match == null) {
+			return;
+		}
+
+		// Leave the practice world first and do nothing else this tick.
+		// disconnect() returns only once the integrated server has
+		// stopped, and the next tick sees a client with no world.
+		if (client.world != null) {
+			client.disconnect();
+			return;
+		}
+
+		pending = null;
+		String token = pendingToken;
+		pendingToken = null;
+		try {
+			MatchState.reset();
+			ReplayRecorder.reset();
+			MatchState.matchId = match.matchId;
+			MatchState.sessionToken = token;
+			// Deliberately NOT started here. MatchClock starts it on the
+			// first tick the player can actually play, so world
+			// generation, setup and loading are not charged to the run.
+			// Set before the world is created: the setup hook fires as
+			// soon as the integrated server starts and reads these to
+			// know what to guarantee.
+			MatchState.seedType = match.seedType;
+			MatchState.structureX = match.structureX;
+			MatchState.structureZ = match.structureZ;
+			MatchState.overworldSeed = match.overworldSeed;
+			MatchState.netherSeed = match.netherSeed;
+			MatchState.bastionX = match.bastionX;
+			MatchState.bastionZ = match.bastionZ;
+			MatchState.smithX = match.smithX;
+			MatchState.smithZ = match.smithZ;
+			MatchState.runAlreadyStarted = match.runAlreadyStarted;
+			MatchWorldCreator.createMatchWorld(client, "match-" + match.matchId,
+					match.overworldSeed, match.netherSeed);
+			LiveMatchPoller.start();
+			state = State.IDLE;
+		} catch (Exception e) {
+			MatchState.reset();
+			ReplayRecorder.reset();
+			error = e.getMessage();
+			state = State.ERROR;
+			SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Match world creation failed", e);
+		}
+	}
+
+
 	public static State state() {
 		return state;
 	}
@@ -101,49 +184,10 @@ public final class Matchmaker {
 						result.bastionX, result.bastionZ,
 						result.overworldSeed, result.netherSeed);
 
-				QueueJoinResult match = result;
-				// World creation touches client/server state, so it has to
-				// run on the main thread rather than this polling thread.
-				client.execute(() -> {
-					try {
-						MatchState.reset();
-						ReplayRecorder.reset();
-						MatchState.matchId = match.matchId;
-						MatchState.sessionToken = token;
-						// Deliberately NOT started here. MatchClock starts
-						// it on the first tick the player can actually
-						// play, so world generation, setup and loading are
-						// not charged to the run - they vary by hardware
-						// and would hand the faster machine free seconds.
-						// Set before the world is created: the setup hook
-						// fires as soon as the integrated server starts,
-						// and reads these to know what to guarantee.
-						MatchState.seedType = match.seedType;
-						MatchState.structureX = match.structureX;
-						MatchState.structureZ = match.structureZ;
-						MatchState.overworldSeed = match.overworldSeed;
-						MatchState.netherSeed = match.netherSeed;
-						MatchState.bastionX = match.bastionX;
-						MatchState.bastionZ = match.bastionZ;
-						MatchState.smithX = match.smithX;
-						MatchState.smithZ = match.smithZ;
-						// Must come after reset(), which clears it. Set
-						// before the world exists, so MatchClock knows
-						// not to show the planning countdown well before
-						// the first playable tick can ask.
-						MatchState.runAlreadyStarted = match.runAlreadyStarted;
-						MatchWorldCreator.createMatchWorld(client, "match-" + match.matchId,
-								match.overworldSeed, match.netherSeed);
-						LiveMatchPoller.start();
-						state = State.IDLE;
-					} catch (Exception e) {
-						MatchState.reset();
-						ReplayRecorder.reset();
-						error = e.getMessage();
-						state = State.ERROR;
-						SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Match world creation failed", e);
-					}
-				});
+				// Nothing client-side happens on this thread. The tick
+				// handler picks it up from here.
+				pendingToken = token;
+				pending = result;
 			} catch (InterruptedException interrupted) {
 				Thread.currentThread().interrupt();
 			} catch (Exception e) {
