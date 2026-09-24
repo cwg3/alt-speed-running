@@ -22,10 +22,29 @@ public final class BackendClient {
 	private BackendClient() {
 	}
 
+	/**
+	 * This build's version, read from the mod's own metadata.
+	 *
+	 * Taken from fabric.mod.json rather than a constant, so it cannot
+	 * disagree with the jar it is compiled into - a hand-maintained
+	 * version string is exactly the kind that gets forgotten on a
+	 * release and then reports the wrong thing forever.
+	 */
+	private static String clientVersion() {
+		return net.fabricmc.loader.api.FabricLoader.getInstance()
+				.getModContainer("speedrunmcalt")
+				.map(c -> c.getMetadata().getVersion().getFriendlyString())
+				.orElse("unknown");
+	}
+
 	public static VerifyResult verify(String username, String serverId) throws IOException {
 		JsonObject body = new JsonObject();
 		body.addProperty("username", username);
 		body.addProperty("serverId", serverId);
+		// Sent on login, which is the only moment a stale client can be
+		// turned away before it reaches matchmaking and fails in ways
+		// that look like server bugs.
+		body.addProperty("clientVersion", clientVersion());
 
 		JsonObject resp = post(API_BASE + "/auth/verify", body, null);
 		return new VerifyResult(
@@ -278,6 +297,18 @@ public final class BackendClient {
 		}
 
 		if (!ok) {
+			// The backend's own "error" string, when it sent one.
+			// AltSession puts getMessage() straight on the screen, and
+			// the whole JSON body plus a URL is not something to show
+			// somebody - least of all for the version gate, whose
+			// entire job is to say one clear sentence.
+			String friendly = null;
+			if (json != null && json.has("error") && json.get("error").isJsonPrimitive()) {
+				friendly = json.get("error").getAsString();
+			}
+			if (friendly != null) {
+				throw new IOException(friendly);
+			}
 			String detail = json != null ? json.toString() : text;
 			throw new IOException("POST " + url + " failed with HTTP " + status + ": " + detail);
 		}

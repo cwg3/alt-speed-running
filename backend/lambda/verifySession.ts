@@ -13,9 +13,44 @@ const SESSIONS_TABLE_NAME = process.env.SESSIONS_TABLE_NAME!;
 const DEFAULT_SKILL_RATING = 1500;
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 
+/**
+ * Oldest client build allowed to log in.
+ *
+ * Checked at login because that is the last moment a stale client can
+ * be turned away cleanly. Past it, an old build reaches matchmaking
+ * and fails against whatever changed - a missing field, a renamed
+ * response - and every one of those failures looks like a server bug
+ * to the person running it. "Update your client" is a far better
+ * message than a match that will not start.
+ *
+ * Compared as dotted numbers, not strings: "0.10.0" is NEWER than
+ * "0.9.0" and a lexicographic compare gets that backwards.
+ *
+ * Raise this only for a change that genuinely breaks older clients.
+ * Every bump locks out anyone who has not updated, so it is a
+ * deliberate act, not routine release housekeeping.
+ */
+const MIN_CLIENT_VERSION = process.env.MIN_CLIENT_VERSION ?? '0.1.0';
+
+/** true when `have` is at least `want`. */
+export function versionAtLeast(have: string, want: string): boolean {
+	const clean = (v: string) => v.split('+')[0].split('-')[0];
+	const a = clean(have).split('.').map((n) => parseInt(n, 10));
+	const b = clean(want).split('.').map((n) => parseInt(n, 10));
+	for (let i = 0; i < Math.max(a.length, b.length); i++) {
+		const x = a[i] ?? 0;
+		const y = b[i] ?? 0;
+		if (Number.isNaN(x)) return false;   // unparseable: treat as too old
+		if (x !== y) return x > y;
+	}
+	return true;
+}
+
 interface VerifyRequest {
 	username: string;
 	serverId: string;
+	/** Absent from clients built before the version gate existed. */
+	clientVersion?: string;
 }
 
 interface MojangProfile {
@@ -40,6 +75,26 @@ export const handler = async (
 		body = JSON.parse(event.body ?? '{}');
 	} catch {
 		return { statusCode: 400, body: JSON.stringify({ error: 'invalid JSON body' }) };
+	}
+
+	// Before anything else, and before touching Mojang. A client too
+	// old to talk to this backend should be told so, not authenticated
+	// and then failed later somewhere less obvious.
+	//
+	// 426 rather than 400: "your request was malformed" and "your
+	// build is too old" want different reactions from the person
+	// reading it, and only one of them is fixed by updating.
+	const clientVersion = body.clientVersion ?? '0.0.0';
+	if (!versionAtLeast(clientVersion, MIN_CLIENT_VERSION)) {
+		return {
+			statusCode: 426,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				error: `this build is too old - update to ${MIN_CLIENT_VERSION} or newer`,
+				clientVersion,
+				minimumVersion: MIN_CLIENT_VERSION,
+			}),
+		};
 	}
 
 	if (!body.username || !body.serverId) {
