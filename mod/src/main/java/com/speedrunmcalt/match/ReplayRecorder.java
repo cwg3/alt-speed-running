@@ -29,13 +29,32 @@ import java.util.List;
  * at - it does not make the client trustworthy.
  */
 public final class ReplayRecorder {
-	/** One sample per second. Enough to bound movement speed and catch
-	 * teleports without producing a file worth worrying about. */
-	private static final int SAMPLE_INTERVAL_TICKS = 20;
+	/**
+	 * Every 2 ticks - 10 samples a second.
+	 *
+	 * One per second was enough for the original job: bound movement
+	 * speed, catch teleports, check a claimed split against where the
+	 * player actually was. It is not enough to WATCH. A replay drives a
+	 * camera from these, and at 1Hz that is a slideshow; first-person
+	 * playback at 1Hz is unwatchable in a way a third-person path is
+	 * not.
+	 *
+	 * Costs about ten times the storage - a ten minute run goes from
+	 * roughly 50KB to 300-500KB gzipped. Still nothing against video,
+	 * which is the alternative this design rejected.
+	 */
+	private static final int SAMPLE_INTERVAL_TICKS = 2;
 
-	/** Hard ceiling so a stuck or very long session can't grow without
-	 * bound - about two hours of samples. */
-	private static final int MAX_SAMPLES = 7200;
+	/**
+	 * Hard ceiling so a stuck or very long session cannot grow without
+	 * bound. Two hours at the CURRENT rate.
+	 *
+	 * This moved with the rate. Left at 7200 it would have silently
+	 * truncated every run past twelve minutes - long runs, the ones
+	 * most worth reviewing, losing their endings and nothing saying
+	 * so.
+	 */
+	private static final int MAX_SAMPLES = 72000;
 
 	public static final class Sample {
 		public final long t;
@@ -43,13 +62,26 @@ public final class ReplayRecorder {
 		public final double x;
 		public final double y;
 		public final double z;
+		/**
+		 * Where they were LOOKING, in degrees.
+		 *
+		 * Not recorded at all before, because position alone answers
+		 * the verification questions. It does not answer "what did they
+		 * see": a first-person replay without rotation is a camera
+		 * pointing wherever the viewer happens to drag it, which is not
+		 * the player's perspective in any meaningful sense.
+		 */
+		public final float yaw;
+		public final float pitch;
 
-		Sample(long t, int dim, double x, double y, double z) {
+		Sample(long t, int dim, double x, double y, double z, float yaw, float pitch) {
 			this.t = t;
 			this.dim = dim;
 			this.x = x;
 			this.y = y;
 			this.z = z;
+			this.yaw = yaw;
+			this.pitch = pitch;
 		}
 	}
 
@@ -89,7 +121,8 @@ public final class ReplayRecorder {
 		SAMPLES.add(new Sample(
 				System.currentTimeMillis() - MatchState.matchStartMillis,
 				dimensionIndex(player.world.getRegistryKey()),
-				player.getX(), player.getY(), player.getZ()));
+				player.getX(), player.getY(), player.getZ(),
+				player.yaw, player.pitch));
 	}
 
 	private static int dimensionIndex(net.minecraft.util.registry.RegistryKey<World> key) {

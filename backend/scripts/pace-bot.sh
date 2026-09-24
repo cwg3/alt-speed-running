@@ -148,4 +148,29 @@ for entry in "${SPLITS[@]}"; do
   echo "[$(date +%H:%M:%S)] $name claimed ${at}s (sent at ${due}s) -> $OUT"
 done
 
+# Upload a synthetic replay trace.
+#
+# The bot posts splits but never recorded a position trace, so every
+# replay in the system was single-perspective and the dual-perspective
+# playback had nothing to test against. This gives the bot a second
+# trace per match.
+#
+# Generated to be PLAUSIBLE, not random: in the right dimension when
+# each split is claimed, moving at speeds replayChecks accepts, looking
+# roughly where it is going. Verified against checkReplay itself -
+# a fixture that trips the anti-cheat would be useless for testing the
+# real upload path.
+if [ -n "${MATCH_ID:-}" ]; then
+  TRACE=$(npx tsx "$(dirname "$0")/synthTrace.ts" "$FINISH" 10 2>/dev/null)
+  if [ -n "$TRACE" ]; then
+    BODY=$(printf '{"matchId":"%s","samples":%s}' "$MATCH_ID" "$TRACE")
+    RESP=$(curl -s --globoff -X POST "$API/matches/replay" \
+      -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
+      -d "$BODY")
+    echo "replay upload -> ${RESP:0:120}"
+  else
+    echo "replay upload skipped - synthTrace produced nothing" >&2
+  fi
+fi
+
 echo "PaceBot finished - $OPPONENT should see DEFEAT, then the result screen"

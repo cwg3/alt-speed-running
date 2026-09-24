@@ -290,6 +290,11 @@ public final class BackendClient {
 			row.add(Math.round(s.x * 10.0) / 10.0);
 			row.add(Math.round(s.y * 10.0) / 10.0);
 			row.add(Math.round(s.z * 10.0) / 10.0);
+			// Whole degrees. A tenth of a degree is below what anyone
+			// can see in a played-back camera, and it is two more
+			// characters on every row of a file with tens of thousands.
+			row.add(Math.round(s.yaw));
+			row.add(Math.round(s.pitch));
 			packed.add(row);
 		}
 

@@ -16,7 +16,10 @@ const REPLAY_BUCKET = process.env.REPLAY_BUCKET!;
 
 // One sample per second, so this is about two hours of play. Beyond it
 // the client is misbehaving rather than playing.
-const MAX_SAMPLES = 7200;
+// Two hours at the recorder's 10Hz. This moved with the sample rate;
+// left at 7200 the backend would have rejected every run past twelve
+// minutes, which is to say every run worth reviewing.
+const MAX_SAMPLES = 72000;
 
 interface ReplayRequest {
 	matchId: string;
@@ -46,7 +49,15 @@ export const handler = async (
 			body: JSON.stringify({ error: `samples must be between 1 and ${MAX_SAMPLES} entries` }),
 		};
 	}
-	if (!body.samples.every((s) => Array.isArray(s) && s.length === 5 && s.every(Number.isFinite))) {
+	// 5 = the original [t, dim, x, y, z]. 7 adds [yaw, pitch].
+	//
+	// Both are accepted because the client version gate enforces a
+	// MINIMUM, not an exact build: a client on the current minimum
+	// still sends five-wide rows. Rejecting those would turn an
+	// optional upload into a hard failure at the end of somebody's
+	// match.
+	if (!body.samples.every((s) => Array.isArray(s)
+			&& (s.length === 5 || s.length === 7) && s.every(Number.isFinite))) {
 		return {
 			statusCode: 400,
 			body: JSON.stringify({ error: 'each sample must be [elapsedMs, dimension, x, y, z]' }),
