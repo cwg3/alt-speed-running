@@ -54,6 +54,39 @@ rather than drifting into.
 - Timeline: scrub, pause, speed, jump to a split
 - Switch between the two players' paths, or show both
 
+## The feature set to match
+
+Taken from a description of what the incumbent's replays do. These are
+functional requirements, and they change two things above.
+
+| feature | what it needs from us |
+|---|---|
+| **Dual perspectives** - switch freely between both players' FIRST-PERSON views | BOTH traces client-side, and yaw/pitch, which we do not record at all |
+| **Both players visible in the world** | the other player rendered as an entity driven by their trace, not just a camera path |
+| **Timeline bar on Escape**, colour-coded by dimension | already supported - every sample carries `dim` |
+| click the bar to scrub instantly | seek to an arbitrary t; trace is already time-indexed |
+| **Free spectator flight**, or lock the camera to a player | camera mode toggle over the same data |
+| pause, play, arrow keys to jump, playback speed | playback clock decoupled from the world tick |
+| **name visibility, player opacity, glowing distance** | render options on the rendered opponent |
+
+Two consequences worth naming:
+
+**First-person is the requirement, not a nicety.** A path with no
+rotation can only ever be a floating camera. Recording yaw and pitch
+moves from "would be nice" to load-bearing, and so does the sample
+rate - a first-person view at 1Hz is unwatchable in a way a
+third-person path is not.
+
+**Both players are rendered, so both traces must be fetched.** That
+settles part of the access question below: studying the opponent IS
+the feature, so participants necessarily see each other's replays.
+What stays open is whether anyone ELSE can.
+
+**The dimension colouring is free.** We already store `dim` per
+sample, so overworld/nether/end banding on the timeline needs no
+recording change - a small piece of luck from a field added for
+verification.
+
 ## Decisions needed before building
 
 **Who can watch?** Participants only is safe: under the seen-seeds rule
