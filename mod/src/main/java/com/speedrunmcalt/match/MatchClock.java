@@ -180,7 +180,6 @@ public final class MatchClock {
 			// request was in flight.
 			if (matchId.equals(MatchState.matchId) && MatchState.matchStartMillis <= 0) {
 				MatchState.matchStartMillis = startMillis;
-				com.speedrunmcalt.menu.Cues.raceStart();
 				SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Run clock started");
 			}
 			claiming = false;

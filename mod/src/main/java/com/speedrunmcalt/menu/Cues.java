@@ -26,11 +26,12 @@ public final class Cues {
 	/**
 	 * An opponent was found and the world is being built.
 	 *
-	 * The XP pickup blip - short, unmistakable, and already means
-	 * "something arrived" to anyone who has played the game.
+	 * The level-up chime. This is the moment a player is waiting for
+	 * while staring at a queue timer, so it gets the game's own "this
+	 * is good news" sound rather than a blip.
 	 */
 	public static void matchFound() {
-		play(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f);
+		play(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0f);
 	}
 
 	/**
@@ -43,30 +44,17 @@ public final class Cues {
 		play(SoundEvents.BLOCK_BEACON_ACTIVATE, 0.9f);
 	}
 
-	/**
-	 * The countdown reached zero - the run clock is live.
-	 *
-	 * Delayed a few ticks so it lands after the reveal screen has
-	 * closed and the world is live, rather than in the same frame.
-	 *
-	 * NOT because of a sound-engine quirk. This cue was reported as
-	 * never audible and I attributed it to submissions being dropped
-	 * during the unpause transition - a confident explanation for a
-	 * symptom whose actual cause was that raceStart() HAD NO CALL SITE.
-	 * A patch adding it had failed silently and the cue was listed as
-	 * working anyway. The delay is a reasonable precaution; it was
-	 * never the bug.
-	 */
-	public static void raceStart() {
-		playDelayed(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.4f, 3);
-	}
-
 	/*
-	 * There was an opponent-split cue here - an enderman teleport on
-	 * every split the opponent reached. Removed: on a fast test pace it
-	 * fired six times in fifteen minutes, and a sound a player learns
-	 * to tune out is worse than no sound. The HUD already shows their
-	 * splits in magenta, which is where that information belongs.
+	 * There is deliberately NO cue at zero on the countdown. The reveal
+	 * sound already says "get ready", the number on screen says the
+	 * rest, and a runner about to move does not need another noise in
+	 * the same three seconds.
+	 *
+	 * There was also an opponent-split cue - an enderman teleport on
+	 * every split. Removed: on a fast test pace it fired six times in
+	 * fifteen minutes, and a sound a player learns to tune out is worse
+	 * than none. Their splits are on the HUD in magenta, which is where
+	 * that information belongs.
 	 */
 
 	/** The advancement chime - the game's own "you did it". */
@@ -85,34 +73,6 @@ public final class Cues {
 	 * Called from the poll thread and the matchmaker thread as well as
 	 * the client one, and the sound manager is not safe off-thread.
 	 */
-	/** Sounds waiting on a tick countdown, drained by register(). */
-	private static final java.util.List<Object[]> pending =
-			java.util.Collections.synchronizedList(new java.util.ArrayList<>());
-
-	/** Call once at client start so delayed cues actually fire. */
-	public static void register() {
-		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK
-				.register(client -> {
-					synchronized (pending) {
-						java.util.Iterator<Object[]> it = pending.iterator();
-						while (it.hasNext()) {
-							Object[] e = it.next();
-							int left = (Integer) e[2] - 1;
-							if (left <= 0) {
-								play((SoundEvent) e[0], (Float) e[1]);
-								it.remove();
-							} else {
-								e[2] = left;
-							}
-						}
-					}
-				});
-	}
-
-	private static void playDelayed(SoundEvent sound, float pitch, int ticks) {
-		pending.add(new Object[] { sound, pitch, ticks });
-	}
-
 	private static void play(SoundEvent sound, float pitch) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null) {
