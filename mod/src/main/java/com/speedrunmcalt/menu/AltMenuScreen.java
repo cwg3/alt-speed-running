@@ -33,8 +33,16 @@ public class AltMenuScreen extends Screen {
 				cx - 100, this.height / 2 + 14, 200, 20,
 				new LiteralText("..."), button -> onAction()));
 
+		// Between Find Match and Back: it is the second thing a player
+		// wants from this screen, and the way into a replay once those
+		// exist.
 		this.addButton(new ButtonWidget(
 				cx - 100, this.height / 2 + 42, 200, 20,
+				new LiteralText("Matches"),
+				button -> this.client.openScreen(new MatchHistoryScreen(this))));
+
+		this.addButton(new ButtonWidget(
+				cx - 100, this.height / 2 + 70, 200, 20,
 				new LiteralText("Back"), button -> this.client.openScreen(parent)));
 
 		// Kick off the handshake on open so the player doesn't have to

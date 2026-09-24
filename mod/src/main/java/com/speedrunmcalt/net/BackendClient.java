@@ -229,6 +229,45 @@ public final class BackendClient {
 	}
 
 	/** Gives up the current match. The opponent is awarded the win. */
+	/**
+	 * This player's finished matches, newest first.
+	 *
+	 * `before` pages backwards: pass the completedAt of the oldest row
+	 * already held, or 0 for the first page. The server returns its own
+	 * nextBefore, and omits it when there is nothing older - so an
+	 * empty page is never needed to discover the end.
+	 */
+	public static java.util.List<MatchHistoryEntry> matchHistory(
+			String sessionToken, int limit, long before) throws IOException {
+		String url = API_BASE + "/players/me/matches?limit=" + limit
+				+ (before > 0 ? "&before=" + before : "");
+		JsonObject resp = get(url, sessionToken);
+
+		java.util.List<MatchHistoryEntry> out = new java.util.ArrayList<>();
+		for (com.google.gson.JsonElement el : resp.getAsJsonArray("matches")) {
+			JsonObject m = el.getAsJsonObject();
+			out.add(new MatchHistoryEntry(
+					str(m, "matchId", ""),
+					m.has("completedAt") ? m.get("completedAt").getAsLong() : 0L,
+					str(m, "opponentName", "opponent"),
+					m.has("won") && m.get("won").getAsBoolean(),
+					num(m, "ratingDelta"),
+					num(m, "seasonPointsAwarded"),
+					str(m, "seedType", "unknown"),
+					num(m, "worldSetupVersion")));
+		}
+		return out;
+	}
+
+	/** Absent or null fields are normal on older rows; do not throw. */
+	private static String str(JsonObject o, String key, String fallback) {
+		return o.has(key) && !o.get(key).isJsonNull() ? o.get(key).getAsString() : fallback;
+	}
+
+	private static int num(JsonObject o, String key) {
+		return o.has(key) && !o.get(key).isJsonNull() ? o.get(key).getAsInt() : 0;
+	}
+
 	public static void forfeit(String sessionToken, String matchId) throws IOException {
 		JsonObject body = new JsonObject();
 		body.addProperty("matchId", matchId);
