@@ -125,5 +125,6 @@ good" means nothing if the nether came from somewhere else.
 | type | overworld | nether | notes |
 |------|-----------|--------|-------|
 | desert_temple | seed#3fcb | seed#8037 | temple at 64,64. Overworld and nether both clean; two deaths were pace, not layout. |
+| ruined_portal | seed#54b2 | seed#4654 | portal at 80,208, bastion at 16,-96 (hoglin stable). Overworld and nether both clean; death was skill, not layout. |
 | ruined_portal | seed#218e | - | portal at 64,224, bastion at -112,32 (bridge). Spawned near the bastion. |
 | ruined_portal | seed#9796 | - | the first play-confirmed seed. Survived being wiped by a `--only` load and restored from the match record. |
