@@ -59,6 +59,19 @@ public class SeedRevealScreen extends Screen {
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText(typeName(MatchState.seedType)), cx, y + 16, PHOSPHOR);
 
+		// Who you are actually racing.
+		//
+		// The title overlay says it for two seconds while the world
+		// loads, which a player watching their practice world save is
+		// not necessarily reading. These five seconds are the one
+		// moment both players are certainly looking at the screen with
+		// nothing else to do, so the name belongs here.
+		String vs = MatchState.opponentUsername;
+		com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer,
+				cx, y + 30,
+				new String[] { "vs ", vs == null ? "opponent" : vs },
+				new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW });
+
 		long remaining = MatchState.countdownRemaining();
 		long seconds = (remaining + 999) / 1000;
 		drawCenteredText(matrices, this.textRenderer,
