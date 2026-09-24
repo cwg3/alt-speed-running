@@ -31,14 +31,14 @@ public final class Cues {
 	private static final float DEFAULT_VOLUME = 0.25f;
 
 	/**
-	 * Twice the amplitude of DEFAULT_VOLUME - +6 dB.
+	 * The ceiling. SoundSystem.getAdjustedVolume clamps volume times
+	 * the category volume to 1.0, so nothing above this exists - a cue
+	 * asking for 2.0f gets exactly what 1.0f gets, and the number in
+	 * the source would be a lie about how loud it is.
 	 *
-	 * SoundSystem.getAdjustedVolume clamps volume * categoryVolume to
-	 * 1.0, so 0.25 leaves 12 dB of headroom and this spends half of
-	 * it. Anything above 1.0f is silently discarded by the clamp, so
-	 * that is the ceiling for any future cue.
+	 * Four times the amplitude of DEFAULT_VOLUME: +12 dB.
 	 */
-	private static final float LOUD = 0.5f;
+	private static final float MAX = 1.0f;
 
 	private Cues() {
 	}
@@ -61,7 +61,7 @@ public final class Cues {
 	 * across the whole reveal rather than blipping and vanishing.
 	 */
 	public static void seedReveal() {
-		play(SoundEvents.BLOCK_BEACON_ACTIVATE, 0.9f, LOUD);
+		play(SoundEvents.BLOCK_BEACON_ACTIVATE, 0.9f, MAX);
 	}
 
 	/*
@@ -83,24 +83,33 @@ public final class Cues {
 	}
 
 	/**
-	 * The burning sizzle - random/fizz.
+	 * Burning: entity/player/hurt/fire_hurt1-3.
 	 *
 	 * Asked for as "the loop that happens when PLAYER tried to swim in
-	 * lava". Nothing is attached to a death MESSAGE, so the question is
-	 * which FILE that moment sounds like, and the asset index answers
-	 * it: entity.generic.burn plays random/fizz, the hiss that repeats
-	 * the whole time a player is cooking. That is the loop.
+	 * lava", and it took three tries because the first two answered
+	 * from the event NAME instead of from what the game plays.
 	 *
-	 * The previous attempt was entity.player.death, on the reasoning
-	 * that it lands when the death text does. It does - but the index
-	 * shows entity.player.death and entity.player.hurt resolve to the
-	 * SAME three files (damage/hit1-3). There is no distinct death
-	 * sound in Java Edition, so a defeat cue built on it is a damage
-	 * sound, which is what it was heard as. Guessing from the event
-	 * NAME was the mistake; the files are what a player hears.
+	 * What actually happens on lava entry, from Entity and
+	 * PlayerEntity: setOnFireFor(15) plus one DamageSource.LAVA hit,
+	 * then fifteen seconds of DamageSource.ON_FIRE ticks.
+	 * PlayerEntity.getHurtSound maps ON_FIRE to
+	 * ENTITY_PLAYER_HURT_ON_FIRE, and that repetition is the loop.
+	 *
+	 * The two wrong answers, kept because each was wrong in a way
+	 * worth not repeating:
+	 *
+	 *   ENTITY_PLAYER_DEATH - picked for landing when the death text
+	 *   does. The asset index shows it and ENTITY_PLAYER_HURT resolve
+	 *   to the same three files (damage/hit1-3); Java Edition has no
+	 *   distinct death sound, so it was heard as taking damage.
+	 *
+	 *   ENTITY_GENERIC_BURN - picked for being "the sizzle". It plays
+	 *   random/fizz, which is also what BLOCK_LAVA_EXTINGUISH plays,
+	 *   so it was heard as water spilling over lava. Correct file for
+	 *   a fire going out; wrong one for a player in it.
 	 */
 	public static void defeat() {
-		play(SoundEvents.ENTITY_GENERIC_BURN, 1.0f);
+		play(SoundEvents.ENTITY_PLAYER_HURT_ON_FIRE, 1.0f);
 	}
 
 	/**
