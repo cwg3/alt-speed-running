@@ -56,6 +56,13 @@ cat > "$WORK/modrinth.index.json" <<JSON
 }
 JSON
 
+# The raw jars too, for anyone installing into the official Minecraft
+# launcher - it cannot import a modpack file, so those users need the
+# mods on their own. Same files the pack embeds.
+cp "$WORK/overrides/mods/speedrunmcalt-$VERSION.jar" "$ROOT/pack/"
+cp "$WORK/overrides/mods/fabric-api.jar" \
+   "$ROOT/pack/fabric-api-0.18.0+build.387-1.16.1.jar"
+
 OUT="$ROOT/pack/alt-$VERSION.mrpack"
 rm -f "$OUT"
 (cd "$WORK" && zip -qr "$OUT" modrinth.index.json overrides)
