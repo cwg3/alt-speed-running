@@ -40,6 +40,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  *     they use -16772609, not white. They also only run when the gap
  *     argument is non-zero, which the caller never passes.
  *
+ * The redirect targets LevelLoadingScreen.fill, not
+ * DrawableHelper.fill, and the difference crashed the client on
+ * launch - "Critical injection failure ... Scanned 0 target(s)". fill
+ * is declared on DrawableHelper, but drawChunkMap calls it
+ * unqualified, so javac emits the Methodref against the SUBCLASS:
+ * constant pool entry #164 reads LevelLoadingScreen.fill. A redirect
+ * matches the owner written at the CALL SITE, not the class that
+ * declares the method. For an inherited static, read the constant
+ * pool instead of reasoning about where the method lives.
+ *
  * Applies to every world load, not just matches. The loading screen
  * is one of the few places the client's identity is visible at all.
  */
@@ -97,7 +107,7 @@ public class LoadingScreenLogoMixin {
 	 */
 	@Redirect(method = "drawChunkMap",
 			at = @At(value = "INVOKE",
-					target = "Lnet/minecraft/client/gui/DrawableHelper;"
+					target = "Lnet/minecraft/client/gui/screen/LevelLoadingScreen;"
 							+ "fill(Lnet/minecraft/client/util/math/MatrixStack;IIIII)V"))
 	private static void speedrunmcalt$skipFinishedChunks(MatrixStack matrices,
 			int x1, int y1, int x2, int y2, int color) {
