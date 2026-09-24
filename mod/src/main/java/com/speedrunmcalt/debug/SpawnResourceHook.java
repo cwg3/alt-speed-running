@@ -125,6 +125,8 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 					// clears the tag.
 					int wreckChests = 0;
 					boolean food = false;
+					boolean haveSupply = false;
+					boolean haveTreasure = false;
 					int worstCover = -1;
 					for (BlockPos cp : ContainerScan.find(world, exclude)) {
 						net.minecraft.block.entity.BlockEntity be = world.getBlockEntity(cp);
@@ -138,8 +140,19 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 							continue;   // somebody else's chest
 						}
 						wreckChests++;
+						boolean isMap = table.getPath().contains("map");
+						if (table.getPath().contains("supply")) {
+							haveSupply = true;
+						} else if (table.getPath().contains("treasure")) {
+							haveTreasure = true;
+						}
 						int cover = solidDirectlyAbove(world, cp);
-						worstCover = Math.max(worstCover, cover);
+						// The MAP chest is paper, feathers and a map. A
+						// block on top of it costs a runner nothing,
+						// because they are not opening it.
+						if (!isMap) {
+							worstCover = Math.max(worstCover, cover);
+						}
 						SpeedrunMcAlt.LOGGER.info("[spawncheck]   {} at {},{},{} blockedAbove={}",
 								table.getPath(), cp.getX(), cp.getY(), cp.getZ(), cover);
 						if (table.getPath().contains("supply")) {
@@ -155,13 +168,18 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 							}
 						}
 					}
-					detail += " wreckChests=" + wreckChests + " food=" + food
+					detail += " chests=" + wreckChests + " supply=" + haveSupply + " treasure=" + haveTreasure + " food=" + food
 							+ " chestsBlocked=" + worstCover;
 					// THE WRECK MUST NOT BE BURIED AT ALL. Not "the food
 					// is reachable with some digging" - a buried wreck is
 					// a different and slower opening, and two players on
 					// two shipwreck seeds should be running the same one.
-					ok = ok && wreckChests >= 3 && food
+					// The chests that matter are SUPPLY and TREASURE -
+					// food, and iron and diamonds. The map chest holds
+					// paper, feathers and a filled map, none of which a
+					// route uses, so requiring all three rejected wrecks
+					// over a chest nobody opens.
+					ok = ok && haveSupply && haveTreasure && food
 							&& worstCover >= 0 && worstCover <= MAX_COVER;
 				}
 

@@ -312,6 +312,18 @@ ship vanilla and filter for it. All three have the same shape:
     a vertical frame, 4 wide by 5 tall, of real obsidian,
     exactly 2 non-corner blocks missing, and a chest.
 
+**A shipwreck needs its SUPPLY and TREASURE chests; the map chest does
+not matter.** Food, and iron and diamonds, are what the route uses. The
+map chest holds paper, feathers and a filled map - nothing a runner
+opens - so requiring all three rejected a wreck over a chest nobody
+touches, and a block sitting on that chest failed a seed that was
+otherwise perfect.
+
+The rule cuts both ways. It reinstated one seed whose only blocked
+chest was the map, and it rejected two wrecks that had ONLY a supply
+chest: food but no iron and no diamonds, which is not a shipwreck
+opening.
+
 `PortalFrame` enforces that: **above ground**, vertical, at least 4x5,
 at most 2 missing non-corner slots, **no crying obsidian in a frame
 slot**, and **at least one chest**. Each of those clauses was learned the hard way, in
