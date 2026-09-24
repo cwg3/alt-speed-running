@@ -67,8 +67,28 @@
 // which is the same mistake as iron in a dungeon chest and a ravine
 // with no bubble columns.
 //
-// Five chunks, matching what the report described as already too far.
-#define MAX_WOOD_DIST      CH(5)
+// Eight chunks - 128 blocks - matching WOOD_RADIUS in
+// SpawnResourceHook, which is the check that actually decides.
+//
+// This was five chunks, and the two stages disagreeing is worse than
+// either value. This one runs FIRST and only rejects, so a candidate
+// dropped here never reaches the Java stage that counts real logs: the
+// stricter number silently won regardless of what the real check
+// thought. A single 12-per-type scan reported 40 structure matches
+// rejected for no wood within 80 blocks, and there is no way to know
+// how many of those had a tree at 81.
+//
+// 80 was inherited from a play report describing a spawn with nothing
+// within four or five chunks. The Java side was widened to 128 after
+// it rejected a desert temple whose nearest tree was 83 blocks out,
+// with 470 logs inside 160 - a five-second walk, not a dead seed. The
+// same reasoning applies here; it just never got applied.
+//
+// This stage samples biomes every 16 blocks and cannot see a tree, so
+// it stays a cheap pre-filter for "no wooded biome anywhere near". The
+// Java stage counts actual logs. Widening this only stops it from
+// vetoing seeds the real check would have passed.
+#define MAX_WOOD_DIST      CH(8)
 // The standard's nether distances, restored.
 //
 // The intended bastion is within 14 chunks of nether spawn, and the

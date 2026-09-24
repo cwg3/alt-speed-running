@@ -28,6 +28,14 @@ WORKERS="${3:-16}"
 ITYPE="${4:-c7g.4xlarge}"
 REGION="${REGION:-us-west-2}"
 MAX_MINUTES="${MAX_MINUTES:-180}"
+# Heap PER CONTAINER. Must fit the instance: a t4g.small has 2GB total,
+# so one worker at 1400m leaves room for the OS and docker. Chunk
+# generation over a wide radius is the memory-hungry part.
+HEAP="${HEAP:-2G}"
+# Spot is blocked on the AWS Free Plan along with every non-free-tier
+# instance type. On-demand for a free-tier type is covered by the
+# monthly free hours; SPOT=0 switches to it.
+SPOT="${SPOT:-1}"
 
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 BUCKET="alt-seedwork-$ACCOUNT"
@@ -93,6 +101,7 @@ for s in /work/shard-*; do
   name=\$(basename \$s)
   docker run -d --rm -v /work:/work \
     -e CHECK=$CHECK -e IN=/work/\$name -e OUT=/work/out-\$name.csv \
+    -e HEAP=$HEAP \
     $IMAGE
 done
 while [ "\$(docker ps -q | wc -l)" -gt 0 ]; do sleep 20; done
@@ -108,10 +117,16 @@ AMI=$(aws ssm get-parameter --region "$REGION" \
   --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
   --query Parameter.Value --output text)
 
-echo "launching $ITYPE spot (ami $AMI)"
+if [ "$SPOT" = 1 ]; then
+  MARKET=(--instance-market-options '{"MarketType":"spot"}')
+  echo "launching $ITYPE spot (ami $AMI)"
+else
+  MARKET=()
+  echo "launching $ITYPE on-demand (ami $AMI) - free-tier hours"
+fi
 IID=$(aws ec2 run-instances --region "$REGION" \
   --image-id "$AMI" --instance-type "$ITYPE" --count 1 \
-  --instance-market-options '{"MarketType":"spot"}' \
+  ${MARKET[@]+"${MARKET[@]}"} \
   --iam-instance-profile "Name=$ROLE" \
   --instance-initiated-shutdown-behavior terminate \
   --metadata-options 'HttpTokens=required,HttpEndpoint=enabled' \

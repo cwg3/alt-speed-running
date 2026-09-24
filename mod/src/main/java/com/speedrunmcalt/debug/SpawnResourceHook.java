@@ -63,33 +63,38 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 	/** Logs below this are in a ravine or a sunken wreck, not a forest. */
 	private static final int MIN_WOOD_Y = 60;
 
-	/** Enough to make a table and the tools that follow. */
-	private static final int MIN_LOGS = 8;
+	/**
+	 * Trees a runner must have within WOOD_RADIUS: two.
+	 *
+	 * This replaces a raw log count of 8 on land and 6 on ocean. The
+	 * count was the wrong unit twice over. It could not tell six logs
+	 * in one trunk from six strays scattered over 128 blocks, and it
+	 * was not reproducible - the same seed gave seven different counts
+	 * across seven runs, which put 93 of 1000 seeds inside the noise
+	 * around a threshold of 8.
+	 *
+	 * Two trees is roughly where both old numbers already sat, so this
+	 * is mostly an honest restatement of the land rule rather than a
+	 * new one: 8 logs is about two small trunks. It is slightly
+	 * stricter than the ocean's 6.
+	 *
+	 * Same value for every type. Ocean got a lower bar because a
+	 * shipwreck spawn is on water by definition and should not be held
+	 * to a forest's wood - but the thing it needs is a BOAT, which is
+	 * five planks on top of the tools, and one tree does not cover
+	 * both. Beaches have trees; the old rule was failing them by
+	 * counting blocks instead of trunks, which is the actual bug.
+	 */
+	private static final int MIN_TREES = 2;
 
 	/**
-	 * Ocean openings get 6.
+	 * Logs that make a cluster a tree rather than a stray.
 	 *
-	 * A shipwreck or buried treasure spawn is on or near water by
-	 * definition, and holding ocean seeds to the same wood as a village
-	 * seed rejects the route rather than a bad instance of it. Six logs
-	 * is twenty-four planks: table, pickaxe, and the boat the route
-	 * wants anyway.
-	 *
-	 * The count these are compared against is not perfectly
-	 * reproducible - see generateScanArea - so a seed sitting exactly
-	 * on this line can pass one run and fail the next. That is
-	 * tolerable here in a way it would not be higher up: everything
-	 * near the line is a marginal seed either way, and the rejections
-	 * that matter for ocean types are the open-water spawns with zero
-	 * logs, which no amount of jitter moves.
+	 * Four: the shortest trunk vanilla generates, an oak at the bottom
+	 * of its 4-to-6 range. See countTrees.
 	 */
-	private static final int MIN_LOGS_OCEAN = 6;
+	private static final int MIN_TREE_LOGS = 4;
 
-	/** Ocean routes start at the water; they cannot also start in a forest. */
-	private static int minLogsFor(String type) {
-		return ("shipwreck".equals(type) || "buried_treasure".equals(type))
-				? MIN_LOGS_OCEAN : MIN_LOGS;
-	}
 
 	/**
 	 * Blocks of SEABED allowed above any of the wreck's chests: none.
@@ -129,15 +134,14 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 					}
 				}
 
-				int logs = countLogs(world, spawn, exclude);
-				int minLogs = minLogsFor(type);
-				boolean woodOk = logs >= minLogs;
+				int trees = countLogs(world, spawn, exclude);
+				boolean woodOk = trees >= MIN_TREES;
 
 				// The threshold goes in the row so a verdict can be
 				// re-derived from the csv later without re-generating a
 				// thousand worlds.
 				String detail = "spawn=" + spawn.getX() + "," + spawn.getZ()
-						+ " logs=" + logs + " minLogs=" + minLogs;
+						+ " trees=" + trees + " minTrees=" + MIN_TREES;
 				boolean ok = woodOk;
 
 				if ("shipwreck".equals(type) && exclude != null) {
@@ -260,8 +264,15 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 	 * that overhang has not been written yet. Letting getBlockState
 	 * generate chunks as the scan wanders means the order - and so the
 	 * count - depends on where the scan happens to go first. The spread
-	 * is about one tree, which is nothing against 2600 and decisive
-	 * against MIN_LOGS.
+	 * was about one tree in 2600 logs: nothing against a raw count of
+	 * thousands, and decisive against a threshold of 8.
+	 *
+	 * Counting TREES rather than logs makes this mostly moot - a tree
+	 * at the edge of the radius is one either way, and the metric no
+	 * longer moves by five when a single overhang is missed. This is
+	 * kept because a stable world is worth having regardless, and
+	 * because a tree that straddles the boundary can still appear or
+	 * vanish.
 	 *
 	 * One chunk of margin beyond the scan area, so chunks at the very
 	 * edge also have their populated neighbours.
@@ -280,7 +291,7 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 
 	private static int countLogs(ServerWorld world, BlockPos spawn, BlockBox exclude) {
 		generateScanArea(world, spawn);
-		int found = 0;
+		java.util.Set<Long> logs = new java.util.HashSet<>();
 		BlockPos.Mutable pos = new BlockPos.Mutable();
 		for (int dx = -WOOD_RADIUS; dx <= WOOD_RADIUS; dx++) {
 			for (int dz = -WOOD_RADIUS; dz <= WOOD_RADIUS; dz++) {
@@ -301,11 +312,81 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 					if (!world.getFluidState(pos).isEmpty()) {
 						continue;
 					}
-					found++;
+					logs.add(pos.asLong());
 				}
 			}
 		}
-		return found;
+		return countTrees(logs);
+	}
+
+	/**
+	 * How many TREES are within reach?
+	 *
+	 * Counting loose log blocks answers the wrong question. Six logs
+	 * scattered over a 128-block radius - a branch here, a stray block
+	 * there - is not a crafting table; six logs in one trunk is. So
+	 * logs are grouped into connected clusters and the clusters big
+	 * enough to be a tree are counted.
+	 *
+	 * A tree is also the unit a runner experiences. One tree is 16 to
+	 * 24 planks: table, pickaxe, axe and sticks, and then nothing left
+	 * for the boat an ocean route wants. Two is 32 to 48 and
+	 * comfortable.
+	 *
+	 * MIN_TREE_LOGS is 4 because that is the shortest trunk vanilla
+	 * builds. From DefaultBiomeFeatures, as StraightTrunkPlacer(base,
+	 * randA, randB) giving base + rand(randA) + rand(randB):
+	 *
+	 *   oak     (4, 2, 0)   4 to 6
+	 *   birch   (5, 2, 0)   5 to 7
+	 *   spruce  (6, 4, 0)   6 to 10
+	 *   jungle  (4, 8, 0)   4 to 12
+	 *
+	 * An ordinary oak is four to six logs, so a per-tree minimum of six
+	 * would reject most oaks outright - a beach with two good oaks
+	 * scores eight to twelve logs and zero trees. Four admits every
+	 * real trunk and still excludes the strays.
+	 *
+	 * Neighbours are the full 26 around a block, not just the six
+	 * faces, because trunks fork and large oaks step diagonally. Two
+	 * trees growing into each other merge into one cluster, which does
+	 * not matter here: the question is how much of this wood is
+	 * choppable, not how many trees there are.
+	 */
+	private static int countTrees(java.util.Set<Long> logs) {
+		java.util.Set<Long> seen = new java.util.HashSet<>();
+		int total = 0;
+		for (Long start : logs) {
+			if (!seen.add(start)) {
+				continue;
+			}
+			java.util.ArrayDeque<Long> queue = new java.util.ArrayDeque<>();
+			java.util.List<Long> cluster = new java.util.ArrayList<>();
+			queue.add(start);
+			cluster.add(start);
+			while (!queue.isEmpty()) {
+				BlockPos p = BlockPos.fromLong(queue.poll());
+				for (int dx = -1; dx <= 1; dx++) {
+					for (int dy = -1; dy <= 1; dy++) {
+						for (int dz = -1; dz <= 1; dz++) {
+							if (dx == 0 && dy == 0 && dz == 0) {
+								continue;
+							}
+							long n = new BlockPos(p.getX() + dx, p.getY() + dy, p.getZ() + dz)
+									.asLong();
+							if (logs.contains(n) && seen.add(n)) {
+								queue.add(n);
+								cluster.add(n);
+							}
+						}
+					}
+				}
+			}
+			if (cluster.size() >= MIN_TREE_LOGS) {
+				total++;
+			}
+		}
+		return total;
 	}
 
 	/**
