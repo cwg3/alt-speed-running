@@ -41,6 +41,29 @@ public final class Palette {
 	 * out by hand: total the widths, start half of that left of centre,
 	 * and advance by each segment as it is drawn.
 	 */
+	/**
+	 * Where one segment's own centre lands, in the same layout
+	 * drawCenteredSegments would produce.
+	 *
+	 * For stacking something above a particular segment rather than
+	 * above the whole line. The wordmark needs it: "speed" is five
+	 * characters and "running" is seven, so the hyphen sits well left
+	 * of the string's centre. Centring "alt" on the string is
+	 * geometrically correct and looks wrong, because "alt" and the
+	 * hyphen are both phosphor green and the eye pairs them.
+	 */
+	public static int segmentCenterX(TextRenderer font, int cx, String[] parts, int index) {
+		int total = 0;
+		for (String part : parts) {
+			total += font.getWidth(part);
+		}
+		int x = cx - total / 2;
+		for (int i = 0; i < index; i++) {
+			x += font.getWidth(parts[i]);
+		}
+		return x + font.getWidth(parts[index]) / 2;
+	}
+
 	public static void drawCenteredSegments(MatrixStack matrices, TextRenderer font,
 			int cx, int y, String[] parts, int[] colors) {
 		int total = 0;
