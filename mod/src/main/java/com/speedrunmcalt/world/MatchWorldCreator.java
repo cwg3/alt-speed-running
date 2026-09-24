@@ -18,7 +18,7 @@ import net.minecraft.world.gen.chunk.SurfaceChunkGenerator;
 import net.minecraft.world.level.LevelInfo;
 
 /**
- * Creates and loads a singleplayer world for a ranked match, with the
+ * Creates and loads a singleplayer world for a match, with the
  * overworld and nether generated from INDEPENDENT seeds - deliberate
  * (see seed-filter/seedfilter.c): it breaks the vanilla correlation
  * between overworld and nether terrain that "Divine Travel"-style

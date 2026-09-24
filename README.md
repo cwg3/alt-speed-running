@@ -1,6 +1,6 @@
 # alt
 
-A ranked 1v1 ladder for Minecraft 1.16.1 speedrunning (RSG).
+A 1v1 ladder for Minecraft 1.16.1 speedrunning (RSG).
 
 Two players race the same filtered seed in their own worlds. Whoever
 kills the dragon first wins. Ratings move, seasons reset.

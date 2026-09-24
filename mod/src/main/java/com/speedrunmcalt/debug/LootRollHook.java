@@ -24,7 +24,7 @@ import java.util.List;
  * An unopened chest stores its table and its LootTableSeed and nothing
  * else: the items do not exist until someone opens it. So a save full
  * of unopened chests looks empty, and a save of opened ones shows only
- * what the player left behind - thirteen opened MCSR shipwreck chests
+ * what the player left behind - thirteen opened the incumbent shipwreck chests
  * held no food at all, because the food is exactly what gets taken.
  *
  * Rolling the stored seed recovers the real contents exactly.

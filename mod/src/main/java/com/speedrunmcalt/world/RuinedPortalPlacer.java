@@ -59,7 +59,7 @@ public final class RuinedPortalPlacer {
 	 * was justified as matching vanilla's 80/20 split, and vanilla is
 	 * the wrong thing to match here.
 	 *
-	 * Measured off an MCSR Ranked install: three ruined portal worlds,
+	 * Measured off an the incumbent install: three ruined portal worlds,
 	 * 0, 1 and 0 crying obsidian, every frame exactly two real obsidian
 	 * short of complete. They filter for completable frames, so every
 	 * player on an RP seed runs the SAME opening.
@@ -69,7 +69,7 @@ public final class RuinedPortalPlacer {
 	 * corners are missing. Crying obsidian changes the route outright,
 	 * from "place two obsidian" to "find lava, find water, cast a
 	 * portal", and two players on two RP seeds were running materially
-	 * different openings. On a ranked ladder that is a fairness bug
+	 * different openings. On a ladder that is a fairness bug
 	 * wearing a flavour costume.
 	 *
 	 * Reported from play at 1:01 into a match, on a frame that was

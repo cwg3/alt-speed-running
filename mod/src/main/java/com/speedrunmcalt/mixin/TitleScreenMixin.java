@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Adds the ranked entry point to the title screen.
+ * Adds the entry point to the title screen.
  *
  * The mixin extends Screen so the inherited addButton/width/height are
  * available; fabric-screen-api-v1 would normally do this more cleanly

@@ -24,7 +24,7 @@ import java.util.Set;
  * ground.
  *
  * The standard here is measured, not invented. Three ruined portal
- * worlds read out of an MCSR Ranked install, with the same seeds
+ * worlds read out of an the incumbent install, with the same seeds
  * regenerated unmodified for comparison - 0 blocks differ, so they ship
  * vanilla and filter for it - gave the same shape every time:
  *

@@ -398,7 +398,7 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 	 * opening depends on; a block to break on top of that is time the
 	 * route cannot spare, whatever the block is made of.
 	 *
-	 * This matches what the incumbent ships. Across five MCSR Ranked
+	 * This matches what the incumbent ships. Across five the incumbent
 	 * wrecks, thirteen of fifteen chests have WATER directly above
 	 * them, with the deck planks and stairs sitting a block or two
 	 * higher rather than on the chest. The two exceptions - gravel over

@@ -6,7 +6,7 @@
 // between a seed's overworld and nether generation, which is what
 // blocks "Divine Travel"-style strategies where a skilled player infers
 // nether structure locations from overworld terrain. This is the same
-// tradeoff MCSR Ranked documents using independent seeds for.
+// tradeoff the incumbent documents using independent seeds for.
 //
 // Criteria:
 //   overworld: a Village within MAX_VILLAGE_DIST of the actual world
@@ -17,7 +17,7 @@
 // The distances are deliberately tight. An earlier pass allowed a
 // village up to 2000 blocks from spawn, which is far enough away to be
 // useless and produced starts a runner would just reset. 112 blocks is
-// 7 chunks, comparable to what MCSR Ranked filters for.
+// 7 chunks, comparable to what the incumbent filters for.
 //
 // Village distance is measured from getSpawn(), NOT from the origin.
 // Minecraft does not spawn the player at (0,0) - it searches outward
@@ -38,7 +38,7 @@
 // The scan starts from a random offset rather than from seed 0. An
 // earlier version always started at 0, so every run produced the same
 // twenty seeds - a pool a competitor could simply memorise, which on a
-// ranked ladder is an advantage that has nothing to do with skill.
+// ladder is an advantage that has nothing to do with skill.
 // Pass a start seed as the second argument to reproduce a pool.
 //
 // Output: JSON files under output/ listing accepted seeds, plus a

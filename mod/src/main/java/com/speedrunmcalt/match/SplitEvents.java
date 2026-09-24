@@ -3,7 +3,7 @@ package com.speedrunmcalt.match;
 import net.minecraft.util.Identifier;
 
 /**
- * Maps advancement IDs to ranked split names. Full split list: enter
+ * Maps advancement IDs to split names. Full split list: enter
  * nether, trade with piglin, obtain rod, enter stronghold, enter end,
  * kill dragon.
  *

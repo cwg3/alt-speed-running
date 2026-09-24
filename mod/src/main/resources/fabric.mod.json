@@ -3,7 +3,7 @@
 	"id": "speedrunmcalt",
 	"version": "${version}",
 	"name": "alt",
-	"description": "Open, transparent alternative ranked ladder for Minecraft 1.16.1 speedrunning.",
+	"description": "Open, transparent alternative ladder for Minecraft 1.16.1 speedrunning.",
 	"authors": [
 		"cwg3"
 	],

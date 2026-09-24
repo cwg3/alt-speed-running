@@ -53,7 +53,7 @@ public final class MatchClock {
 	 * Planning time before the race starts, once the player is in the
 	 * world.
 	 *
-	 * FIVE seconds, which is what MCSR Ranked uses. This was ten for a
+	 * FIVE seconds, which is what the incumbent uses. This was ten for a
 	 * while on an earlier report; five is the corrected figure.
 	 */
 	private static final long COUNTDOWN_MS = 5_000;

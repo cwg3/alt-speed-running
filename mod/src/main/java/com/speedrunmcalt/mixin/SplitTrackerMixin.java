@@ -27,7 +27,7 @@ public class SplitTrackerMixin {
 			return; // criterion was already satisfied, not a new grant
 		}
 		if (MatchState.matchStartMillis < 0) {
-			return; // no active ranked match
+			return; // no active match
 		}
 
 		String splitName = SplitEvents.nameFor(advancement.getId());

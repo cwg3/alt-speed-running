@@ -56,7 +56,7 @@ public final class LootTopUp {
 		// String is wool is beds, and beds are the dragon kill - four
 		// string to a wool, three wool to a bed. Sand is how a runner
 		// gets out of the pit the four chests sit at the bottom of.
-		// Measured in one MCSR Ranked temple: 18 string and 14 sand
+		// Measured in one the incumbent temple: 18 string and 14 sand
 		// across its four chests, alongside 4 iron and 56 hunger points.
 		// Neither is guaranteed here yet; both should be, once there are
 		// enough samples to set a floor rather than guess one.
@@ -78,7 +78,7 @@ public final class LootTopUp {
 		 * 88 for the ocean types, which is the MEASURED AVERAGE of what
 		 * the incumbent's shipwreck supply chests actually hold.
 		 *
-		 * Eleven MCSR Ranked supply chests were rolled from the loot
+		 * Eleven the incumbent supply chests were rolled from the loot
 		 * seeds stored in their own save files: 139, 127, 105, 98, 91,
 		 * 89, 88, 85, 64, 56, 27 hunger points. Mean 88, median 89,
 		 * worst 27. Wheat and rotten flesh carry almost all of it -
@@ -197,7 +197,7 @@ public final class LootTopUp {
 	 *
 	 * The first version inserted the whole deficit as cooked cod, which
 	 * meant eighteen cod in a chest vanilla would never fill that way.
-	 * Measured against eleven MCSR Ranked supply chests, the real
+	 * Measured against eleven the incumbent supply chests, the real
 	 * composition is bulk wheat and rotten flesh - typically 17 to 20
 	 * wheat and 13 to 21 flesh - with suspicious stew in about a third
 	 * of chests and cooked fish occasionally. Those proportions are
@@ -300,7 +300,7 @@ public final class LootTopUp {
 	 *   WHEAT      three to a loaf, five points a loaf
 	 *
 	 * Rotten flesh counts everywhere now, not only in a desert temple.
-	 * It is unpleasant and it is food; MCSR Ranked ships it as a
+	 * It is unpleasant and it is food; the incumbent ships it as a
 	 * shipwreck food source, and a runner at zero hunger eats it.
 	 *
 	 * Suspicious stew counts too. We already strip its harmful effects

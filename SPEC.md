@@ -156,7 +156,7 @@ worth blocking this on.
 | Desert temple: 7 iron, 52 hunger points of food | built — was "13 rotten flesh"; counted in items until a player ran short |
 | Desert temple: string (→ wool → beds) and sand (→ out of the chest pit) | **not built** — both are route material, neither is guaranteed |
 | Desert temple: 3 lava pools | built (placed) |
-| Shipwreck / buried treasure: 7 iron equivalent, 88 hunger points of food | built — 88 is the measured average of eleven MCSR supply chests |
+| Shipwreck / buried treasure: 7 iron equivalent, 88 hunger points of food | built — 88 is the measured average of eleven the incumbent supply chests |
 | Shipwreck / buried treasure: 2 magma ravines within 10 chunks, with bubble columns and kelp | built (world check) — matches the standard |
 | Ruined portal: 27 nuggets (= 3 ingots = one bucket) | built — **[ours]**, the standard is 18 nuggets |
 | Ruined portal: 2–4 obsidian, seed-varied | built — **[ours]**, not in the standard |
@@ -305,7 +305,7 @@ magma, real gold blocks - and the pool only admits seeds whose portal a
 runner can actually finish.
 
 The standard is measured off the incumbent, not invented. Three ruined
-portal worlds read out of an MCSR Ranked install, with the same seeds
+portal worlds read out of an the incumbent install, with the same seeds
 regenerated unmodified for comparison: **0 blocks differ**, so they
 ship vanilla and filter for it. All three have the same shape:
 
@@ -701,7 +701,7 @@ goes back to the pool, since nothing was wrong with it.
 | Both players race the same seed in separate worlds | built |
 | Seed type announced with a 10-second countdown before the run | built — confirmed in play |
 
-**The countdown is a real mechanic, not a nicety.** MCSR Ranked tells
+**The countdown is a real mechanic, not a nicety.** the incumbent tells
 both players which seed TYPE they have drawn - village, desert temple,
 shipwreck, buried treasure, ruined portal - and counts down ten
 seconds before the run begins. The layout stays hidden; what is shared
@@ -723,8 +723,8 @@ clock at 11:20:06.
 
 **ZSG is not the standard to copy.** It filters for fast single-player
 times (sub-5 theoretical), with much tighter distances — bastion within
-96 blocks against MCSR's 14 chunks. Same mechanics, different purpose:
-ZSG optimises a time attack, MCSR balances a race. Its `terrain_checker`
+96 blocks against the incumbent's 14 chunks. Same mechanics, different purpose:
+ZSG optimises a time attack, the incumbent balances a race. Its `terrain_checker`
 idea is worth borrowing; its distances are not.
 
 **The countdown is shown once per run, not once per join.** A player who
@@ -953,7 +953,7 @@ lost in a bastion on 2026-09-23, found one chest, could not dig out to
 orient themselves, and reported it as "partially buried". Three
 measurements say otherwise:
 
-| | that bastion | six MCSR bastions |
+| | that bastion | six the incumbent bastions |
 |---|---|---|
 | roof exposure | 64.9% | 7.1 - 29.8% |
 | solid blocks above its chests | 0 | 0 (median, all six) |
@@ -965,7 +965,7 @@ count differs - 3 against their 4 to 12 - but chest count varies by
 bastion type and that one was a bridge.
 
 So no filter was added. Writing one would have rejected seeds for a
-property MCSR does not filter on either, which is the same mistake as
+property the incumbent does not filter on either, which is the same mistake as
 the zero-burial shipwreck rule that would have thrown out one of their
 own seeds. What the player hit was a sprawling variant and the ordinary
 difficulty of navigating it.

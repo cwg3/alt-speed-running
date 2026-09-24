@@ -24,7 +24,7 @@
 // ladder meant to rank the best players needs runs that are comparable
 // to each other.
 //
-// Distances are taken from the published MCSR Ranked criteria so our
+// Distances are taken from the published the incumbent criteria so our
 // seeds are directly comparable to the standard runners already know:
 //   village         <= 7 chunks    desert temple <= 5 chunks
 //   ruined portal   <= 3 chunks    shipwreck     <= 4 chunks

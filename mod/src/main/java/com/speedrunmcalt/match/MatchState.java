@@ -148,7 +148,7 @@ public final class MatchState {
 	public static volatile int portalObsidianNeeded = 0;
 
 	// Identify the active match to the backend when reporting splits.
-	// Null when no ranked match is in progress, which is what
+	// Null when no match is in progress, which is what
 	// SplitReporter checks before attempting any network call.
 	public static volatile String matchId = null;
 	public static volatile String sessionToken = null;
