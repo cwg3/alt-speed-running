@@ -129,6 +129,16 @@ def crt(mask, transparent):
     lit = ImageChops.add(core, bloom_layer(mask, BLOOM_TIGHT_RADIUS, BLOOM_TIGHT_GAIN))
     lit = ImageChops.add(lit, bloom_layer(mask, BLOOM_WIDE_RADIUS, BLOOM_WIDE_GAIN))
 
+    # Put the pure phosphor back over the strokes.
+    #
+    # Adding bloom on top of already-lit glyphs drives their interiors
+    # toward white: the brightest pixel came out #BCFE95 against the
+    # #56FF42 the game draws, so the logo and the in-game wordmark were
+    # visibly different colours. Bloom belongs AROUND a stroke, not
+    # through it - a real phosphor stroke is its own colour and the
+    # halation happens in the glass beside it.
+    lit.paste(Image.new("RGB", size, PHOSPHOR), mask=mask)
+
     if transparent:
         # Alpha follows the light itself, so the bloom fades out over
         # whatever the logo is placed on instead of carrying a screen
