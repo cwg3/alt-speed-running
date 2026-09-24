@@ -131,9 +131,13 @@ for s in /work/shard-*; do
     $IMAGE
 done
 while [ "\$(docker ps -q | wc -l)" -gt 0 ]; do sleep 20; done
-cat /work/out-*.csv > /work/combined.csv
+cat /work/out-*.csv > /work/combined.csv 2>/dev/null || : > /work/combined.csv
 aws s3 cp /work/combined.csv s3://$BUCKET/$RUN/out/combined.csv
 aws s3 cp /work/ s3://$BUCKET/$RUN/out/ --recursive --exclude '*' --include 'out-*.csv'
+# generate mode writes JSON, not csv rows. Uploading only out-*.csv
+# would have finished cleanly and left the whole run's output on a
+# terminated instance.
+aws s3 cp /work/ s3://$BUCKET/$RUN/out/ --recursive --exclude '*' --include 'gen-*.json'
 echo DONE > /work/done && aws s3 cp /work/done s3://$BUCKET/$RUN/out/done
 shutdown -h now
 SCRIPT
@@ -179,8 +183,35 @@ while ! aws s3 ls "s3://$BUCKET/$RUN/out/done" >/dev/null 2>&1; do
   sleep 30
 done
 
-OUT="$(cd "$(dirname "$0")/.." && pwd)/seed-filter/results/$RUN.csv"
-mkdir -p "$(dirname "$OUT")"
-aws s3 cp "s3://$BUCKET/$RUN/out/combined.csv" "$OUT" --quiet
-echo "=== $(wc -l < "$OUT" | tr -d ' ') rows -> $OUT ==="
-awk -F, '{print $2}' "$OUT" | sort | uniq -c | sort -rn | head
+RESDIR="$(cd "$(dirname "$0")/.." && pwd)/seed-filter/results"
+mkdir -p "$RESDIR"
+if [ "$CHECK" = generate ]; then
+	dest="$RESDIR/$RUN"
+	mkdir -p "$dest"
+	aws s3 cp "s3://$BUCKET/$RUN/out/" "$dest/" --recursive --exclude '*' --include 'gen-*.json' --quiet
+	echo "=== $(ls "$dest" | grep -c overworld) shards -> $dest ==="
+	python3 - "$dest" <<'PYEOF'
+import json, sys, glob, os
+d = sys.argv[1]
+merged, nether = {}, []
+for f in sorted(glob.glob(os.path.join(d, 'gen-*-overworld.json'))):
+    for t, vs in json.load(open(f)).items():
+        merged.setdefault(t, []).extend(vs)
+for f in sorted(glob.glob(os.path.join(d, 'gen-*-nether.json'))):
+    n = json.load(open(f))
+    nether.extend(n if isinstance(n, list) else n.get('seeds', []))
+seen, uniq = set(), {}
+for t, vs in merged.items():
+    uniq[t] = [v for v in vs if not (v['seed'] in seen or seen.add(v['seed']))]
+json.dump(uniq, open(os.path.join(d, 'overworld_by_type.json'), 'w'), indent=2)
+json.dump(nether, open(os.path.join(d, 'nether_seeds.json'), 'w'), indent=2)
+for t in sorted(uniq):
+    print('  %-16s %d' % (t, len(uniq[t])))
+print('  nether seeds     %d' % len(nether))
+PYEOF
+else
+	OUT="$RESDIR/$RUN.csv"
+	aws s3 cp "s3://$BUCKET/$RUN/out/combined.csv" "$OUT" --quiet
+	echo "=== $(wc -l < "$OUT" | tr -d ' ') rows -> $OUT ==="
+	awk -F, '{print $2}' "$OUT" | sort | uniq -c | sort -rn | head
+fi
