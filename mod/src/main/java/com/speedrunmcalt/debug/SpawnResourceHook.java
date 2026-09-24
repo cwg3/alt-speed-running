@@ -67,6 +67,31 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 	private static final int MIN_LOGS = 8;
 
 	/**
+	 * Ocean openings get 6.
+	 *
+	 * A shipwreck or buried treasure spawn is on or near water by
+	 * definition, and holding ocean seeds to the same wood as a village
+	 * seed rejects the route rather than a bad instance of it. Six logs
+	 * is twenty-four planks: table, pickaxe, and the boat the route
+	 * wants anyway.
+	 *
+	 * The count these are compared against is not perfectly
+	 * reproducible - see generateScanArea - so a seed sitting exactly
+	 * on this line can pass one run and fail the next. That is
+	 * tolerable here in a way it would not be higher up: everything
+	 * near the line is a marginal seed either way, and the rejections
+	 * that matter for ocean types are the open-water spawns with zero
+	 * logs, which no amount of jitter moves.
+	 */
+	private static final int MIN_LOGS_OCEAN = 6;
+
+	/** Ocean routes start at the water; they cannot also start in a forest. */
+	private static int minLogsFor(String type) {
+		return ("shipwreck".equals(type) || "buried_treasure".equals(type))
+				? MIN_LOGS_OCEAN : MIN_LOGS;
+	}
+
+	/**
 	 * Blocks of SEABED allowed above any of the wreck's chests: none.
 	 *
 	 * Submerged is fine and expected; buried is not. The wreck's own
@@ -105,10 +130,14 @@ public class SpawnResourceHook implements DedicatedServerModInitializer {
 				}
 
 				int logs = countLogs(world, spawn, exclude);
-				boolean woodOk = logs >= MIN_LOGS;
+				int minLogs = minLogsFor(type);
+				boolean woodOk = logs >= minLogs;
 
+				// The threshold goes in the row so a verdict can be
+				// re-derived from the csv later without re-generating a
+				// thousand worlds.
 				String detail = "spawn=" + spawn.getX() + "," + spawn.getZ()
-						+ " logs=" + logs;
+						+ " logs=" + logs + " minLogs=" + minLogs;
 				boolean ok = woodOk;
 
 				if ("shipwreck".equals(type) && exclude != null) {
