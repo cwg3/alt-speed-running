@@ -91,7 +91,7 @@ public final class MatchState {
 	/**
 	 * When the pre-race countdown ends, or 0 if there is none.
 	 *
-	 * Both players are shown their seed TYPE and given ten seconds to
+	 * Both players are shown their seed TYPE and given five seconds to
 	 * plan the opening before the race starts. World generation happens
 	 * behind that screen, so loading is not merely uncharged - it is
 	 * the planning window.

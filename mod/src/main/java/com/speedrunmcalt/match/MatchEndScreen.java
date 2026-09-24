@@ -60,8 +60,11 @@ public class MatchEndScreen extends Screen {
 				new LiteralText(won ? "VICTORY" : "DEFEAT"), cx, y, won ? WIN : LOSS);
 		y += 20;
 
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("vs " + (opponent == null ? "opponent" : opponent)), cx, y, DIM);
+		// Same treatment as the HUD and the menu: "vs" recedes, the
+		// name is yellow. Player names are yellow everywhere.
+		com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer, cx, y,
+				new String[] { "vs ", opponent == null ? "opponent" : opponent },
+				new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW });
 		y += 18;
 
 		drawCenteredText(matrices, this.textRenderer,

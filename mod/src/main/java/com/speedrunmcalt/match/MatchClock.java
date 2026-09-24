@@ -51,9 +51,12 @@ public final class MatchClock {
 
 	/**
 	 * Planning time before the race starts, once the player is in the
-	 * world. Ten seconds matches the standard.
+	 * world.
+	 *
+	 * FIVE seconds, which is what MCSR Ranked uses. This was ten for a
+	 * while on an earlier report; five is the corrected figure.
 	 */
-	private static final long COUNTDOWN_MS = 10_000;
+	private static final long COUNTDOWN_MS = 5_000;
 
 	private MatchClock() {
 	}
@@ -82,7 +85,7 @@ public final class MatchClock {
 		// made.
 		//
 		// Starting it at match time was wrong and invisible: world
-		// generation takes about twelve seconds, so a ten-second
+		// generation takes about twelve seconds, so a five-second
 		// countdown begun at matchmaking had already expired before
 		// the player could see it, and the screen never appeared.
 		//
@@ -93,7 +96,7 @@ public final class MatchClock {
 		// Except on a rejoin. The countdown buys planning time before
 		// the race; a player who crashed out twelve minutes in has
 		// already planned, already run, and their clock is still going -
-		// ten seconds of the screen would be ten seconds taken off a run
+		// five seconds of the screen would be five seconds taken off a run
 		// in progress. -1 marks it deliberately skipped, so this branch
 		// does not fire again on the next tick.
 		if (MatchState.runAlreadyStarted) {

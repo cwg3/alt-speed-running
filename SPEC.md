@@ -675,7 +675,7 @@ charged to the run still holds.
 
 The countdown starts on the player's FIRST PLAYABLE TICK, not when the
 match is made. Starting it at matchmaking was wrong and invisible -
-world generation takes about twelve seconds, so a ten-second countdown
+world generation takes about twelve seconds, so a five-second countdown
 begun then had already expired before the player could see it and the
 screen never appeared at all. Confirmed in play: reveal at 11:19:55,
 clock at 11:20:06.
@@ -688,9 +688,9 @@ idea is worth borrowing; its distances are not.
 
 **The countdown is shown once per run, not once per join.** A player who
 crashes out and rejoins is dropped straight back into the world with
-their clock still running. The ten seconds are planning time *before* a
+their clock still running. The five seconds are planning time *before* a
 race; someone twelve minutes into one has already planned, and showing
-the screen again would take ten seconds off a run in progress.
+the screen again would take five seconds off a run in progress.
 
 The client cannot work this out for itself. The countdown is shown on
 the first playable tick, and whether the run start is a fresh claim or a

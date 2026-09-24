@@ -77,9 +77,14 @@ public final class MatchHud {
 			y += LINE;
 		}
 
+		// "vs" stays recessive; the NAME is yellow, the same way the
+		// player's own name is yellow on the menu. In dim grey it was
+		// nearly invisible over bright water.
 		String opponent = MatchState.opponentUsername;
-		drawShadowed(matrices, client,
-				"vs " + (opponent == null ? "..." : opponent), X, y, DIM);
+		drawShadowed(matrices, client, "vs ", X, y, DIM);
+		drawShadowed(matrices, client, opponent == null ? "..." : opponent,
+				X + client.textRenderer.getWidth("vs "), y,
+				com.speedrunmcalt.menu.Palette.YELLOW);
 		y += LINE + 2;
 
 		for (int i = 0; i < ORDER.length; i++) {

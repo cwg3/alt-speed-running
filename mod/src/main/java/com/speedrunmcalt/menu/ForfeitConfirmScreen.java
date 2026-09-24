@@ -16,7 +16,10 @@ import net.minecraft.text.LiteralText;
 public class ForfeitConfirmScreen extends Screen {
 	private static final int PHOSPHOR = Palette.CYAN;
 	private static final int DIM = Palette.DIM;
-	private static final int ALERT = Palette.ORANGE;
+	/** What the forfeit costs you: the consequence line. */
+	private static final int ALERT = Palette.YELLOW;
+	/** Irreversibility, which is the part worth hesitating over. */
+	private static final int FINAL = Palette.MAGENTA;
 
 	private final Screen parent;
 
@@ -47,7 +50,7 @@ public class ForfeitConfirmScreen extends Screen {
 				new LiteralText("Your opponent is awarded the win and ratings change."),
 				cx, this.height / 2 - 24, ALERT);
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("This cannot be undone."), cx, this.height / 2 - 12, DIM);
+				new LiteralText("This cannot be undone."), cx, this.height / 2 - 12, FINAL);
 		super.render(matrices, mouseX, mouseY, delta);
 	}
 
