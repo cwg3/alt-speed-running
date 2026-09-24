@@ -23,7 +23,8 @@ import net.minecraft.text.LiteralText;
  * from something merely uncharged into the planning window itself.
  */
 public class SeedRevealScreen extends Screen {
-	private static final int PHOSPHOR = Palette.CYAN;
+	/** Cyan. Named for what it IS - see the note in Palette. */
+	private static final int ACCENT = Palette.CYAN;
 	private static final int DIM = Palette.DIM;
 	private static final int ALERT = Palette.YELLOW;
 
@@ -74,7 +75,7 @@ public class SeedRevealScreen extends Screen {
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText("YOUR SEED"), cx, y, DIM);
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText(typeName(MatchState.seedType)), cx, y + 16, PHOSPHOR);
+				new LiteralText(typeName(MatchState.seedType)), cx, y + 16, ACCENT);
 
 		// Who you are actually racing.
 		//

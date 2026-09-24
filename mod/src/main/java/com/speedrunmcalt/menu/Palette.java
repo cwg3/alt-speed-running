@@ -44,6 +44,19 @@ public final class Palette {
 	 * any of the rest existed, and a brand mark is the one thing a
 	 * restyle should leave alone.
 	 */
+	/**
+	 * The wordmark's green, and NOTHING else.
+	 *
+	 * Reserved on purpose: it is the one colour that says "alt" rather
+	 * than saying something about the state of a match. It drifted onto
+	 * the MATCH FOUND title once, which made a status message look like
+	 * branding.
+	 *
+	 * Several screens used to declare a local constant called PHOSPHOR
+	 * that was actually CYAN - harmless until somebody "corrects" it to
+	 * the real thing and spreads the green across half the UI. Those are
+	 * named ACCENT now.
+	 */
 	public static final int PHOSPHOR = 0x56FF42;
 
 	/** Secondary text: present, but not competing with the palette. */

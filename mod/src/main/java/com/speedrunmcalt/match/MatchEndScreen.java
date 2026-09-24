@@ -15,7 +15,8 @@ import net.minecraft.text.LiteralText;
  * stop - so neither is buried behind the title screen.
  */
 public class MatchEndScreen extends Screen {
-	private static final int PHOSPHOR = com.speedrunmcalt.menu.Palette.CYAN;
+	/** Cyan. Named for what it IS - see the note in Palette. */
+	private static final int ACCENT = com.speedrunmcalt.menu.Palette.CYAN;
 	private static final int DIM = com.speedrunmcalt.menu.Palette.DIM;
 	private static final int WIN = com.speedrunmcalt.menu.Palette.CYAN;
 	private static final int LOSS = com.speedrunmcalt.menu.Palette.MAGENTA;
@@ -68,7 +69,7 @@ public class MatchEndScreen extends Screen {
 		y += 18;
 
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("your time   " + MatchState.formatTime(myTimeMs)), cx, y, PHOSPHOR);
+				new LiteralText("your time   " + MatchState.formatTime(myTimeMs)), cx, y, ACCENT);
 		y += 12;
 
 		String theirs = opponentTimeMs == null ? "--:--" : MatchState.formatTime(opponentTimeMs);

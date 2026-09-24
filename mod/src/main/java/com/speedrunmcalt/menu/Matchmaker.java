@@ -102,8 +102,11 @@ public final class Matchmaker {
 		if (waited == 0 && client.inGameHud != null) {
 			String vs = opponent == null ? "opponent" : opponent;
 			client.inGameHud.setTitles(
+					// Yellow, not phosphor. The green belongs to the "alt"
+					// wordmark and nothing else - using it here made a
+					// status message look like branding.
 					new net.minecraft.text.LiteralText("MATCH FOUND").styled(
-							st -> st.withColor(net.minecraft.text.TextColor.fromRgb(Palette.PHOSPHOR))),
+							st -> st.withColor(net.minecraft.text.TextColor.fromRgb(Palette.YELLOW))),
 					new net.minecraft.text.LiteralText("vs " + vs).styled(
 							st -> st.withColor(net.minecraft.text.TextColor.fromRgb(Palette.YELLOW))),
 					0, CHIME_TICKS, 10);

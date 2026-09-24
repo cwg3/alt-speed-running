@@ -14,7 +14,8 @@ import net.minecraft.client.util.math.MatrixStack;
  * health, effects).
  */
 public final class MatchHud {
-	private static final int PHOSPHOR = com.speedrunmcalt.menu.Palette.CYAN;
+	/** Cyan. Named for what it IS - see the note in Palette. */
+	private static final int ACCENT = com.speedrunmcalt.menu.Palette.CYAN;
 	private static final int DIM = com.speedrunmcalt.menu.Palette.DIM;
 	private static final int AHEAD = com.speedrunmcalt.menu.Palette.CYAN;
 	private static final int BEHIND = com.speedrunmcalt.menu.Palette.MAGENTA;
@@ -90,7 +91,7 @@ public final class MatchHud {
 		// menu read as the same product.
 		drawShadowed(matrices, client, "alt", X, y, com.speedrunmcalt.menu.Palette.PHOSPHOR);
 		drawShadowed(matrices, client, MatchState.formatTime(elapsed),
-				X + client.textRenderer.getWidth("alt  "), y, PHOSPHOR);
+				X + client.textRenderer.getWidth("alt  "), y, ACCENT);
 		y += LINE;
 
 		if (outcome != null) {

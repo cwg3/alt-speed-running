@@ -24,7 +24,8 @@ import net.minecraft.text.LiteralText;
  * forfeit.
  */
 public class BadSeedScreen extends Screen {
-	private static final int PHOSPHOR = Palette.CYAN;
+	/** Cyan. Named for what it IS - see the note in Palette. */
+	private static final int ACCENT = Palette.CYAN;
 	private static final int DIM = Palette.DIM;
 	private static final int ALERT = Palette.YELLOW;
 
@@ -101,7 +102,7 @@ public class BadSeedScreen extends Screen {
 					cx, y, ALERT);
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText("If you agree, the match is voided for both of you."),
-					cx, y + 16, PHOSPHOR);
+					cx, y + 16, ACCENT);
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText("Nobody wins, and neither rating changes."),
 					cx, y + 28, DIM);
@@ -110,7 +111,7 @@ public class BadSeedScreen extends Screen {
 					cx, y + 44, DIM);
 		} else {
 			drawCenteredText(matrices, this.textRenderer,
-					new LiteralText("Is this seed unplayable?"), cx, y, PHOSPHOR);
+					new LiteralText("Is this seed unplayable?"), cx, y, ACCENT);
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText("For a seed that cannot be run at all - no blacksmith,"),
 					cx, y + 18, DIM);

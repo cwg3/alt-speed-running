@@ -14,7 +14,8 @@ import net.minecraft.text.LiteralText;
  * mid-run. Cancel is the default focus.
  */
 public class ForfeitConfirmScreen extends Screen {
-	private static final int PHOSPHOR = Palette.CYAN;
+	/** Cyan. Named for what it IS - see the note in Palette. */
+	private static final int ACCENT = Palette.CYAN;
 	private static final int DIM = Palette.DIM;
 	/** What the forfeit costs you: the consequence line. */
 	private static final int ALERT = Palette.YELLOW;
@@ -45,7 +46,7 @@ public class ForfeitConfirmScreen extends Screen {
 		this.renderBackground(matrices);
 		int cx = this.width / 2;
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("Forfeit this match?"), cx, this.height / 2 - 40, PHOSPHOR);
+				new LiteralText("Forfeit this match?"), cx, this.height / 2 - 40, ACCENT);
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText("Your opponent is awarded the win and ratings change."),
 				cx, this.height / 2 - 24, ALERT);

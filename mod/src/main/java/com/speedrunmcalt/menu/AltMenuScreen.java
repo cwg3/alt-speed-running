@@ -8,7 +8,8 @@ import net.minecraft.text.LiteralText;
 /** The lobby: connection state, profile, and queue controls. */
 public class AltMenuScreen extends Screen {
 	// Phosphor green from the wordmark, so the screen and the brand match.
-	private static final int PHOSPHOR = Palette.CYAN;
+	/** Cyan. Named for what it IS - see the note in Palette. */
+	private static final int ACCENT = Palette.CYAN;
 	private static final int DIM = Palette.DIM;
 	private static final int ALERT = Palette.ALERT;
 
@@ -84,7 +85,7 @@ public class AltMenuScreen extends Screen {
 
 		String status;
 		String detail = null;
-		int statusColor = PHOSPHOR;
+		int statusColor = ACCENT;
 
 		switch (AltSession.state()) {
 			case DISCONNECTED:
@@ -138,7 +139,7 @@ public class AltMenuScreen extends Screen {
 					break;
 				case LAUNCHING:
 					queue = "match found vs " + Matchmaker.opponent() + " - loading world";
-					queueColor = PHOSPHOR;
+					queueColor = ACCENT;
 					break;
 				case ERROR:
 					queue = "error: " + Matchmaker.error();
