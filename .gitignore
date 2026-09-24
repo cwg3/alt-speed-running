@@ -38,3 +38,4 @@ cdk.out/
 *.key
 credentials.json
 brand/venv/
+pack/*.mrpack
