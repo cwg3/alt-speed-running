@@ -62,9 +62,21 @@ public final class Cues {
 		play(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0f);
 	}
 
-	/** An anvil landing. Final, and nobody mistakes it for good news. */
+	/**
+	 * The player death sound - the "oof".
+	 *
+	 * Asked for as "the loop that happens when PLAYER tried to swim in
+	 * lava". There is no sound attached to a death MESSAGE; what a
+	 * runner hears going into lava is the burning sizzle
+	 * (entity.player.hurt_on_fire) repeating while they cook, then
+	 * entity.player.death at the moment the message appears. This is
+	 * that last one - the sound that lands exactly when the death text
+	 * does, and the one every player already reads as "the run is
+	 * over". Pitched down slightly so it reads as final rather than as
+	 * an ordinary death mid-run.
+	 */
 	public static void defeat() {
-		play(SoundEvents.BLOCK_ANVIL_LAND, 0.8f);
+		play(SoundEvents.ENTITY_PLAYER_DEATH, 0.9f);
 	}
 
 	/**
