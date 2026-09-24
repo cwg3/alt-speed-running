@@ -57,6 +57,25 @@ public final class Matchmaker {
 	private static volatile QueueJoinResult pending;
 	private static volatile String pendingToken;
 
+	/**
+	 * Ticks to wait after a match is found before leaving the world.
+	 *
+	 * The level-up chime is the only thing telling a player practising
+	 * elsewhere that they have been matched, and it is 1.75 seconds
+	 * long - entity.player.levelup, measured from the asset index.
+	 * disconnect() tears the sound engine down, so switching worlds on
+	 * the very next tick cut the chime off after about a twentieth of
+	 * a second.
+	 *
+	 * 40 ticks is two seconds: the chime finishes, and the pause reads
+	 * as "match found, here we go" rather than as a stall. It costs the
+	 * run nothing, because the clock does not start until the countdown
+	 * ends, well after this.
+	 */
+	private static final int CHIME_TICKS = 40;
+
+	private static volatile int waited;
+
 	/** Registered once, from the client initializer. */
 	public static void init() {
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
@@ -66,6 +85,12 @@ public final class Matchmaker {
 	private static void tick(MinecraftClient client) {
 		QueueJoinResult match = pending;
 		if (match == null) {
+			return;
+		}
+
+		// Let the chime finish before anything tears down audio.
+		if (waited < CHIME_TICKS) {
+			waited++;
 			return;
 		}
 
@@ -89,6 +114,7 @@ public final class Matchmaker {
 		}
 
 		pending = null;
+		waited = 0;
 		String token = pendingToken;
 		pendingToken = null;
 		try {
@@ -198,6 +224,7 @@ public final class Matchmaker {
 				// Nothing client-side happens on this thread. The tick
 				// handler picks it up from here.
 				pendingToken = token;
+				waited = 0;
 				pending = result;
 			} catch (InterruptedException interrupted) {
 				Thread.currentThread().interrupt();
