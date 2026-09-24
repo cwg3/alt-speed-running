@@ -14,6 +14,7 @@ public class SpeedrunMcAltClient implements ClientModInitializer {
 		com.speedrunmcalt.client.GammaUnlock.apply();
 		MatchHud.register();
 		MatchClock.register();
+		com.speedrunmcalt.menu.Cues.register();
 		ReplayRecorder.register();
 		AltKeybinds.register();
 

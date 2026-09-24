@@ -55,6 +55,14 @@ public final class MatchEnd {
 		MatchState.finish(hudMessage != null ? hudMessage
 				: won ? "VICTORY" : "DEFEAT - " + opponentName + " finished first");
 
+		// The result lands before the teardown and the summary screen,
+		// so the cue arrives with the HUD change rather than after it.
+		if (won) {
+			com.speedrunmcalt.menu.Cues.victory();
+		} else {
+			com.speedrunmcalt.menu.Cues.defeat();
+		}
+
 		// Snapshot before the teardown clears it.
 		final long myTime = MatchState.elapsedMillis();
 		final Long opponentTime = MatchState.opponentSplits.get("kill_dragon");

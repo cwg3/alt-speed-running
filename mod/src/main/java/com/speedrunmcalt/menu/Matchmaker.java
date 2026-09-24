@@ -92,6 +92,7 @@ public final class Matchmaker {
 
 				opponent = result.opponentUsername;
 				state = State.LAUNCHING;
+				Cues.matchFound();
 				SpeedrunMcAlt.LOGGER.info(
 						"[speedrunmcalt] Matched vs {} - matchId={} type={} structure={},{} "
 								+ "bastion={}@{},{} overworldSeed={} netherSeed={}",
