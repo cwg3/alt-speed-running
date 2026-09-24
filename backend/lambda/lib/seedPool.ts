@@ -1,5 +1,5 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { BatchGetCommand, DynamoDBDocumentClient, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { randomInt } from 'node:crypto';
 
@@ -42,17 +42,43 @@ export interface SeedPair {
 	smithZ: number | null;
 }
 
-// Atomically claims one unused seed pair for a match. Scans for
-// candidates, then races a conditional update against each in turn -
-// the condition (used = false) means a concurrent claim by another
-// match loses cleanly instead of double-assigning the same seed.
-// Fine at MVP scale; would need a smarter allocation strategy (or a
-// bigger pool + random start point) once concurrent matches are common
-// enough for repeated contention on the same few candidates to matter.
+/** Why a claim failed, so the caller can say which. */
+export type ClaimFailure = 'pool_empty' | 'all_seen';
+
+export type ClaimResult =
+	| { ok: true; pair: SeedPair }
+	| { ok: false; reason: ClaimFailure };
+
+/**
+ * Draws a seed neither player has played before.
+ *
+ * Seeds used to be CONSUMED: the claim set used = true and that pair
+ * was gone for good, so the pool was a count of matches the ladder
+ * could ever run. 300 seeds meant 300 matches, total, across everyone.
+ *
+ * Fairness never needed that. Both players race the SAME seed, so a
+ * seed is only unfair when one of them has seen it and the other has
+ * not. Tracking what each player has seen turns pool size from a
+ * global budget into a per-player one: 300 seeds now means each player
+ * can play 300 matches, and a hundred players get 15,000 matches out
+ * of the same pool instead of 300.
+ *
+ * Every sighting counts, including a match abandoned after thirty
+ * seconds. Strictly any sighting is information, and the alternative -
+ * deciding how much of a seed someone saw before it counts - is a rule
+ * that has to be defended later. Over-applying it is the safer error.
+ *
+ * `used` is left alone. It still gates rows that are held pending
+ * verification or quarantined by a bad-seed vote, which is a different
+ * question from whether a given player has seen a seed, and
+ * verify-and-release.sh depends on it.
+ */
 export async function claimSeedPair(
 	seedPoolTableName: string,
 	matchId: string,
-): Promise<SeedPair | null> {
+	playersTableName: string,
+	playerUuids: string[],
+): Promise<ClaimResult> {
 	// TEMPORARY: restrict which seed types are handed out.
 	//
 	// Set SEED_TYPE_BIAS to a comma-separated list (for example
@@ -66,6 +92,32 @@ export async function claimSeedPair(
 		.split(',')
 		.map((t) => t.trim())
 		.filter(Boolean);
+
+	// What have these two already played?
+	//
+	// One BatchGet rather than a read per candidate. A player's set is
+	// seed ids, so a thousand matches is tens of kilobytes - well
+	// inside the 400KB item limit, but it wants a plan before it is
+	// one.
+	const seen = new Set<string>();
+	if (playerUuids.length > 0) {
+		const got = await ddb.send(new BatchGetCommand({
+			RequestItems: {
+				[playersTableName]: {
+					Keys: playerUuids.map((uuid) => ({ uuid })),
+					ProjectionExpression: 'seenSeeds',
+				},
+			},
+		}));
+		for (const row of got.Responses?.[playersTableName] ?? []) {
+			// DocumentClient gives a Set for a DynamoDB string set.
+			const s = row.seenSeeds;
+			if (!s) continue;
+			for (const id of (s instanceof Set ? Array.from(s) : s) as string[]) {
+				seen.add(id);
+			}
+		}
+	}
 
 	const names: Record<string, string> = { '#used': 'used' };
 	const values: Record<string, unknown> = { ':false': false };
@@ -120,17 +172,33 @@ export async function claimSeedPair(
 		[items[i], items[j]] = [items[j], items[i]];
 	}
 
-	for (const item of items) {
+	// "No seeds at all" and "none this pair has not already played" are
+	// different problems with different fixes - refill the pool, or
+	// widen it for a heavy player - and they must not look alike to
+	// the caller. Exhaustion here is per-player and would otherwise be
+	// silent: everyone else keeps matching fine.
+	if (items.length === 0) {
+		return { ok: false, reason: 'pool_empty' };
+	}
+	const unseen = items.filter((i) => !seen.has(String(i.seedPairId)));
+	if (unseen.length === 0) {
+		return { ok: false, reason: 'all_seen' };
+	}
+
+	for (const item of unseen) {
 		try {
+			// No conditional claim any more. Two concurrent matches
+			// drawing the same seed is now legal - it is only unfair if
+			// a PLAYER repeats one - so the contention the old
+			// used = false condition existed to resolve is gone.
 			await ddb.send(new UpdateCommand({
 				TableName: seedPoolTableName,
 				Key: { seedPairId: item.seedPairId },
-				UpdateExpression: 'SET #used = :true, assignedMatchId = :matchId',
-				ConditionExpression: '#used = :false',
-				ExpressionAttributeNames: { '#used': 'used' },
-				ExpressionAttributeValues: { ':true': true, ':false': false, ':matchId': matchId },
+				UpdateExpression:
+					'SET lastAssignedMatchId = :matchId ADD timesPlayed :one',
+				ExpressionAttributeValues: { ':matchId': matchId, ':one': 1 },
 			}));
-			return {
+			return { ok: true, pair: {
 				seedPairId: item.seedPairId,
 				overworldSeed: item.overworldSeed,
 				netherSeed: item.netherSeed,
@@ -142,14 +210,38 @@ export async function claimSeedPair(
 				bastionZ: item.bastionZ ?? 0,
 				smithX: item.smithX ?? null,
 				smithZ: item.smithZ ?? null,
-			};
+			} };
 		} catch (err) {
 			if (err instanceof ConditionalCheckFailedException) {
-				continue; // someone else claimed it first - try the next candidate
+				continue; // someone else got there first - try the next
 			}
 			throw err;
 		}
 	}
 
-	return null;
+	return { ok: false, reason: 'pool_empty' };
+}
+
+/**
+ * Records that these players have now seen this seed.
+ *
+ * ADD on a string set is atomic and idempotent, so concurrent matches
+ * cannot clobber each other and a retry is harmless.
+ *
+ * This must not be best-effort. If the match is created and this does
+ * not land, the seed can be dealt to the same player again, which is
+ * the exact thing the whole scheme exists to prevent - so the caller
+ * treats a failure here as a failed match, not a warning.
+ */
+export async function recordSeedsSeen(
+	playersTableName: string,
+	playerUuids: string[],
+	seedPairId: string,
+): Promise<void> {
+	await Promise.all(playerUuids.map((uuid) => ddb.send(new UpdateCommand({
+		TableName: playersTableName,
+		Key: { uuid },
+		UpdateExpression: 'ADD seenSeeds :s',
+		ExpressionAttributeValues: { ':s': new Set([seedPairId]) },
+	}))));
 }

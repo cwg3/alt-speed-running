@@ -38,8 +38,21 @@ async function main() {
 	do {
 		const page = await ddb.send(new ScanCommand({
 			TableName: poolTable,
-			ProjectionExpression: 'seedPairId, assignedMatchId, used',
-			FilterExpression: '#u = :true',
+			ProjectionExpression: 'seedPairId, assignedMatchId, used, heldUnverified, poolReject',
+			// Held and quarantined rows are used = true as well, and
+			// they are NOT free to release. Held means no generated
+			// world has been looked at yet; quarantined means a player
+			// voted the seed unplayable. Releasing either puts a pair
+			// nobody has verified - or one already known bad - straight
+			// into the drawable pool.
+			//
+			// This mattered less when used = true also meant "consumed
+			// by a finished match", because most such rows really were
+			// releasable. Seeds are no longer consumed, so used = true
+			// now means ONLY held or quarantined, and without this
+			// filter the script would release every one of them.
+			FilterExpression: '#u = :true AND attribute_not_exists(heldUnverified) '
+				+ 'AND attribute_not_exists(poolReject)',
 			ExpressionAttributeNames: { '#u': 'used' },
 			ExpressionAttributeValues: { ':true': true },
 			ExclusiveStartKey: startKey,

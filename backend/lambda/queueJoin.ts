@@ -10,7 +10,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'crypto';
 import { resolveSessionToken } from './lib/auth';
-import { claimSeedPair } from './lib/seedPool';
+import { claimSeedPair, recordSeedsSeen } from './lib/seedPool';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -194,9 +194,37 @@ export const handler = async (
 	// Claim the seed before persisting the match - if the pool is
 	// exhausted, fail loudly rather than create a match nobody can
 	// actually play.
-	const seedPair = await claimSeedPair(SEED_POOL_TABLE_NAME, matchId);
-	if (!seedPair) {
-		return { statusCode: 503, body: JSON.stringify({ error: 'no seed pairs available' }) };
+	const uuids = [uuid, bestOpponent.uuid];
+	const claim = await claimSeedPair(SEED_POOL_TABLE_NAME, matchId, PLAYERS_TABLE_NAME, uuids);
+	if (!claim.ok) {
+		// Two different problems. 'pool_empty' is everyone's - refill
+		// it. 'all_seen' is this PAIR's: the pool is fine and other
+		// players are matching normally, but between them these two
+		// have played everything in it. Reporting them the same way
+		// would send someone hunting a pool that is not the problem.
+		const error = claim.reason === 'all_seen'
+			? 'no unplayed seed for these players - the pool needs more, or one of them has played it out'
+			: 'no seed pairs available';
+		return {
+			statusCode: 503,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ error, reason: claim.reason }),
+		};
+	}
+	const seedPair = claim.pair;
+
+	// Before the match exists, not after. If this fails the match is
+	// never created, so a player cannot end up having seen a seed that
+	// was never recorded - which would hand it back to them later.
+	try {
+		await recordSeedsSeen(PLAYERS_TABLE_NAME, uuids, seedPair.seedPairId);
+	} catch (err) {
+		console.error('[queueJoin] could not record seen seeds', err);
+		return {
+			statusCode: 503,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ error: 'could not reserve seed' }),
+		};
 	}
 
 	await ddb.send(new PutCommand({
@@ -208,6 +236,11 @@ export const handler = async (
 				{ uuid: bestOpponent.uuid, username: bestOpponent.username, skillRating: bestOpponent.skillRating },
 			],
 			ratingDiff: bestDiff,
+			// Which POOL ROW this came from, not just the numbers. A
+			// match used to record only the seeds, so "which players
+			// have seen this pair" could not be answered from history
+			// without mapping seeds back to rows.
+			seedPairId: seedPair.seedPairId,
 			overworldSeed: seedPair.overworldSeed,
 			netherSeed: seedPair.netherSeed,
 			seedType: seedPair.seedType,
@@ -260,6 +293,11 @@ export const handler = async (
 			matched: true,
 			matchId,
 			opponent: { uuid: bestOpponent.uuid, username: bestOpponent.username },
+			// Which POOL ROW this came from, not just the numbers. A
+			// match used to record only the seeds, so "which players
+			// have seen this pair" could not be answered from history
+			// without mapping seeds back to rows.
+			seedPairId: seedPair.seedPairId,
 			overworldSeed: seedPair.overworldSeed,
 			netherSeed: seedPair.netherSeed,
 			seedType: seedPair.seedType,
