@@ -1,6 +1,6 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { randomBytes } from 'crypto';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
@@ -31,6 +31,21 @@ const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
  * deliberate act, not routine release housekeeping.
  */
 const MIN_CLIENT_VERSION = process.env.MIN_CLIENT_VERSION ?? '0.1.0';
+
+/**
+ * Whether login is restricted to invited players.
+ *
+ * Defaults to ON. Authentication proves somebody owns a Minecraft
+ * account, which everyone does - it is identity, not permission. The
+ * endpoint is public and the client is distributable, so without this
+ * the ladder is open to anyone who gets hold of a jar.
+ *
+ * Secure by default is the right way round here: forgetting to turn a
+ * gate ON is silent, and forgetting to turn one OFF is a support
+ * message from somebody who cannot log in. Set ALLOWLIST_ENABLED to
+ * "false" to open it up.
+ */
+const ALLOWLIST_ENABLED = (process.env.ALLOWLIST_ENABLED ?? 'true') !== 'false';
 
 /** true when `have` is at least `want`. */
 export function versionAtLeast(have: string, want: string): boolean {
@@ -135,6 +150,32 @@ export const handler = async (
 
 	const profile = JSON.parse(text) as MojangProfile;
 	const now = Date.now();
+
+	// After Mojang, because the allowlist is keyed by the VERIFIED uuid
+	// rather than a claimed username - otherwise anyone could be turned
+	// away or let in by typing a name. Before the upsert, so a stranger
+	// does not leave a player row behind.
+	//
+	// An invite IS the row: scripts/invite.ts creates it with
+	// allowed = true. A player who has never been invited has no row at
+	// all, so the default is refusal without needing a second table.
+	if (ALLOWLIST_ENABLED) {
+		const existing = await ddb.send(new GetCommand({
+			TableName: PLAYERS_TABLE_NAME,
+			Key: { uuid: profile.id },
+			ProjectionExpression: 'allowed',
+		}));
+		if (existing.Item?.allowed !== true) {
+			return {
+				statusCode: 403,
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					error: 'this ladder is invite-only while it is being tested',
+					uuid: profile.id,
+				}),
+			};
+		}
+	}
 
 	// Single atomic upsert: if_not_exists means a first-time login creates
 	// the row with defaults, a returning login only touches username/
