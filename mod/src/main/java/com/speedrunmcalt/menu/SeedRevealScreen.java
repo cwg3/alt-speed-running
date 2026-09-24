@@ -26,7 +26,16 @@ public class SeedRevealScreen extends Screen {
 	/** Cyan. Named for what it IS - see the note in Palette. */
 	private static final int ACCENT = Palette.CYAN;
 	private static final int DIM = Palette.DIM;
-	private static final int ALERT = Palette.YELLOW;
+	/**
+	 * The countdown number: cyan.
+	 *
+	 * Yellow before, which collided with the two things either side of
+	 * it - the opponent's name is yellow, as player names are
+	 * everywhere, and MATCH FOUND is yellow moments earlier. Three
+	 * yellows in sequence stopped the number being the thing the eye
+	 * lands on.
+	 */
+	private static final int COUNT = Palette.CYAN;
 
 	public SeedRevealScreen() {
 		super(new LiteralText("Seed"));
@@ -93,7 +102,7 @@ public class SeedRevealScreen extends Screen {
 		long remaining = MatchState.countdownRemaining();
 		long seconds = (remaining + 999) / 1000;
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText(String.valueOf(seconds)), cx, y + 44, ALERT);
+				new LiteralText(String.valueOf(seconds)), cx, y + 44, COUNT);
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText("the race begins at zero"), cx, y + 64, DIM);
 
