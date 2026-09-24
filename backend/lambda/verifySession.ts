@@ -66,6 +66,14 @@ interface VerifyRequest {
 	serverId: string;
 	/** Absent from clients built before the version gate existed. */
 	clientVersion?: string;
+	/**
+	 * Which build of the world-building rules this client has.
+	 *
+	 * Tracked separately from clientVersion because most releases do
+	 * not change how a seed becomes a world, and the two move at
+	 * different rates.
+	 */
+	worldSetupVersion?: number;
 }
 
 interface MojangProfile {
@@ -191,12 +199,17 @@ export const handler = async (
 			'SET username = :username, lastLoginAt = :now, ' +
 			'createdAt = if_not_exists(createdAt, :now), ' +
 			'skillRating = if_not_exists(skillRating, :defaultRating), ' +
-			'seasonPoints = if_not_exists(seasonPoints, :zero)',
+			'seasonPoints = if_not_exists(seasonPoints, :zero), ' +
+			// Recorded every login, not if_not_exists: it changes when
+			// the player updates, and a stale value is worse than none
+			// because matchmaking pairs on it.
+			'worldSetupVersion = :wsv',
 		ExpressionAttributeValues: {
 			':username': profile.name,
 			':now': now,
 			':defaultRating': DEFAULT_SKILL_RATING,
 			':zero': 0,
+			':wsv': body.worldSetupVersion ?? 0,
 		},
 	}));
 

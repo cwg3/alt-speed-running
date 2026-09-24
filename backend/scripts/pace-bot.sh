@@ -37,6 +37,14 @@ PLAYERS="${PLAYERS_TABLE:-BackendStack-PlayersTable70A03D78-1LMEI6GSB9FIU}"
 SESSIONS="${SESSIONS_TABLE:-BackendStack-SessionsTable7C302024-77WDLRN5BZ7T}"
 QUEUE="${QUEUE_TABLE:-BackendStack-QueueTable4C3A1E0F-BI6XYSUC1HRJ}"
 
+# Must match WorldSetupVersion.CURRENT in the mod.
+#
+# The bot never calls /auth/verify - it writes its own session row - so
+# nothing sets this for it the way a real login does. Matchmaking now
+# refuses to pair players whose world-building rules differ, so leaving
+# it unset means the bot silently never matches anybody.
+WORLD_SETUP_VERSION="${WORLD_SETUP_VERSION:-1}"
+
 FINISH="${1:-240}"
 LEAD="${2:-0}"
 # Must stay under the server's WALL_CLOCK_TOLERANCE_MS (10s).
@@ -73,8 +81,8 @@ now=$(date +%s); now_ms=$((now*1000)); exp=$((now+7200))
 # players, which was always an update and was never affected.
 aws dynamodb update-item --region "$REGION" --table-name "$PLAYERS" \
   --key "{\"uuid\":{\"S\":\"$UUID\"}}" \
-  --update-expression "SET username = :n, lastLoginAt = :t, createdAt = if_not_exists(createdAt, :t), skillRating = if_not_exists(skillRating, :r), seasonPoints = if_not_exists(seasonPoints, :z)" \
-  --expression-attribute-values "{\":n\":{\"S\":\"$NAME\"},\":t\":{\"N\":\"$now_ms\"},\":r\":{\"N\":\"1500\"},\":z\":{\"N\":\"0\"}}" >/dev/null
+  --update-expression "SET username = :n, lastLoginAt = :t, createdAt = if_not_exists(createdAt, :t), skillRating = if_not_exists(skillRating, :r), seasonPoints = if_not_exists(seasonPoints, :z), worldSetupVersion = :w" \
+  --expression-attribute-values "{\":n\":{\"S\":\"$NAME\"},\":t\":{\"N\":\"$now_ms\"},\":r\":{\"N\":\"1500\"},\":z\":{\"N\":\"0\"},\":w\":{\"N\":\"$WORLD_SETUP_VERSION\"}}" >/dev/null
 aws dynamodb put-item --region "$REGION" --table-name "$SESSIONS" --item \
   "{\"token\":{\"S\":\"$TOK\"},\"uuid\":{\"S\":\"$UUID\"},\"createdAt\":{\"N\":\"$now_ms\"},\"expiresAt\":{\"N\":\"$exp\"}}" >/dev/null
 

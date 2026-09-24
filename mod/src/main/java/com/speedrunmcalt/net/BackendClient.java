@@ -45,6 +45,16 @@ public final class BackendClient {
 		// turned away before it reaches matchmaking and fails in ways
 		// that look like server bugs.
 		body.addProperty("clientVersion", clientVersion());
+		// Which build of the world-building rules this client has.
+		//
+		// Separate from clientVersion on purpose: most releases change
+		// nothing about how a seed becomes a world, and the two move at
+		// different rates. This is the one the backend must not let
+		// differ between two players in a match - they each build their
+		// own world from the shared seed, so different rules mean
+		// different worlds, and the race stops being the same race.
+		body.addProperty("worldSetupVersion",
+				com.speedrunmcalt.world.WorldSetupVersion.CURRENT);
 
 		JsonObject resp = post(API_BASE + "/auth/verify", body, null);
 		return new VerifyResult(

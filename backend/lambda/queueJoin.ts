@@ -119,8 +119,18 @@ export const handler = async (
 	const waiting = await ddb.send(new ScanCommand({ TableName: QUEUE_TABLE_NAME }));
 	const now = Date.now();
 
+	// Two players build their OWN world from the shared seed, so if
+	// their world-building rules differ they are not racing the same
+	// world. The client version gate only enforces a minimum, which
+	// would happily pair 0.1.0 against a later build whose lava pools
+	// land somewhere else. This is the check that makes the race fair,
+	// and the same stamp is what lets a replay regenerate the world
+	// later.
+	const myWorldSetup: number = player.Item.worldSetupVersion ?? 0;
+
 	let bestOpponent: any = null;
 	let bestDiff = Infinity;
+	let skippedForVersion = 0;
 	// Whether this player already has a row, and whether it is still
 	// live. A row left over from a previous session must not carry its
 	// old joinedAt forward - see the update below.
@@ -143,11 +153,24 @@ export const handler = async (
 			MAX_RATING_RANGE,
 			BASE_RATING_RANGE + waitSeconds * RANGE_GROWTH_PER_SECOND,
 		);
+		if ((candidate.worldSetupVersion ?? 0) !== myWorldSetup) {
+			skippedForVersion++;
+			continue; // different world-building rules: different world
+		}
+
 		const diff = Math.abs(candidate.skillRating - myRating);
 		if (diff <= allowedRange && diff < bestDiff) {
 			bestOpponent = candidate;
 			bestDiff = diff;
 		}
+	}
+
+	if (!bestOpponent && skippedForVersion > 0) {
+		// Worth saying out loud. To the player this looks like an empty
+		// queue while somebody is plainly waiting, and the cause - one
+		// of them has not updated - is invisible from the client.
+		console.log(`[queueJoin] ${uuid} found no opponent; skipped `
+			+ `${skippedForVersion} on worldSetupVersion (mine: ${myWorldSetup})`);
 	}
 
 	if (!bestOpponent) {
@@ -171,10 +194,14 @@ export const handler = async (
 			// and joinedAt is what separates "waiting" from "gone".
 			UpdateExpression: 'SET username = :username, skillRating = :rating, '
 				+ joinedAtClause + ', '
+				+ 'worldSetupVersion = :wsv, '
 				+ 'lastSeenAt = :now, expiresAt = :expires',
 			ExpressionAttributeValues: {
 				':username': player.Item.username,
 				':rating': myRating,
+				// On the queue row so matching can compare it without a
+				// second read per candidate.
+				':wsv': myWorldSetup,
 				':now': now,
 				// DynamoDB TTL (seconds) so abandoned rows are reaped
 				// rather than accumulating forever. Correctness comes
@@ -240,6 +267,12 @@ export const handler = async (
 			// match used to record only the seeds, so "which players
 			// have seen this pair" could not be answered from history
 			// without mapping seeds back to rows.
+			// Which rules built this world. A replay regenerates the
+			// world rather than storing it, so without this an old
+			// match would be rebuilt under whatever rules are current -
+			// a truthful movement trace inside a world the players
+			// never saw.
+			worldSetupVersion: myWorldSetup,
 			seedPairId: seedPair.seedPairId,
 			overworldSeed: seedPair.overworldSeed,
 			netherSeed: seedPair.netherSeed,
@@ -297,6 +330,12 @@ export const handler = async (
 			// match used to record only the seeds, so "which players
 			// have seen this pair" could not be answered from history
 			// without mapping seeds back to rows.
+			// Which rules built this world. A replay regenerates the
+			// world rather than storing it, so without this an old
+			// match would be rebuilt under whatever rules are current -
+			// a truthful movement trace inside a world the players
+			// never saw.
+			worldSetupVersion: myWorldSetup,
 			seedPairId: seedPair.seedPairId,
 			overworldSeed: seedPair.overworldSeed,
 			netherSeed: seedPair.netherSeed,

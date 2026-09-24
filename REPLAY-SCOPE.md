@@ -87,6 +87,27 @@ sample, so overworld/nether/end banding on the timeline needs no
 recording change - a small piece of luck from a field added for
 verification.
 
+## Getting to a replay, and keeping one
+
+| behaviour | what it needs from us |
+|---|---|
+| **Profile > Matches**, click a match, Watch Replay | a MATCH HISTORY screen, which does not exist at all |
+| **"My Replays"** - download one to keep it permanently | local storage, and a server-side expiry for everything else |
+| playback speed and name toggles on a second menu page | a settings layer over playback |
+| replays only for real matchmaking, not private rooms | nothing yet - we have no private rooms |
+
+**Match history is a prerequisite, not part of the replay work.** There
+is no screen listing a player's past matches, and no endpoint behind
+one. A replay nobody can navigate to is not a feature. That is its own
+piece of work and it should land first.
+
+**Download-to-keep answers the storage question** in the section below.
+Keep every replay for a window, let a player pin the ones they care
+about, expire the rest. The permanent record stays cheap and the
+player keeps their best games and worst losses. That is a better
+answer than the downsampling idea below, because it puts the choice
+with the person who knows which matches mattered.
+
 ## Decisions needed before building
 
 **Who can watch?** Participants only is safe: under the seen-seeds rule
