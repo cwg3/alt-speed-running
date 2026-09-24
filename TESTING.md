@@ -108,3 +108,22 @@ Lines worth watching: `Blacksmith at`, `Bastion centre`,
 World generation is CPU-hungry. Seven parallel workers once put a live
 match 28 seconds behind. One serial worker is fine on a 10-core
 machine; anything more should wait.
+
+## Play-confirmed seeds
+
+A seed that passed every filter has been verified by a program. A seed
+in this list has been WALKED - somebody played the opening and said it
+worked. That is a different claim and a stronger one, and it is the one
+that has caught things the filters missed: a biome instead of a tree, a
+portal that existed but could not be lit, a food chest under seven
+blocks of stone.
+
+Record the overworld and nether seed together. They are paired at load
+time and a seed is only meaningful with its partner - "that seed was
+good" means nothing if the nether came from somewhere else.
+
+| type | overworld | nether | notes |
+|------|-----------|--------|-------|
+| desert_temple | seed#3fcb | seed#8037 | temple at 64,64. Overworld and nether both clean; two deaths were pace, not layout. |
+| ruined_portal | seed#218e | - | portal at 64,224, bastion at -112,32 (bridge). Spawned near the bastion. |
+| ruined_portal | seed#9796 | - | the first play-confirmed seed. Survived being wiped by a `--only` load and restored from the match record. |
