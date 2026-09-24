@@ -40,6 +40,23 @@ public class SeedRevealScreen extends Screen {
 	}
 
 	@Override
+	protected void init() {
+		// Clear the MATCH FOUND title, which has done its job by now.
+		//
+		// This screen pauses the game, and a paused client does not tick
+		// the HUD - so the title's own timer stops here and resumes the
+		// instant the countdown closes, putting it back on screen for
+		// its remaining couple of seconds just as the race starts.
+		//
+		// setTitles(null, null, -1, -1, -1) is vanilla's own reset: all
+		// five arguments have to be null-or-negative or it takes the
+		// other branch and only adjusts timings.
+		if (this.client != null && this.client.inGameHud != null) {
+			this.client.inGameHud.setTitles(null, null, -1, -1, -1);
+		}
+	}
+
+	@Override
 	public void tick() {
 		if (MatchState.countdownRemaining() <= 0) {
 			// Closing releases the pause, which is what lets MatchClock
