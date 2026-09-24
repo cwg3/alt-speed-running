@@ -88,6 +88,27 @@ public final class Matchmaker {
 			return;
 		}
 
+		// Say so on screen, not just in sound.
+		//
+		// The menu already reads "match found vs X - loading world",
+		// but a player practising elsewhere is not looking at the menu
+		// - that is the whole point of queueing this way. Without this
+		// the only signal is a chime, and two seconds of nothing
+		// happening afterwards looks like a hang, which is exactly what
+		// it was until a moment ago.
+		//
+		// Held for CHIME_TICKS so it is still up when the world starts
+		// tearing down, rather than vanishing first.
+		if (waited == 0 && client.inGameHud != null) {
+			String vs = opponent == null ? "opponent" : opponent;
+			client.inGameHud.setTitles(
+					new net.minecraft.text.LiteralText("MATCH FOUND").styled(
+							st -> st.withColor(net.minecraft.text.TextColor.fromRgb(Palette.PHOSPHOR))),
+					new net.minecraft.text.LiteralText("vs " + vs).styled(
+							st -> st.withColor(net.minecraft.text.TextColor.fromRgb(Palette.YELLOW))),
+					0, CHIME_TICKS, 10);
+		}
+
 		// Let the chime finish before anything tears down audio.
 		if (waited < CHIME_TICKS) {
 			waited++;
