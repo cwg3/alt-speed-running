@@ -94,6 +94,25 @@ learn.
 and we publish exactly how it differs. If you find behaviour that is
 not on that list, it is a bug and we want to know.
 
+## If Java crashes when you QUIT (macOS)
+
+You may see a crash dialog after closing the game, with
+`libjemalloc.dylib` in it. Your world is already saved by then - the
+crash happens after shutdown, not during play, so nothing is lost.
+
+It is not this mod. It is LWJGL's bundled memory allocator segfaulting
+under the launcher's old Java 8 runtime on macOS, and it predates this
+project on machines that have it.
+
+The mod already sets `org.lwjgl.system.allocator=system` before the
+game starts, which avoids it. If you still see it:
+
+- **Run on a newer Java.** 1.16.1 with Fabric is fine on Java 17, and
+  the crash is specific to the Java 8 runtime the official launcher
+  ships. In Prism: Edit Instance -> Settings -> Java.
+- Or add `-Dorg.lwjgl.system.allocator=system` to your JVM arguments
+  yourself, in the same place.
+
 ## When something breaks
 
 Include your Minecraft log (`logs/latest.log` in the instance folder) —

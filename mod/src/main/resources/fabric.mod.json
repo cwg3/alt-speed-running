@@ -34,6 +34,9 @@
 			"com.speedrunmcalt.debug.RavineCheckHook",
 			"com.speedrunmcalt.debug.BastionTimeHook",
 			"com.speedrunmcalt.debug.PortalPlaceHook"
+		],
+		"preLaunch": [
+			"com.speedrunmcalt.client.AllocatorFix"
 		]
 	},
 	"mixins": [
