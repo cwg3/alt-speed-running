@@ -73,6 +73,24 @@ export class BackendStack extends cdk.Stack {
 			billingMode: BillingMode.PAY_PER_REQUEST,
 		});
 
+		// One row per PLAYER per match, newest first.
+		//
+		// The matches table is keyed by matchId, so "which matches did
+		// this player play" would be a full scan - and a match has TWO
+		// players, which a single GSI cannot index from one item. So
+		// each completed match writes a row per player here instead.
+		//
+		// This is also where a replay pointer belongs, which is why it
+		// is worth building properly now rather than scanning and
+		// redoing it.
+		const matchHistoryTable = new Table(this, 'MatchHistoryTable', {
+			partitionKey: { name: 'uuid', type: AttributeType.STRING },
+			// Descending reads come from ScanIndexForward: false at
+			// query time; the key itself is just the completion time.
+			sortKey: { name: 'completedAt', type: AttributeType.NUMBER },
+			billingMode: BillingMode.PAY_PER_REQUEST,
+		});
+
 		// Populated offline by scripts/loadSeedPool.ts from the Phase 1
 		// cubiomes output (seed-filter/output/match_seeds.json) - this
 		// table is the bridge between the seed-filtering tool and actual
@@ -93,6 +111,7 @@ export class BackendStack extends cdk.Stack {
 				PLAYERS_TABLE_NAME: playersTable.tableName,
 				QUEUE_TABLE_NAME: queueTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
+				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
 				SEED_POOL_TABLE_NAME: seedPoolTable.tableName,
 				// TEMPORARY: restricts which seed types are drawn.
 				//
@@ -110,7 +129,20 @@ export class BackendStack extends cdk.Stack {
 				// Currently limited to the two land openings while the
 				// ocean routes are being practised - buried treasure and
 				// shipwreck both need the kelp/ravine/bubble technique.
-				SEED_TYPE_BIAS: process.env.SEED_TYPE_BIAS ?? 'village,desert_temple',
+				// Default EMPTY: draw evenly across all five types, which
+				// is what a ladder has to do. Biasing is opt-in, by
+				// exporting SEED_TYPE_BIAS before a deploy.
+				//
+				// It defaulted to 'village,desert_temple' so that
+				// practising a specific opening was the easy path. That
+				// is backwards for anything but a solo session: whoever
+				// deployed next without thinking about it would quietly
+				// narrow every player's draws to two of five types, and
+				// nothing would look broken. The live function is
+				// currently empty while the synthesised template says
+				// otherwise, which is exactly the kind of drift a
+				// default like that produces.
+				SEED_TYPE_BIAS: process.env.SEED_TYPE_BIAS ?? '',
 			},
 		});
 		sessionsTable.grantReadData(queueJoinFn);
@@ -137,11 +169,14 @@ export class BackendStack extends cdk.Stack {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				PLAYERS_TABLE_NAME: playersTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
+				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
 			},
 		});
 		sessionsTable.grantReadData(completeMatchFn);
 		playersTable.grantReadWriteData(completeMatchFn);
 		matchesTable.grantReadWriteData(completeMatchFn);
+		// Settles matches, so it writes the history rows.
+		matchHistoryTable.grantWriteData(completeMatchFn);
 
 		api.addRoutes({
 			path: '/matches/complete',
@@ -157,6 +192,7 @@ export class BackendStack extends cdk.Stack {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				PLAYERS_TABLE_NAME: playersTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
+				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
 			},
 		});
 		sessionsTable.grantReadData(reportSplitFn);
@@ -176,6 +212,7 @@ export class BackendStack extends cdk.Stack {
 			environment: {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
+				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
 				PLAYERS_TABLE_NAME: playersTable.tableName,
 			},
 		});
@@ -183,6 +220,8 @@ export class BackendStack extends cdk.Stack {
 		// Writes now: the poll doubles as a heartbeat, and resolves a
 		// match whose other player has gone silent.
 		matchesTable.grantReadWriteData(liveMatchFn);
+		// Settles matches, so it writes the history rows.
+		matchHistoryTable.grantWriteData(liveMatchFn);
 		playersTable.grantReadWriteData(liveMatchFn);
 
 		api.addRoutes({
@@ -202,6 +241,7 @@ export class BackendStack extends cdk.Stack {
 			environment: {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
+				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
 			},
 		});
 		sessionsTable.grantReadData(startRunFn);
@@ -222,6 +262,7 @@ export class BackendStack extends cdk.Stack {
 			environment: {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
+				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
 				SEED_POOL_TABLE_NAME: seedPoolTable.tableName,
 			},
 		});
@@ -243,11 +284,14 @@ export class BackendStack extends cdk.Stack {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				PLAYERS_TABLE_NAME: playersTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
+				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
 			},
 		});
 		sessionsTable.grantReadData(forfeitMatchFn);
 		playersTable.grantReadWriteData(forfeitMatchFn);
 		matchesTable.grantReadWriteData(forfeitMatchFn);
+		// Settles matches, so it writes the history rows.
+		matchHistoryTable.grantWriteData(forfeitMatchFn);
 
 		api.addRoutes({
 			path: '/matches/forfeit',
@@ -273,6 +317,7 @@ export class BackendStack extends cdk.Stack {
 			environment: {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
+				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
 				REPLAY_BUCKET: replayBucket.bucketName,
 			},
 		});
@@ -286,7 +331,30 @@ export class BackendStack extends cdk.Stack {
 			integration: new HttpLambdaIntegration('UploadReplayIntegration', uploadReplayFn),
 		});
 
+		const matchHistoryFn = new NodejsFunction(this, 'MatchHistoryFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'matchHistory.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			timeout: cdk.Duration.seconds(10),
+			memorySize: 256,
+			environment: {
+				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
+			},
+		});
+		sessionsTable.grantReadData(matchHistoryFn);
+		// Read only. This endpoint answers questions; it never writes
+		// history, which only the settle path does.
+		matchHistoryTable.grantReadData(matchHistoryFn);
+
+		api.addRoutes({
+			path: '/players/me/matches',
+			methods: [HttpMethod.GET],
+			integration: new HttpLambdaIntegration('MatchHistoryIntegration', matchHistoryFn),
+		});
+
 		new cdk.CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
+		new cdk.CfnOutput(this, 'MatchHistoryTableName', { value: matchHistoryTable.tableName });
 		new cdk.CfnOutput(this, 'ReplayBucketName', { value: replayBucket.bucketName });
 		new cdk.CfnOutput(this, 'SeedPoolTableName', { value: seedPoolTable.tableName });
 	}

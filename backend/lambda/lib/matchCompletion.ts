@@ -75,6 +75,63 @@ async function reviewPlayer(
 	return result;
 }
 
+/**
+ * Writes one history row per player.
+ *
+ * Denormalised on purpose: a history screen should not have to fetch
+ * the match, then the opponent, then the result. Everything a row
+ * needs to render is on the row.
+ *
+ * Best-effort. A completed match with a missing history row is a gap
+ * in a list; a settlement that fails because a list row could not be
+ * written would be a match with no rating change. The first is worth
+ * risking to avoid the second, and the backfill script can repair it.
+ */
+async function writeHistory(
+	historyTableName: string,
+	matchId: string,
+	match: Record<string, any>,
+	winner: MatchPlayer,
+	loser: MatchPlayer,
+	winnerDelta: number,
+	loserDelta: number,
+	seasonPoints: number,
+	completedAt: number,
+): Promise<void> {
+	const rows = [
+		{ me: winner, them: loser, won: true, delta: winnerDelta, points: seasonPoints },
+		{ me: loser, them: winner, won: false, delta: loserDelta, points: 0 },
+	];
+	for (const r of rows) {
+		try {
+			await ddb.send(new UpdateCommand({
+				TableName: historyTableName,
+				Key: { uuid: r.me.uuid, completedAt },
+				UpdateExpression: 'SET matchId = :m, opponentUuid = :ou, opponentName = :on, '
+					+ 'won = :w, ratingDelta = :d, seasonPointsAwarded = :p, '
+					+ 'seedType = :st, overworldSeed = :os, netherSeed = :ns, '
+					+ 'worldSetupVersion = :wsv',
+				ExpressionAttributeValues: {
+					':m': matchId,
+					':ou': r.them.uuid,
+					':on': r.them.username ?? 'opponent',
+					':w': r.won,
+					':d': r.delta,
+					':p': r.points,
+					':st': match.seedType ?? 'unknown',
+					':os': match.overworldSeed ?? 0,
+					':ns': match.netherSeed ?? 0,
+					// Carried so a replay knows whether it can rebuild
+					// this world with the current rules.
+					':wsv': match.worldSetupVersion ?? 0,
+				},
+			}));
+		} catch (err) {
+			console.error(`[matchCompletion] history row failed for ${r.me.uuid}`, err);
+		}
+	}
+}
+
 export async function applyMatchCompletion(
 	matchesTableName: string,
 	playersTableName: string,
@@ -82,7 +139,11 @@ export async function applyMatchCompletion(
 	winner: MatchPlayer,
 	loser: MatchPlayer,
 	splits: Record<string, Record<string, number>> = {},
+	historyTableName?: string,
 ): Promise<CompletionResult> {
+	// One timestamp for both the match record and the history sort key,
+	// so a row can be found from a match and vice versa.
+	const completedAt = Date.now();
 	try {
 		await ddb.send(new UpdateCommand({
 			TableName: matchesTableName,
@@ -94,7 +155,7 @@ export async function applyMatchCompletion(
 				':completed': 'completed',
 				':pending': 'pending',
 				':winner': winner.uuid,
-				':now': Date.now(),
+				':now': completedAt,
 			},
 		}));
 	} catch (err) {
@@ -143,6 +204,16 @@ export async function applyMatchCompletion(
 			},
 		},
 	}));
+
+	if (historyTableName) {
+		const m = await ddb.send(new GetCommand({
+			TableName: matchesTableName,
+			Key: { matchId },
+			ProjectionExpression: 'seedType, overworldSeed, netherSeed, worldSetupVersion',
+		}));
+		await writeHistory(historyTableName, matchId, m.Item ?? {},
+			winner, loser, winnerDelta, loserDelta, seasonPoints, completedAt);
+	}
 
 	// Clear the pointer so neither player is handed this finished match
 	// again on their next queue poll.
