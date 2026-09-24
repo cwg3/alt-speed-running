@@ -161,7 +161,22 @@ def main():
     icon_mask.paste(art, ((128 - art.width) // 2, (128 - art.height) // 2))
     crt(icon_mask, transparent=False).save(f"{out_dir}/icon.png")
 
-    print("wrote logo_alt.png, logo_alt_preview.png, icon.png")
+    # Square 256x256 tile for the world-loading screen, built the same
+    # way as the icon and for the same reason: the CRT pass has to run
+    # over the WHOLE canvas or the vignette stops at the art's edge and
+    # leaves a visible rectangular seam inside the square.
+    #
+    # 256 rather than 128 because this one is drawn at 128 GUI pixels,
+    # and a GUI scale of 2 or more would otherwise be magnifying a
+    # 128px source. Scale 4 keeps the wordmark about two thirds of the
+    # tile width, which leaves the glow room to fall off inside the
+    # square instead of being clipped by it.
+    art = upscaled_mask(rows, w, h, scale=4, pad=0)
+    tile = Image.new("L", (256, 256), 0)
+    tile.paste(art, ((256 - art.width) // 2, (256 - art.height) // 2))
+    crt(tile, transparent=False).save(f"{out_dir}/logo_square.png")
+
+    print("wrote logo_alt.png, logo_alt_preview.png, icon.png, logo_square.png")
 
 
 if __name__ == "__main__":

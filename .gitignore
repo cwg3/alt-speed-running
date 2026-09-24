@@ -37,3 +37,4 @@ cdk.out/
 *.pem
 *.key
 credentials.json
+brand/venv/

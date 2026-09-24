@@ -25,7 +25,8 @@
 	"client": [
 		"TitleScreenMixin",
 		"GammaUnlockMixin",
-		"PauseMenuMixin"
+		"PauseMenuMixin",
+		"LoadingScreenLogoMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
