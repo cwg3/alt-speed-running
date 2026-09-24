@@ -34,8 +34,15 @@ done
 [ -n "$DIR" ] || { echo "$SEED,,,,,-1,-1,ERROR" > "$POOL/res_$SEED"; exit 0; }
 trap 'rmdir "$CLAIM" 2>/dev/null' EXIT
 
-printf 'level-seed=%s\nlevel-type=default\nonline-mode=false\nmax-tick-time=-1\nsync-chunk-writes=false\n' \
-  "$SEED" > "$DIR/run/server.properties"
+# Unique port per worker. Without it every worker fights over
+# 25565: the losers boot, log FAILED TO BIND TO PORT, shut down
+# writing no csv, and the caller records ERROR. That was 388 of
+# 539 rows on one ocean run, and because the filter tested only
+# for a PASS value, every crashed check was silently counted as
+# a failed one. check-one-spawn.sh had this from the start,
+# which is why its stage ran 1000/1000 clean the same night.
+printf 'level-seed=%s\nlevel-type=default\nonline-mode=false\nmax-tick-time=-1\nsync-chunk-writes=false\nserver-port=%s\n' \
+  "$SEED" $((26500 + ${DIR##*w})) > "$DIR/run/server.properties"
 printf '%s\n' "$SEED" > "$DIR/run/netherlocate.txt"
 rm -rf "$DIR/run/world"
 rm -f "$DIR/run/netherlocate.csv"
