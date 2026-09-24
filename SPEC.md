@@ -154,6 +154,7 @@ worth blocking this on.
 | Village + desert temple: river within 6 chunks (boat routing) | built (filter) |
 | Village: all five biome variants eligible (plains, desert, savanna, taiga, snowy) | built (filter) — the earlier taiga/snowy exclusion was **removed**, see below |
 | Desert temple: 7 iron, 52 hunger points of food | built — was "13 rotten flesh"; counted in items until a player ran short |
+| Desert temple: string (→ wool → beds) and sand (→ out of the chest pit) | **not built** — both are route material, neither is guaranteed |
 | Desert temple: 3 lava pools | built (placed) |
 | Shipwreck / buried treasure: 7 iron equivalent, 88 hunger points of food | built — 88 is the measured average of eleven MCSR supply chests |
 | Shipwreck / buried treasure: 2 magma ravines within 10 chunks, with bubble columns and kelp | built (world check) — matches the standard |

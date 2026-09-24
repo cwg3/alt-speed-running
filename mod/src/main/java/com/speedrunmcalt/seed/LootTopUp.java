@@ -52,6 +52,14 @@ public final class LootTopUp {
 		// A village's iron golem is a guaranteed 4 on top of this, which
 		// is why the chest floor is 3 rather than 7.
 		VILLAGE(3, IronUnit.INGOTS, 0, "minecraft:chests/village/", false, false),
+		// NOTE: a temple's string and sand are ROUTE MATERIAL, not junk.
+		// String is wool is beds, and beds are the dragon kill - four
+		// string to a wool, three wool to a bed. Sand is how a runner
+		// gets out of the pit the four chests sit at the bottom of.
+		// Measured in one MCSR Ranked temple: 18 string and 14 sand
+		// across its four chests, alongside 4 iron and 56 hunger points.
+		// Neither is guaranteed here yet; both should be, once there are
+		// enough samples to set a floor rather than guess one.
 		DESERT_TEMPLE(7, IronUnit.INGOTS, 52, "minecraft:chests/desert_pyramid", false, false),
 		// 27 nuggets is exactly three ingots, which is exactly a bucket -
 		// see the note on the bucket route below.
