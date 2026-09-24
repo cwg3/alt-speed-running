@@ -109,9 +109,10 @@ public final class MatchState {
 	 * nobody's loading is charged to their run.
 	 *
 	 * Seen in play: a player rejoined twelve minutes into a run and was
-	 * given ten seconds to plan an opening they were long past. The
-	 * clock correctly resumed, so those ten seconds came straight out of
-	 * a run in progress.
+	 * shown the planning screen again for an opening they were long
+	 * past. The clock correctly resumed, so that time came straight out
+	 * of a run in progress. (The countdown was ten seconds then; it is
+	 * five now, which makes it cheaper and no less wrong.)
 	 */
 	public static volatile boolean runAlreadyStarted = false;
 
