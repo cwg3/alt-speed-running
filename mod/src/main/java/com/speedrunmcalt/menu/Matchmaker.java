@@ -73,7 +73,18 @@ public final class Matchmaker {
 		// disconnect() returns only once the integrated server has
 		// stopped, and the next tick sees a client with no world.
 		if (client.world != null) {
-			client.disconnect();
+			// BOTH calls, in this order. This is exactly what vanilla's
+			// "Save and Quit to Title" does, and the first one is not
+			// optional: ClientWorld.disconnect() closes the connection,
+			// which is what makes the integrated server begin stopping.
+			//
+			// MinecraftClient.disconnect() on its own ends in
+			// `while (!integratedServer.isStopping()) render(false)` -
+			// a spin waiting for a shutdown that, without the first
+			// call, nobody ever asked for. It never returns.
+			client.world.disconnect();
+			client.disconnect(new net.minecraft.client.gui.screen.SaveLevelScreen(
+					new net.minecraft.text.TranslatableText("menu.savingLevel")));
 			return;
 		}
 

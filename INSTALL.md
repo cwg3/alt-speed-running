@@ -69,6 +69,12 @@ countdown hits zero.
 
 ## Things worth knowing
 
+**You can keep playing while you queue.** Hit Find Match, back out to
+the title screen, and load a practice world - the search keeps running.
+When an opponent is found you will hear the level-up chime, your
+practice world saves and closes on its own, and the match world loads.
+No need to sit on the menu watching a timer.
+
 **The clock does not start until the world finishes loading.** Loading
 is never charged to your run.
 
