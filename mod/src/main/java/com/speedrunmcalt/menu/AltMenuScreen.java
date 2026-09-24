@@ -24,12 +24,16 @@ public class AltMenuScreen extends Screen {
 	protected void init() {
 		int cx = this.width / 2;
 
+		// Buttons sit 14px lower than the midpoint to leave room for the
+		// queue status line above them. At the midpoint the "searching
+		// for opponent..." text overlapped the Cancel button - only
+		// while searching, which is why it went unnoticed.
 		actionButton = this.addButton(new ButtonWidget(
-				cx - 100, this.height / 2, 200, 20,
+				cx - 100, this.height / 2 + 14, 200, 20,
 				new LiteralText("..."), button -> onAction()));
 
 		this.addButton(new ButtonWidget(
-				cx - 100, this.height / 2 + 28, 200, 20,
+				cx - 100, this.height / 2 + 42, 200, 20,
 				new LiteralText("Back"), button -> this.client.openScreen(parent)));
 
 		// Kick off the handshake on open so the player doesn't have to

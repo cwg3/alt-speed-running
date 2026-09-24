@@ -104,12 +104,31 @@ from play: a desert temple seed with no tree within four or five
 chunks, which is unroutable rather than merely awkward — a desert
 village has oak buildings to fall back on, a temple has sandstone.
 
-The check is a **biome** check, not a tree check. It asks what biome
-each sampled column sits in, walking a 5-chunk radius from world spawn
-in 16-block steps. A forest with a bare patch at the sampled point
-still passes, and a lone oak in a savanna is still missed. What it
-reliably catches is the reported case: spawning with nothing wooded in
-range at all.
+The cubiomes stage is a **biome** check, which is a pre-filter and
+nothing more. It asks what biome each sampled column sits in, walking a
+5-chunk radius from world spawn in 16-block steps, and passes on a
+single wooded hit.
+
+That is not a tree. It shipped a shipwreck seed whose spawn was open
+ocean with a jungle biome clipping the sample radius, where the only
+logs within 80 blocks were the WRECK'S OWN HULL, 61 blocks out and 12
+blocks under water. The player had no wood, so no crafting table, so no
+run.
+
+So a generated-world stage decides it now: `SpawnResourceHook` counts
+real `*_log` blocks within 128 blocks of spawn, above y60, ignoring
+anything with water above it. Submerged wood is a wreck, not a tree.
+Measured verdicts - that ocean seed scores 0, a working village 334, a
+desert temple whose nearest tree is 83 blocks away 85.
+
+Two false negatives had to be fixed before it could be trusted, both
+caught by checking its rejections against an independent count rather
+than believing them. It excluded the structure's own bounding box, and
+a village box is about 107 by 174 blocks, so it swallowed every tree
+near the village AND the village's own logs - reporting 0 for a seed
+with 235 within 80 blocks. And its radius was 80, inherited from the
+cubiomes check without asking whether it was right, which rejected a
+desert temple whose nearest tree was 83 blocks out with 470 inside 160.
 
 The biome list is deliberately conservative, so the error runs toward
 **discarding good seeds rather than shipping unroutable ones**. It
@@ -134,9 +153,9 @@ worth blocking this on.
 | Village: 3 lava pools ~2 chunks out | built (placed) |
 | Village + desert temple: river within 6 chunks (boat routing) | built (filter) |
 | Village: all five biome variants eligible (plains, desert, savanna, taiga, snowy) | built (filter) — the earlier taiga/snowy exclusion was **removed**, see below |
-| Desert temple: 7 iron, 13+ rotten flesh | built |
+| Desert temple: 7 iron, 52 hunger points of food | built — was "13 rotten flesh"; counted in items until a player ran short |
 | Desert temple: 3 lava pools | built (placed) |
-| Shipwreck / buried treasure: 7 iron equivalent, food | built |
+| Shipwreck / buried treasure: 7 iron equivalent, 88 hunger points of food | built — 88 is the measured average of eleven MCSR supply chests |
 | Shipwreck / buried treasure: 2 magma ravines within 10 chunks, with bubble columns and kelp | built (world check) — matches the standard |
 | Ruined portal: 27 nuggets (= 3 ingots = one bucket) | built — **[ours]**, the standard is 18 nuggets |
 | Ruined portal: 2–4 obsidian, seed-varied | built — **[ours]**, not in the standard |
