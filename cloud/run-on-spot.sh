@@ -46,6 +46,32 @@ ROLE=alt-seedwork
 n=$(grep -cve '^[[:space:]]*$' "$SEEDS")
 echo "=== $RUN: $n seeds, $CHECK, $WORKERS workers on $ITYPE ==="
 
+# Does WORKERS x HEAP actually fit the instance?
+#
+# The first cloud run did not: 16 workers at the default 2G heap on a
+# c7g.4xlarge is 32GiB of heap on a 32GiB machine, and the kernel
+# OOM-killed containers mid-batch. vCPU count is the obvious number to
+# size workers by and it is the wrong one - these are JVMs generating
+# chunks, so MEMORY binds first.
+MEM_MIB=$(aws ec2 describe-instance-types --region "$REGION" \
+  --instance-types "$ITYPE" --query 'InstanceTypes[0].MemoryInfo.SizeInMiB' --output text)
+case "$HEAP" in
+	*G|*g) HEAP_MIB=$(( ${HEAP%[Gg]} * 1024 )) ;;
+	*M|*m) HEAP_MIB=${HEAP%[Mm]} ;;
+	*)     HEAP_MIB=$(( HEAP / 1048576 )) ;;
+esac
+# Each JVM needs roughly its heap again for metaspace, GC structures,
+# thread stacks and direct buffers; leave 2GiB for the OS and docker.
+NEED_MIB=$(( WORKERS * HEAP_MIB * 13 / 10 + 2048 ))
+echo "memory: $WORKERS x $HEAP needs ~${NEED_MIB}MiB, $ITYPE has ${MEM_MIB}MiB"
+if [ "$NEED_MIB" -gt "$MEM_MIB" ]; then
+	fit=$(( (MEM_MIB - 2048) * 10 / 13 / HEAP_MIB ))
+	echo
+	echo "REFUSING TO LAUNCH: this will OOM-kill containers mid-batch." >&2
+	echo "  drop to $fit workers, lower HEAP, or pick a larger instance." >&2
+	exit 1
+fi
+
 # --- bucket -----------------------------------------------------------
 aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null || {
   echo "creating s3://$BUCKET"
