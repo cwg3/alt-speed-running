@@ -18,6 +18,27 @@ ARG MC_VERSION=1.16.1
 ARG LOADER_VERSION=0.19.5
 ARG INSTALLER_VERSION=1.0.1
 
+# The cubiomes stage. seedtypes is the candidate generator - pure C, no
+# JVM and no Minecraft - and it was the last thing still running on the
+# dev machine after the Java checks moved here. Ocean is always the
+# limiting type, so a big shipwreck batch is over half an hour of local
+# CPU, which is exactly what this image exists to stop.
+FROM debian:bookworm-slim AS cfilter
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential \
+ && rm -rf /var/lib/apt/lists/*
+# The repo's own layout, mirrored. seedtypes.c includes
+# "../tools/cubiomes/finders.h" - a path relative to where it lives in
+# the tree - so the build directory is shaped the same way instead of
+# patching the include and having the two copies drift.
+WORKDIR /build
+COPY cubiomes/ tools/cubiomes/
+COPY seedtypes.c seed-filter/
+WORKDIR /build/seed-filter
+RUN make -C ../tools/cubiomes release \
+ && cc -O3 -o seedtypes seedtypes.c ../tools/cubiomes/libcubiomes.a -lm -lpthread \
+ && test -x seedtypes
+
 FROM eclipse-temurin:17-jdk-jammy AS build
 ARG MC_VERSION
 ARG LOADER_VERSION
@@ -67,6 +88,7 @@ RUN printf 'eula=true\n' > eula.txt
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /srv
 COPY --from=build /srv /srv
+COPY --from=cfilter /build/seed-filter/seedtypes /usr/local/bin/seedtypes
 COPY run-checks.sh /usr/local/bin/run-checks
 RUN chmod +x /usr/local/bin/run-checks
 ENTRYPOINT ["/usr/local/bin/run-checks"]

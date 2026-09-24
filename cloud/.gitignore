@@ -1,2 +1,4 @@
 # Copied in by build.sh from mod/build/libs at image build time.
 speedrunmcalt.jar
+cubiomes/
+seedtypes.c

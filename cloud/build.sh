@@ -17,6 +17,19 @@ echo "=== building the mod ==="
 # Loom runs against yarn mappings.
 cp "$ROOT/mod/build/libs/speedrunmcalt-0.1.0.jar" "$ROOT/cloud/speedrunmcalt.jar"
 
+# The C candidate generator and its library, compiled inside the image
+# so the binary matches the image architecture rather than the Mac's.
+rm -rf "$ROOT/cloud/cubiomes"
+mkdir -p "$ROOT/cloud/cubiomes"
+# Copy the tree, do not enumerate it. Listing *.c and *.h by hand
+# missed the lowercase makefile and then the tables/ directory of
+# generated headers, each failing a layer deep in the image build
+# rather than here. Object files and the archive are excluded so the
+# image never links the Mac's binaries.
+rsync -a --exclude '*.o' --exclude '*.a' --exclude 'docs/' \
+  "$ROOT/tools/cubiomes/" "$ROOT/cloud/cubiomes/"
+cp "$ROOT/seed-filter/seedtypes.c" "$ROOT/cloud/seedtypes.c"
+
 echo "=== building the image ($PLATFORM) ==="
 docker build --platform "$PLATFORM" -t altseed:latest "$ROOT/cloud"
 docker images altseed:latest --format '  {{.Repository}}:{{.Tag}}  {{.Size}}'

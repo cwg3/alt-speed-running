@@ -21,10 +21,35 @@
 # thrown away because the caller tested only for a pass value.
 set -uo pipefail
 
-CHECK="${CHECK:?set CHECK to spawn|ravine|nether|route|portalfilter}"
+CHECK="${CHECK:?set CHECK to generate|spawn|ravine|nether|route|portalfilter}"
 IN="${IN:?set IN to the input file}"
 OUT="${OUT:?set OUT to the output csv}"
 HEAP="${HEAP:-2G}"
+
+# Candidate generation is a different shape from the per-seed checks:
+# no server, no world, one JSON pair per shard rather than a CSV row
+# per seed. seedtypes takes a START SEED, so shards scan disjoint
+# ranges and parallelise without coordinating.
+if [ "$CHECK" = generate ]; then
+	OUTDIR=$(dirname "$OUT")
+	n=0
+	while read -r per start; do
+		case "$per" in ''|\#*) continue ;; esac
+		n=$((n + 1))
+		work=$(mktemp -d)
+		cd "$work" || exit 2
+		echo "[container] generate: $per per type from $start" >&2
+		if seedtypes "$per" "$start" >&2; then
+			cp output/overworld_by_type.json "$OUTDIR/gen-$start-overworld.json"
+			cp output/nether_seeds.json     "$OUTDIR/gen-$start-nether.json"
+		else
+			echo "[container] seedtypes FAILED for start $start" >&2
+		fi
+		cd / && rm -rf "$work"
+	done < "$IN"
+	echo "[container] done: $n shards" >&2
+	exit 0
+fi
 
 case "$CHECK" in
 	spawn)         INFILE=spawncheck.txt;   CSV=spawncheck.csv   ;;
