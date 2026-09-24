@@ -612,6 +612,15 @@ magma ravine found within 3 blocks of its predicted position, though
 that seed was later quarantined for the link-point rule. Shipwreck
 remains untested against the current code.
 
+**Buried treasure confirmed in play 2026-09-23**, on seed
+seed#3a5b - the first pair tier 4 ever verified, and until now
+never played. Treasure found at 4:49, wood at spawn fine, magma ravine
+where tier 5 said it was. That was the last type with no completed
+overworld route.
+
+The wood result matters on its own: this seed predates the wood filter
+entirely, so nothing had ever checked it. The player carried 57 wood.
+
 ### Nether arrival terrain
 
 Biome is filtered; terrain is not. A seed can pass every check and
