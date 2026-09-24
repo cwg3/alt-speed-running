@@ -48,16 +48,38 @@ public final class MatchHud {
 	private MatchHud() {
 	}
 
+	/** Search time as mm:ss - a bare second count reads badly past 99. */
+	private static String clock(long seconds) {
+		return String.format("%02d:%02d", seconds / 60, seconds % 60);
+	}
+
 	public static void register() {
 		HudRenderCallback.EVENT.register(MatchHud::render);
 	}
 
 	private static void render(MatrixStack matrices, float tickDelta) {
-		if (!MatchState.inMatch()) {
-			return;
-		}
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.options.hudHidden || client.textRenderer == null) {
+			return;
+		}
+
+		// Queueing while practising elsewhere is the normal way to
+		// queue, so the search has to be visible from inside whatever
+		// world the player is in - not only on the menu they walked
+		// away from. Without it there is no way to tell a live search
+		// from one that silently died, and no reminder that a match is
+		// coming.
+		if (!MatchState.inMatch()) {
+			if (com.speedrunmcalt.menu.Matchmaker.state()
+					== com.speedrunmcalt.menu.Matchmaker.State.SEARCHING) {
+				drawShadowed(matrices, client, "alt", X, Y,
+						com.speedrunmcalt.menu.Palette.PHOSPHOR);
+				drawShadowed(matrices, client,
+						"searching for an opponent  " + MatchHud.clock(
+								com.speedrunmcalt.menu.Matchmaker.searchSeconds()),
+						X + client.textRenderer.getWidth("alt  "), Y,
+						com.speedrunmcalt.menu.Palette.DIM);
+			}
 			return;
 		}
 

@@ -53,6 +53,13 @@ echo "=== $RUN: $n seeds, $CHECK, $WORKERS workers on $ITYPE ==="
 # OOM-killed containers mid-batch. vCPU count is the obvious number to
 # size workers by and it is the wrong one - these are JVMs generating
 # chunks, so MEMORY binds first.
+# Only the JVM checks are memory-bound. generate runs seedtypes, a C
+# binary with no heap at all, so applying the JVM arithmetic to it
+# refuses instance types that would be entirely fine - which is
+# exactly what happened the first time it ran.
+if [ "$CHECK" = generate ]; then
+	echo "memory: generate runs a C binary, no heap - check skipped"
+else
 MEM_MIB=$(aws ec2 describe-instance-types --region "$REGION" \
   --instance-types "$ITYPE" --query 'InstanceTypes[0].MemoryInfo.SizeInMiB' --output text)
 case "$HEAP" in
@@ -70,6 +77,7 @@ if [ "$NEED_MIB" -gt "$MEM_MIB" ]; then
 	echo "REFUSING TO LAUNCH: this will OOM-kill containers mid-batch." >&2
 	echo "  drop to $fit workers, lower HEAP, or pick a larger instance." >&2
 	exit 1
+fi
 fi
 
 # --- bucket -----------------------------------------------------------
