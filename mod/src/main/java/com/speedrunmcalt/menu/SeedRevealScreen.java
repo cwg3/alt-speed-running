@@ -10,7 +10,7 @@ import net.minecraft.text.LiteralText;
  *
  * Both players are told which opening they have drawn - village,
  * desert temple, ruined portal, shipwreck, buried treasure - and get
- * five seconds with it. The layout stays hidden; what is shared is the
+ * ten seconds with it. The layout stays hidden; what is shared is the
  * route you are about to run, so the opening is planned rather than
  * improvised from a cold start. The race begins when the count reaches
  * zero.
@@ -63,7 +63,7 @@ public class SeedRevealScreen extends Screen {
 		//
 		// The title overlay says it for two seconds while the world
 		// loads, which a player watching their practice world save is
-		// not necessarily reading. These five seconds are the one
+		// not necessarily reading. These ten seconds are the one
 		// moment both players are certainly looking at the screen with
 		// nothing else to do, so the name belongs here.
 		String vs = MatchState.opponentUsername;

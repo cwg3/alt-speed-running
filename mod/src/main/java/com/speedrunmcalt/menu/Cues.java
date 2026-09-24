@@ -55,7 +55,7 @@ public final class Cues {
 	}
 
 	/**
-	 * The seed reveal screen just opened - five seconds to plan.
+	 * The seed reveal screen just opened - ten seconds to plan.
 	 *
 	 * A beacon activating: deep, resonant, and long enough to carry
 	 * across the whole reveal rather than blipping and vanishing.

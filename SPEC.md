@@ -729,9 +729,9 @@ idea is worth borrowing; its distances are not.
 
 **The countdown is shown once per run, not once per join.** A player who
 crashes out and rejoins is dropped straight back into the world with
-their clock still running. The five seconds are planning time *before* a
+their clock still running. The ten seconds are planning time *before* a
 race; someone twelve minutes into one has already planned, and showing
-the screen again would take five seconds off a run in progress.
+the screen again would take ten seconds off a run in progress.
 
 The client cannot work this out for itself. The countdown is shown on
 the first playable tick, and whether the run start is a fresh claim or a

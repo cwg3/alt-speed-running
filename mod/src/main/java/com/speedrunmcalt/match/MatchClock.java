@@ -53,10 +53,17 @@ public final class MatchClock {
 	 * Planning time before the race starts, once the player is in the
 	 * world.
 	 *
-	 * FIVE seconds, which is what the incumbent uses. This was ten for a
-	 * while on an earlier report; five is the corrected figure.
+	 * TEN seconds.
+	 *
+	 * Five for a while, matching the incumbent, and five turned out not
+	 * to be enough here: the screen has to be read, the seed type taken
+	 * in, the opponent recognised, and - once match chat exists - a
+	 * greeting typed. Ten covers all of that without being dead time.
+	 *
+	 * Deliberately longer than the incumbent's, rather than an accident
+	 * of copying it.
 	 */
-	private static final long COUNTDOWN_MS = 5_000;
+	private static final long COUNTDOWN_MS = 10_000;
 
 	private MatchClock() {
 	}
@@ -96,7 +103,7 @@ public final class MatchClock {
 		// Except on a rejoin. The countdown buys planning time before
 		// the race; a player who crashed out twelve minutes in has
 		// already planned, already run, and their clock is still going -
-		// five seconds of the screen would be five seconds taken off a run
+		// ten seconds of the screen would be ten seconds taken off a run
 		// in progress. -1 marks it deliberately skipped, so this branch
 		// does not fire again on the next tick.
 		if (MatchState.runAlreadyStarted) {

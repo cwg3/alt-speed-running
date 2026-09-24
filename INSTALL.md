@@ -64,7 +64,7 @@ launcher from 2a.
 Launch the instance, and on the title screen choose **alt**.
 
 Then **Find a match**. You will be paired with another player, shown
-your seed type with five seconds to plan, and the race starts when the
+your seed type with ten seconds to plan, and the race starts when the
 countdown hits zero.
 
 ## Things worth knowing
@@ -79,7 +79,7 @@ No need to sit on the menu watching a timer.
 is never charged to your run.
 
 **You get told the seed TYPE, not the layout** — village, desert
-temple, ruined portal, shipwreck, buried treasure. The five seconds are
+temple, ruined portal, shipwreck, buried treasure. The ten seconds are
 for planning your opening, not for memorising a map.
 
 **You will never be given a seed you have played before.** Both players

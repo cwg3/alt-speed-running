@@ -23,6 +23,13 @@ public class SpeedrunMcAltClient implements ClientModInitializer {
 		// Everything else is driven from the title screen button added by
 		// TitleScreenMixin - nothing touches the network until the player
 		// asks for it.
+		// Report the allocator as it actually IS, not as preLaunch tried
+		// to set it. preLaunch runs before Log4j has a file to write to,
+		// so its own line never reaches latest.log - which makes it
+		// useless for confirming anything from a tester's log. This runs
+		// late enough to be recorded and states the effective value.
+		SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] lwjgl allocator: {}",
+				System.getProperty("org.lwjgl.system.allocator", "(default - jemalloc)"));
 		SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] client ready");
 	}
 }

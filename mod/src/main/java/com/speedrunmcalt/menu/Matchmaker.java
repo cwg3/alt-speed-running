@@ -142,6 +142,12 @@ public final class Matchmaker {
 			MatchState.reset();
 			ReplayRecorder.reset();
 			MatchState.matchId = match.matchId;
+			// The queue result already carries it. Without this the
+			// countdown read MatchState.opponentUsername while only
+			// LiveMatchPoller ever wrote it, so the name appeared with
+			// about three seconds left - after the poll came back,
+			// rather than when the match was made.
+			MatchState.opponentUsername = match.opponentUsername;
 			MatchState.sessionToken = token;
 			// Deliberately NOT started here. MatchClock starts it on the
 			// first tick the player can actually play, so world
