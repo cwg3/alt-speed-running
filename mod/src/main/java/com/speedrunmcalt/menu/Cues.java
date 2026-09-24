@@ -20,6 +20,26 @@ import net.minecraft.sound.SoundEvents;
  * starting, the opponent taking a lead, and the result.
  */
 public final class Cues {
+	/**
+	 * What PositionedSoundInstance.master(sound, pitch) uses.
+	 *
+	 * Named rather than left implicit because it is surprisingly quiet
+	 * and it is not obvious from the call: the two-argument master()
+	 * hardcodes 0.25f. Every cue that does not say otherwise is
+	 * playing at a quarter volume.
+	 */
+	private static final float DEFAULT_VOLUME = 0.25f;
+
+	/**
+	 * Twice the amplitude of DEFAULT_VOLUME - +6 dB.
+	 *
+	 * SoundSystem.getAdjustedVolume clamps volume * categoryVolume to
+	 * 1.0, so 0.25 leaves 12 dB of headroom and this spends half of
+	 * it. Anything above 1.0f is silently discarded by the clamp, so
+	 * that is the ceiling for any future cue.
+	 */
+	private static final float LOUD = 0.5f;
+
 	private Cues() {
 	}
 
@@ -41,7 +61,7 @@ public final class Cues {
 	 * across the whole reveal rather than blipping and vanishing.
 	 */
 	public static void seedReveal() {
-		play(SoundEvents.BLOCK_BEACON_ACTIVATE, 0.9f);
+		play(SoundEvents.BLOCK_BEACON_ACTIVATE, 0.9f, LOUD);
 	}
 
 	/*
@@ -90,6 +110,10 @@ public final class Cues {
 	 * the client one, and the sound manager is not safe off-thread.
 	 */
 	private static void play(SoundEvent sound, float pitch) {
+		play(sound, pitch, DEFAULT_VOLUME);
+	}
+
+	private static void play(SoundEvent sound, float pitch, float volume) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null) {
 			return;
@@ -100,13 +124,13 @@ public final class Cues {
 						"[speedrunmcalt] cue {} skipped - no sound manager", sound.getId());
 				return;
 			}
-			client.getSoundManager().play(PositionedSoundInstance.master(sound, pitch));
+			client.getSoundManager().play(PositionedSoundInstance.master(sound, pitch, volume));
 			// Logged so "did it fire?" is answerable from the log rather
 			// than from whether someone heard it. A cue that silently
 			// does nothing is indistinguishable from one that plays too
 			// quietly to notice.
 			com.speedrunmcalt.SpeedrunMcAlt.LOGGER.info(
-					"[speedrunmcalt] cue {} (pitch {})", sound.getId(), pitch);
+					"[speedrunmcalt] cue {} (pitch {} vol {})", sound.getId(), pitch, volume);
 		});
 	}
 }
