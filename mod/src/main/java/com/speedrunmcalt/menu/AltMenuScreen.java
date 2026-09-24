@@ -71,7 +71,11 @@ public class AltMenuScreen extends Screen {
 				cx, top, Palette.PHOSPHOR);
 		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, top + 12,
 				new String[] { "speed", "-", "running" },
-				new int[] { Palette.PURPLE, Palette.MAGENTA, Palette.CYAN });
+				// The hyphen carries the wordmark's phosphor green, the
+				// same colour as "alt" above it, so the two halves of the
+				// name are tied together by it rather than sitting as
+				// three unrelated colours.
+				new int[] { Palette.PURPLE, Palette.PHOSPHOR, Palette.PURPLE });
 
 		String status;
 		String detail = null;

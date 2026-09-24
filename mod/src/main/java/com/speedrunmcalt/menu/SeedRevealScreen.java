@@ -63,9 +63,6 @@ public class SeedRevealScreen extends Screen {
 		long seconds = (remaining + 999) / 1000;
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText(String.valueOf(seconds)), cx, y + 44, ALERT);
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("plan your opening - the race begins at zero"),
-				cx, y + 64, DIM);
 
 		super.render(matrices, mouseX, mouseY, delta);
 	}

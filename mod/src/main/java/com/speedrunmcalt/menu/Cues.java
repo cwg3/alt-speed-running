@@ -83,33 +83,31 @@ public final class Cues {
 	}
 
 	/**
-	 * Burning: entity/player/hurt/fire_hurt1-3.
+	 * A beacon powering down - block/beacon/deactivate, 3.50 seconds.
 	 *
-	 * Asked for as "the loop that happens when PLAYER tried to swim in
-	 * lava", and it took three tries because the first two answered
-	 * from the event NAME instead of from what the game plays.
+	 * The counterpart to seedReveal's beacon activate. A match opens
+	 * with a beacon coming up and closes with it going down, which
+	 * makes the pair read as one idea rather than two borrowed noises.
 	 *
-	 * What actually happens on lava entry, from Entity and
-	 * PlayerEntity: setOnFireFor(15) plus one DamageSource.LAVA hit,
-	 * then fifteen seconds of DamageSource.ON_FIRE ticks.
-	 * PlayerEntity.getHurtSound maps ON_FIRE to
-	 * ENTITY_PLAYER_HURT_ON_FIRE, and that repetition is the loop.
+	 * Chosen by measuring, not by guessing which sounds are long. Every
+	 * candidate's .ogg was timed out of the asset index against a
+	 * three-second floor:
 	 *
-	 * The two wrong answers, kept because each was wrong in a way
-	 * worth not repeating:
+	 *   block.anvil.land               0.75   too short
+	 *   entity.generic.burn            1.25   too short
+	 *   entity.player.hurt_on_fire     1.52   too short - the previous cue
+	 *   entity.elder_guardian.curse    3.00
+	 *   block.beacon.deactivate        3.50   this one
+	 *   block.conduit.deactivate       4.07
+	 *   entity.wither.death            8.00   too much
+	 *   entity.ender_dragon.death     18.00   and it means the opposite
 	 *
-	 *   ENTITY_PLAYER_DEATH - picked for landing when the death text
-	 *   does. The asset index shows it and ENTITY_PLAYER_HURT resolve
-	 *   to the same three files (damage/hit1-3); Java Edition has no
-	 *   distinct death sound, so it was heard as taking damage.
-	 *
-	 *   ENTITY_GENERIC_BURN - picked for being "the sizzle". It plays
-	 *   random/fizz, which is also what BLOCK_LAVA_EXTINGUISH plays,
-	 *   so it was heard as water spilling over lava. Correct file for
-	 *   a fire going out; wrong one for a player in it.
+	 * Full volume, matching its twin at the reveal. The same instrument
+	 * opening a match loudly and closing it at a quarter volume would
+	 * sound like a mistake.
 	 */
 	public static void defeat() {
-		play(SoundEvents.ENTITY_PLAYER_HURT_ON_FIRE, 1.0f);
+		play(SoundEvents.BLOCK_BEACON_DEACTIVATE, 0.9f, MAX);
 	}
 
 	/**
