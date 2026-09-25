@@ -64,6 +64,13 @@ fifth.
   seed. Inconclusive rows stay held; that rule has saved the pool twice.
 - **Cloud CSV shapes differ per check** - `nether` is seed-first,
   `route` is type-first. `run-check.sh`'s header says so in capitals.
+- **`loadSeedPool.ts --only=<type>` DELETES that type's rows.** It reads
+  like a filter and is not one. It discarded four verified drawable
+  buried treasure seeds on 2026-09-25. Drawable rows now need `--yes`.
+- **The loader restarts its nether index at 0 every run**, so repeated
+  `--only` loads re-pair the same nether seeds; some are paired 2-3x.
+  Reorder `nether_seeds.json` unused-first before a load, or fix the
+  loader to track what is taken.
 - **Docs written during a problem outlive the fix.** The gravel stat,
   the F6 forfeit note and the "results are committed" line all survived
   the change that made them false.

@@ -65,8 +65,23 @@ const SEED_TYPES = [
  * verification check, and the ocean types' magma-ravine check is hours
  * of world generation - far too much to pay for a fix that only
  * concerns villages.
+ *
+ * --only DELETES. It reads like a filter - "load only this type" - and
+ * on 2026-09-25 it was used that way, which discarded four verified,
+ * drawable buried treasure seeds to make room for candidates that were
+ * not verified yet. The rows it deletes cost hours of world generation
+ * to produce; the flag that deletes them should not be the quiet one.
+ *
+ * So a DRAWABLE row is never deleted without --yes. Held and
+ * quarantined rows go without ceremony: a held row is unverified by
+ * definition, and a quarantined one already failed.
  */
-async function clearPool(ddb: DynamoDBDocumentClient, tableName: string, onlyType?: string) {
+async function clearPool(
+	ddb: DynamoDBDocumentClient,
+	tableName: string,
+	onlyType?: string,
+	confirmed = false,
+) {
 	let cleared = 0;
 	// Paginate on LastEvaluatedKey, NOT on an empty page. Scan applies
 	// Limit BEFORE FilterExpression, so a filtered scan routinely
@@ -77,17 +92,34 @@ async function clearPool(ddb: DynamoDBDocumentClient, tableName: string, onlyTyp
 	do {
 		const page = await ddb.send(new ScanCommand({
 			TableName: tableName,
-			ProjectionExpression: 'seedPairId, seedType',
+			ProjectionExpression:
+				'seedPairId, seedType, #u, heldUnverified, poolReject',
 			ExclusiveStartKey: startKey,
+			// `used` is a DynamoDB reserved word, so it always needs an
+			// alias - even when there is no filter to attach one to.
+			ExpressionAttributeNames: {
+				'#u': 'used',
+				...(onlyType ? { '#t': 'seedType' } : {}),
+			},
 			...(onlyType
 				? {
 					FilterExpression: '#t = :t',
-					ExpressionAttributeNames: { '#t': 'seedType' },
 					ExpressionAttributeValues: { ':t': onlyType },
 				}
 				: {}),
 		}));
 		const items = page.Items ?? [];
+		const drawable = items.filter(
+			(i) => !i.used && !i.heldUnverified && !i.poolReject);
+		if (drawable.length > 0 && !confirmed) {
+			console.error(
+				`\nRefusing to delete ${drawable.length} DRAWABLE `
+				+ `${onlyType ?? 'pool'} row(s).`);
+			console.error(
+				'These passed every check and cost hours of world generation.');
+			console.error('Re-run with --yes if you really mean to discard them.\n');
+			process.exit(1);
+		}
 		// BatchWrite caps at 25 requests.
 		for (let i = 0; i < items.length; i += 25) {
 			const chunk = items.slice(i, i + 25);
@@ -123,8 +155,12 @@ async function main() {
 	// alone: deletes that type's rows and loads only that type.
 	const onlyArg = process.argv.find((a) => a.startsWith('--only='));
 	const only = onlyArg ? onlyArg.slice('--only='.length) : undefined;
+	// Required before any DRAWABLE row is deleted. See clearPool.
+	const yes = process.argv.includes('--yes');
 	if (!tableName) {
-		console.error('usage: npx tsx scripts/loadSeedPool.ts <table> [--replace] [--held] [--only=<type>] [--skip=a,b]');
+		console.error('usage: npx tsx scripts/loadSeedPool.ts <table> [--replace] [--held] [--only=<type>] [--skip=a,b] [--yes]');
+		console.error('  --only=<type> and --replace DELETE existing rows.');
+		console.error('  --yes is required if any of them are drawable.');
 		process.exit(1);
 	}
 	if (only && !SEED_TYPES.includes(only as typeof SEED_TYPES[number])) {
@@ -215,10 +251,10 @@ async function main() {
 
 	const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 	if (only) {
-		await clearPool(ddb, tableName, only);
+		await clearPool(ddb, tableName, only, yes);
 	}
 	if (replace) {
-		await clearPool(ddb, tableName);
+		await clearPool(ddb, tableName, undefined, yes);
 	}
 
 	// BatchWriteItem caps at 25 items per call.
