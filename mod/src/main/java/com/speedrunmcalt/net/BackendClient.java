@@ -349,7 +349,13 @@ public final class BackendClient {
 				resp.get("netherSeed").getAsLong(),
 				str(resp, "seedType", "unknown"),
 				num(resp, "worldSetupVersion"),
-				tracks, splits);
+				tracks, splits,
+				optInt(resp, "structureX", 0), optInt(resp, "structureZ", 0),
+				optInt(resp, "bastionX", 0), optInt(resp, "bastionZ", 0),
+				resp.has("smithX") && !resp.get("smithX").isJsonNull()
+						? resp.get("smithX").getAsInt() : null,
+				resp.has("smithZ") && !resp.get("smithZ").isJsonNull()
+						? resp.get("smithZ").getAsInt() : null);
 	}
 
 	/** One match's splits, both players, in route order. */

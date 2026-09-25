@@ -103,6 +103,24 @@ public final class ReplayData {
 	public final String seedType;
 
 	/**
+	 * The coordinates MatchWorldSetup keys off.
+	 *
+	 * A replay world is built by the same setup pass as the match, and
+	 * that pass SKIPS the loot top-up when it cannot find the
+	 * structure. Without these it logged "No shipwreck structure at
+	 * 0,0" and built a world whose chests hold different contents than
+	 * the ones the player actually opened - while looking completely
+	 * normal. Seeing what was in the chests is most of why replays
+	 * exist.
+	 */
+	public final int structureX;
+	public final int structureZ;
+	public final int bastionX;
+	public final int bastionZ;
+	public final Integer smithX;
+	public final Integer smithZ;
+
+	/**
 	 * Which build's rules made this world.
 	 *
 	 * 0 means the match predates stamping - unknown, not version zero.
@@ -125,7 +143,15 @@ public final class ReplayData {
 
 	public ReplayData(String matchId, long overworldSeed, long netherSeed, String seedType,
 			int worldSetupVersion, Map<String, Track> tracks,
-			Map<String, Map<String, Long>> splits) {
+			Map<String, Map<String, Long>> splits,
+			int structureX, int structureZ, int bastionX, int bastionZ,
+			Integer smithX, Integer smithZ) {
+		this.structureX = structureX;
+		this.structureZ = structureZ;
+		this.bastionX = bastionX;
+		this.bastionZ = bastionZ;
+		this.smithX = smithX;
+		this.smithZ = smithZ;
 		this.splits = splits;
 		this.matchId = matchId;
 		this.overworldSeed = overworldSeed;

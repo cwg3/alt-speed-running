@@ -157,6 +157,20 @@ public final class ReplayLauncher {
 		MatchState.seedType = data.seedType;
 		MatchState.overworldSeed = data.overworldSeed;
 		MatchState.netherSeed = data.netherSeed;
+		// The same coordinates the match world was built from. Without
+		// them MatchWorldSetup looked for the structure at 0,0, failed,
+		// and SKIPPED the loot top-up - so the replay's chests held
+		// different contents than the ones that were actually opened,
+		// and nothing on screen said so. It took 10ms instead of the
+		// match's 1714ms, which was the only visible sign.
+		MatchState.structureX = data.structureX;
+		MatchState.structureZ = data.structureZ;
+		MatchState.bastionX = data.bastionX;
+		MatchState.bastionZ = data.bastionZ;
+		if (data.smithX != null && data.smithZ != null) {
+			MatchState.smithX = data.smithX;
+			MatchState.smithZ = data.smithZ;
+		}
 
 		ReplayPlayback.begin(data, watch);
 		MatchWorldCreator.createMatchWorld(client, "replay-" + data.matchId,

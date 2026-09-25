@@ -122,8 +122,19 @@ export const handler = async (
 			overworldSeed: match.Item.overworldSeed,
 			netherSeed: match.Item.netherSeed,
 			seedType: match.Item.seedType,
+			// Every coordinate the world setup keys off, not just the
+			// overworld structure. The replay world is built by the
+			// same MatchWorldSetup as the match, and setup that cannot
+			// find the structure SKIPS the loot top-up - so a replay
+			// missing these opens chests holding different contents
+			// than the ones the player actually looted. Seeing what
+			// was in the chests is most of why replays exist.
 			structureX: match.Item.structureX,
 			structureZ: match.Item.structureZ,
+			bastionX: match.Item.bastionX,
+			bastionZ: match.Item.bastionZ,
+			smithX: match.Item.smithX ?? null,
+			smithZ: match.Item.smithZ ?? null,
 			// 0 means "made before stamping existed" - unknown, not
 			// version zero. The client decides whether it can rebuild.
 			worldSetupVersion: stamped,
