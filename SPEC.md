@@ -920,12 +920,23 @@ unchecked and shipped. Villages went out without blacksmiths until one
 turned up in a live match — twice, because the first fix verified a
 piece name rather than a chest.
 
-**Parallel verification does not work.** Serial runs are reliable;
-four workers fail about 70% of the time, and a failed worker once got
-counted as a genuine result — turning 28 crashes into a reported "35
-of 40 villages have no blacksmith". The scripts now write an explicit
-ERROR marker so a failure can never be read as a zero, but the
-underlying contention is unfixed.
+**Parallel verification works. It was a port collision.**
+
+For a long time this said parallel runs fail most of the time and the
+cause was unknown, with Gradle cache contention as the suspect. That
+was wrong, and it was wrong in the way folklore usually is: the
+observation was real, the explanation was never tested, and the belief
+outlived several chances to check it.
+
+Every worker launched a server without setting `server-port`, so they
+all tried to bind the default and all but one died. The fix is one
+line per harness — a distinct port per worker — and the checks that
+had been believed unparallelisable now run clean across every worker.
+
+The ERROR marker stays regardless. A crashed worker once got counted
+as a genuine result, turning crashes into a confident, wrong "35 of 40
+villages have no blacksmith", and a failure must never be readable as
+a zero no matter what caused it.
 
 **The wood check tests a BIOME, not a tree.** `woodNearby` in
 `seedtypes.c` samples biome ids every 16 blocks within 5 chunks of
@@ -979,24 +990,24 @@ something other than the reported experience.
 Engineering debt that is not itself a match guarantee, kept here so it
 lives in one place rather than in somebody's memory.
 
-**Parallel seed verification.** Tier 3 of the pool build runs serially
-because four workers fail roughly 70% of the time. Serial is reliable
-but slow: 70 village seeds is about 15 minutes, and a full rebuild
-including ocean ravines is hours. Fixing it would cut that around 4x.
+**Parallel seed verification — RESOLVED.** This entry used to record
+that parallel runs failed most of the time for reasons nobody had
+established, with shared Gradle cache contention as the suspect and
+two untried fixes listed.
 
-Cause never established. The likely candidate is several concurrent
-first-compiles contending on the shared Gradle cache — a worker copy
-has no build output until its first run. Two untried fixes:
+The cause was a port collision. Every worker started a server without
+`server-port`, so they contended for the default and all but one died
+on startup. Each harness now assigns a distinct port per worker, and
+the stages previously believed serial-only run in parallel with no
+errors.
 
-1. Pre-warm each worker copy with one serial build before fanning out.
-2. Give each worker its own `GRADLE_USER_HOME` so nothing is shared.
-   Heavier on disk, but removes the suspected cause outright.
+Kept here rather than deleted, because the interesting part is not the
+bug. It is that a wrong explanation was written down once and then
+believed for weeks, shaping how the pipeline was built around it. The
+observation was real and the diagnosis was never tested.
 
-The consequence is already guarded: a crashed worker writes an
-explicit ERROR marker and the summary refuses to fold those in. That
-defence exists because 28 crashes were once counted as genuine zeroes
-and produced a confident, wrong "35 of 40 villages have no
-blacksmith". The contention itself is unfixed.
+The ERROR marker that guards the consequence stays: a crashed worker
+must never be readable as a genuine zero, whatever the cause.
 
 **The client explains every void as a bad-seed vote.** `LiveMatchPoller`
 prints "both players agreed the seed was unplayable" whenever it sees
