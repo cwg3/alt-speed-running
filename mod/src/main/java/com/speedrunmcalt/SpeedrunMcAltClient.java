@@ -23,6 +23,7 @@ public class SpeedrunMcAltClient implements ClientModInitializer {
 		// drives the camera.
 		com.speedrunmcalt.replay.ReplayLauncher.init();
 		com.speedrunmcalt.replay.ReplayPlayback.register();
+		com.speedrunmcalt.replay.ReplayKeys.register();
 
 		// Everything else is driven from the title screen button added by
 		// TitleScreenMixin - nothing touches the network until the player

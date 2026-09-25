@@ -58,6 +58,10 @@ public final class ReplayPlayback {
 	/** Spectator is set once, after the world finishes loading. */
 	private static volatile boolean prepared = false;
 
+	/** The viewer's own perspective, restored when the replay ends. */
+	private static int savedPerspective = 0;
+	private static boolean perspectiveSaved = false;
+
 	/**
 	 * The OTHER player, drawn as a figure in the world.
 	 *
@@ -134,6 +138,11 @@ public final class ReplayPlayback {
 	}
 
 	public static void stop() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (perspectiveSaved && mc != null) {
+			mc.options.perspective = savedPerspective;
+			perspectiveSaved = false;
+		}
 		if (ghost != null) {
 			ghost.remove();
 			ghost = null;
@@ -152,6 +161,22 @@ public final class ReplayPlayback {
 			if (ghost != null) {
 				ghost.remove();
 				ghost = null;
+			}
+		}
+	}
+
+	/** Swap to the other player, for the switch key. */
+	public static void watchOther() {
+		if (data == null) {
+			return;
+		}
+		for (String uuid : data.tracks.keySet()) {
+			if (!uuid.equals(watching)) {
+				ReplayData.Track t = data.tracks.get(uuid);
+				if (t.samples != null && !t.samples.isEmpty()) {
+					watch(uuid);
+				}
+				return;
 			}
 		}
 	}
@@ -218,6 +243,12 @@ public final class ReplayPlayback {
 		// but the camera is the viewer's. Spectator flight is already
 		// active, so the whole implementation is to do nothing.
 		if (camera == Camera.FREE) {
+			// Hand the perspective back - flying around in third
+			// person is a legitimate way to look at a structure.
+			if (perspectiveSaved) {
+				client.options.perspective = savedPerspective;
+				perspectiveSaved = false;
+			}
 			driveGhost(client, positionMillis);
 			return;
 		}
@@ -256,13 +287,32 @@ public final class ReplayPlayback {
 		}
 
 		ClientPlayerEntity p = client.player;
-		// Interpolating between samples is what makes 10Hz look like
-		// motion rather than teleporting ten times a second.
-		p.updatePosition(s.x, s.y, s.z);
-		p.yaw = s.yaw;
-		p.pitch = s.pitch;
+
+		// First person while locked.
+		//
+		// Left in third person the camera sits behind and above the
+		// body and the whole thing reads as a bird's-eye view rather
+		// than as what the player saw - which is the entire point of
+		// a locked camera.
+		if (!perspectiveSaved) {
+			savedPerspective = client.options.perspective;
+			perspectiveSaved = true;
+		}
+		client.options.perspective = 0;
+
+		// updatePositionAndAngles, not updatePosition: it sets the
+		// PREVIOUS position too. Without that the renderer interpolates
+		// every frame from wherever the camera was last tick, so a
+		// 10Hz trace is rendered as a permanent lag behind the real
+		// position rather than as motion along it.
+		p.updatePositionAndAngles(s.x, s.y, s.z, s.yaw, s.pitch);
+		p.prevX = s.x;
+		p.prevY = s.y;
+		p.prevZ = s.z;
 		p.prevYaw = s.yaw;
 		p.prevPitch = s.pitch;
+		p.headYaw = s.yaw;
+		p.prevHeadYaw = s.yaw;
 	}
 
 	/**

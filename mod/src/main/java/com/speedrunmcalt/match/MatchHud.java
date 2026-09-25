@@ -107,6 +107,59 @@ public final class MatchHud {
 		drawShadowed(matrices, client, hint,
 				right - client.textRenderer.getWidth(hint), y,
 				com.speedrunmcalt.menu.Palette.DIM);
+
+		renderReplayControls(matrices, client);
+	}
+
+	/**
+	 * The control strip, where the hotbar would be.
+	 *
+	 * Spectator hides the hotbar, so that strip is free and 1-9 mean
+	 * nothing. Putting the controls there keeps them off the middle of
+	 * the screen, which is the part being watched.
+	 */
+	private static void renderReplayControls(MatrixStack matrices, MinecraftClient client) {
+		String[] labels = com.speedrunmcalt.replay.ReplayKeys.LABELS;
+		int screenW = client.getWindow().getScaledWidth();
+		int screenH = client.getWindow().getScaledHeight();
+
+		// Measure first so the strip is centred as a whole rather than
+		// each slot being centred on its own.
+		int gap = 10;
+		int total = 0;
+		for (int i = 0; i < labels.length; i++) {
+			total += client.textRenderer.getWidth((i + 1) + " " + labels[i]) + gap;
+		}
+		int x = (screenW - total) / 2;
+		int y = screenH - 22;
+
+		for (int i = 0; i < labels.length; i++) {
+			String num = String.valueOf(i + 1);
+			String text = labels[i];
+			drawShadowed(matrices, client, num, x, y, com.speedrunmcalt.menu.Palette.YELLOW);
+			x += client.textRenderer.getWidth(num) + 2;
+
+			// The two that have a state worth showing say what it is
+			// rather than only what it does.
+			int colour = com.speedrunmcalt.menu.Palette.DIM;
+			if (i == 0 && com.speedrunmcalt.replay.ReplayPlayback.paused()) {
+				text = "paused";
+				colour = com.speedrunmcalt.menu.Palette.CYAN;
+			} else if (i == 3) {
+				float sp = com.speedrunmcalt.replay.ReplayPlayback.speed();
+				text = (sp == (long) sp ? String.valueOf((long) sp) : String.valueOf(sp)) + "x";
+				if (sp != 1f) {
+					colour = com.speedrunmcalt.menu.Palette.CYAN;
+				}
+			} else if (i == 4
+					&& com.speedrunmcalt.replay.ReplayPlayback.camera()
+							== com.speedrunmcalt.replay.ReplayPlayback.Camera.FREE) {
+				text = "free";
+				colour = com.speedrunmcalt.menu.Palette.CYAN;
+			}
+			drawShadowed(matrices, client, text, x, y, colour);
+			x += client.textRenderer.getWidth(text) + gap;
+		}
 	}
 
 	private static void render(MatrixStack matrices, float tickDelta) {
