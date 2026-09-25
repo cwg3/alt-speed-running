@@ -47,7 +47,7 @@ player takes flint off the first block, the other digs twenty.
 | **Shearing a sheep always gives 3 wool** | `1 + random.nextInt(3)` — 1 to 3 |
 | **A thrown eye of ender always survives** | `random.nextInt(5) > 0` — 20% chance to break |
 | **Mob spawner timing and position are seed-deterministic** | drawn from the world's shared `Random`, so identical seeds diverge |
-| **Gravel, dead bush and iron golem drops are standardised** | ranged rolls |
+| **Dead bush and iron golem drops are standardised** | ranged rolls |
 
 Wool matters because beds are the 1.16 dragon strategy: a 1-to-3x swing
 in wool per sheep is a swing in how many sheep you must find.

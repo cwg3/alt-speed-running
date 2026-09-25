@@ -90,7 +90,7 @@ neither player can be handed a better run by luck:
 - Overworld and nether are seeded **independently**, so you cannot infer
   nether structure locations from overworld terrain
 - Iron golems always drop 4 iron
-- Gravel always drops flint
+- Gravel gives 2 flint per 20 blocks, on a schedule both players share
 - Dead bushes always drop 2 sticks
 - Shearing a sheep always gives 3 wool
 - Thrown eyes of ender never break
