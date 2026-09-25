@@ -37,6 +37,12 @@ TABLE="${1:-BackendStack-SeedPoolTableB4C21150-12O8ZBQS8FM8L}"
 #          downstream keys off the pair id, so it has to be re-joined.
 CLOUD="${CLOUD:-0}"
 WORKERS="${WORKERS:-16}"
+# The instance type has to be passed, not left to run-on-spot's
+# default. That default is c7g.4xlarge, 32GiB, which cannot hold 16
+# workers at 2G each - the memory guard refuses the launch and the
+# tier produces no rows. m7g.4xlarge is the same 16 vCPUs with 64GiB,
+# which is what every stage tonight actually ran on.
+ITYPE="${ITYPE:-m7g.4xlarge}"
 REGION="${REGION:-us-west-2}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export ROOT
@@ -83,7 +89,7 @@ if [ "$CLOUD" = 1 ]; then
   # held-pairs:  ow ns bx bz pairId type
   # netherlocate.txt wants: OW BX BZ NS
   awk '{print $1, $3, $4, $2}' /tmp/held-pairs.txt > /tmp/cloud-nether.txt
-  "$ROOT/cloud/run-on-spot.sh" nether /tmp/cloud-nether.txt "$WORKERS" || true
+  "$ROOT/cloud/run-on-spot.sh" nether /tmp/cloud-nether.txt "$WORKERS" "$ITYPE" || true
   CLOUD_CSV=$(ls -t "$ROOT/seed-filter/results"/nether-*.csv 2>/dev/null | head -1)
   python3 - "$CLOUD_CSV" <<'JOIN'
 import csv, pathlib, sys
@@ -116,7 +122,7 @@ if [ "$CLOUD" = 1 ]; then
   # held-routes is already the shape routecheck.txt wants, minus the
   # trailing pair id the hook ignores.
   awk '{print $1, $2, $3, $4, $5, $6, $7}' /tmp/held-routes.txt > /tmp/cloud-route.txt
-  "$ROOT/cloud/run-on-spot.sh" route /tmp/cloud-route.txt "$WORKERS" || true
+  "$ROOT/cloud/run-on-spot.sh" route /tmp/cloud-route.txt "$WORKERS" "$ITYPE" || true
   CLOUD_CSV=$(ls -t "$ROOT/seed-filter/results"/route-*.csv 2>/dev/null | head -1)
   python3 - "$CLOUD_CSV" <<'JOIN'
 import csv, pathlib, sys, os
