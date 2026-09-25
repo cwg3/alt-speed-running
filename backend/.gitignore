@@ -6,3 +6,7 @@ node_modules
 # CDK asset staging directory
 .cdk.staging
 cdk.out
+
+# Anti-cheat thresholds. Public repo: what is checked is published,
+# the numbers are not - they are the cheat sheet for faking a run.
+split-rules.local.json

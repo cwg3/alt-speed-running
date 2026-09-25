@@ -43,29 +43,60 @@ const REQUIRES: Partial<Record<SplitName, SplitName[]>> = {
 };
 
 /**
- * Absolute earliest each split could occur, in ms from run start.
+ * THE NUMBERS LIVE IN THE ENVIRONMENT, NOT IN THIS FILE.
  *
- * Anchored to the real 1.16-1.19 RSG world record of 6:39 (399s) with
- * heavy headroom - the dragon floor is roughly 45% of that record, so
- * beating it would mean halving a heavily optimised world record.
- * These exist to catch "dragon at 10 seconds", not to police fast runs.
+ * What is checked is public; the thresholds are not. This repository
+ * publishes every deviation from vanilla on purpose - that is the
+ * whole pitch - and a reader should be able to see exactly which
+ * rules a split is held to. But the client is authoritative for match
+ * outcomes: the server can only ask whether a reported time is
+ * plausible, not whether it happened. Printing the floors would hand
+ * anyone who wanted to fake a run the precise minimum that survives,
+ * which is a different thing from explaining the rules.
+ *
+ * Defaults here are deliberately LOOSER than production. A missing
+ * variable should degrade to weak checking that lets honest runs
+ * through, never to strict checking that rejects them - a threshold
+ * that silently tightens because a deploy dropped an env var would
+ * reject real matches and look like a bug in the game.
+ *
+ * Set SPLIT_FLOORS_MS and SPLIT_GAPS_MS on the ReportSplit function to
+ * the real values. Format:
+ *
+ *   SPLIT_FLOORS_MS = {"kill_dragon":180000, ...}
+ *   SPLIT_GAPS_MS   = {"kill_dragon":{"after":"enter_end","ms":20000}, ...}
  */
-const MIN_ELAPSED_MS: Record<SplitName, number> = {
-	enter_nether: 15_000,
-	piglin_barter: 20_000,
-	obtain_rod: 60_000,
-	enter_stronghold: 100_000,
-	enter_end: 110_000,
-	kill_dragon: 180_000,
-};
+function envJson<T>(name: string, fallback: T): T {
+	const raw = process.env[name];
+	if (!raw) {
+		return fallback;
+	}
+	try {
+		return { ...fallback, ...JSON.parse(raw) };
+	} catch {
+		// A malformed value must not tighten anything silently. Fall
+		// back to the permissive default and let the honest runs pass.
+		console.error(`[splitRules] ${name} is not valid JSON - using defaults`);
+		return fallback;
+	}
+}
 
-/** Minimum time between a split and its immediate predecessor. */
-const MIN_GAP_MS: Partial<Record<SplitName, { after: SplitName; ms: number }>> = {
-	piglin_barter: { after: 'enter_nether', ms: 3_000 },
-	obtain_rod: { after: 'enter_nether', ms: 20_000 },
-	enter_end: { after: 'enter_stronghold', ms: 3_000 },
-	kill_dragon: { after: 'enter_end', ms: 20_000 },
-};
+const MIN_ELAPSED_MS: Record<SplitName, number> = envJson('SPLIT_FLOORS_MS', {
+	enter_nether: 1_000,
+	piglin_barter: 1_000,
+	obtain_rod: 1_000,
+	enter_stronghold: 1_000,
+	enter_end: 1_000,
+	kill_dragon: 1_000,
+});
+
+const MIN_GAP_MS: Partial<Record<SplitName, { after: SplitName; ms: number }>> =
+	envJson('SPLIT_GAPS_MS', {
+		piglin_barter: { after: 'enter_nether', ms: 0 },
+		obtain_rod: { after: 'enter_nether', ms: 0 },
+		enter_end: { after: 'enter_stronghold', ms: 0 },
+		kill_dragon: { after: 'enter_end', ms: 0 },
+	});
 
 // Allows for clock skew and request latency between the client's run
 // timer and the server's view of when the match started.
@@ -86,7 +117,8 @@ const MIN_GAP_MS: Partial<Record<SplitName, { after: SplitName; ms: number }>> =
 // world still has to generate), so honest clients report less elapsed
 // time than the server measures, not more. That gives this bound a
 // wide margin in the safe direction.
-const WALL_CLOCK_TOLERANCE_MS = 10_000;
+const WALL_CLOCK_TOLERANCE_MS =
+	Number(process.env.WALL_CLOCK_TOLERANCE_MS ?? 60_000);
 
 export interface SplitCheck {
 	ok: boolean;

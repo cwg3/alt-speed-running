@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import * as cdk from 'aws-cdk-lib/core';
 import { Construct } from 'constructs';
@@ -30,6 +31,30 @@ export class BackendStack extends cdk.Stack {
 		// Pay-per-request billing: no capacity to plan/pay for while this is
 		// just us testing - cost tracks actual usage, same reasoning as the
 		// serverless-first choice for the whole backend.
+		// Anti-cheat thresholds, loaded from a file that is NOT in this
+		// repository.
+		//
+		// Everything about WHAT is checked is public - the rules, the
+		// ordering, the reasoning - because publishing every deviation is
+		// the point of this project. The NUMBERS are not, because the
+		// client is authoritative for match outcomes: the server can only
+		// ask whether a reported time is plausible, never whether it
+		// happened. Printing the floors would hand anyone wanting to fake
+		// a run the exact minimum that survives, which is a different
+		// thing from explaining the rules.
+		//
+		// Absent, the Lambda falls back to deliberately LOOSE defaults.
+		// A missing file must degrade to weak checking that lets honest
+		// runs through, never to strict checking that rejects them.
+		const splitRulesPath = path.join(__dirname, '..', 'split-rules.local.json');
+		const splitRules: Record<string, unknown> = fs.existsSync(splitRulesPath)
+			? JSON.parse(fs.readFileSync(splitRulesPath, 'utf8'))
+			: {};
+		if (!fs.existsSync(splitRulesPath)) {
+			cdk.Annotations.of(this).addWarning(
+				'split-rules.local.json not found - split checking will use loose defaults');
+		}
+
 		const playersTable = new Table(this, 'PlayersTable', {
 			partitionKey: { name: 'uuid', type: AttributeType.STRING },
 			billingMode: BillingMode.PAY_PER_REQUEST,
@@ -241,6 +266,12 @@ export class BackendStack extends cdk.Stack {
 				PLAYERS_TABLE_NAME: playersTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
 				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
+				...(splitRules.floors
+					? { SPLIT_FLOORS_MS: JSON.stringify(splitRules.floors) } : {}),
+				...(splitRules.gaps
+					? { SPLIT_GAPS_MS: JSON.stringify(splitRules.gaps) } : {}),
+				...(splitRules.wallClockToleranceMs
+					? { WALL_CLOCK_TOLERANCE_MS: String(splitRules.wallClockToleranceMs) } : {}),
 			},
 		});
 		sessionsTable.grantReadData(reportSplitFn);
