@@ -153,6 +153,7 @@ public final class ReplayRecorder {
 	public static void reset() {
 		EVENTS.clear();
 		SAMPLES.clear();
+		EntityTracks.reset();
 		tickCounter = 0;
 		uploaded = false;
 	}
@@ -167,6 +168,16 @@ public final class ReplayRecorder {
 		if (player == null) {
 			return;
 		}
+		long elapsed = System.currentTimeMillis() - MatchState.matchStartMillis;
+		int dim = dimensionIndex(player.world.getRegistryKey());
+
+		// Before the player's own sample-rate gate, because entity
+		// tracks run at their own slower rate and keep their own
+		// counter. Putting this after the early return below would
+		// have sampled them at the PLAYER's rate, quietly costing five
+		// times the data the class note budgets for.
+		EntityTracks.tick(client, player, elapsed, dim);
+
 		if (++tickCounter < SAMPLE_INTERVAL_TICKS) {
 			return;
 		}
@@ -175,9 +186,7 @@ public final class ReplayRecorder {
 			return;
 		}
 
-		SAMPLES.add(new Sample(
-				System.currentTimeMillis() - MatchState.matchStartMillis,
-				dimensionIndex(player.world.getRegistryKey()),
+		SAMPLES.add(new Sample(elapsed, dim,
 				player.getX(), player.getY(), player.getZ(),
 				player.yaw, player.pitch));
 	}
@@ -218,8 +227,12 @@ public final class ReplayRecorder {
 
 		Thread thread = new Thread(() -> {
 			try {
-				BackendClient.uploadReplay(token, matchId, snapshot, events());
-				SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Uploaded replay: {} samples", snapshot.size());
+				java.util.List<EntityTracks.Row> tracks = EntityTracks.rows();
+				BackendClient.uploadReplay(token, matchId, snapshot, events(),
+						tracks, EntityTracks.typeNames());
+				SpeedrunMcAlt.LOGGER.info(
+						"[speedrunmcalt] Uploaded replay: {} samples, {} events, {} entity rows",
+						snapshot.size(), events().size(), tracks.size());
 			} catch (Exception e) {
 				// A failed upload must not affect the match result.
 				SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] Replay upload failed", e);

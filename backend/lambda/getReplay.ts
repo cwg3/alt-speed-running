@@ -26,7 +26,7 @@ const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
 const REPLAY_BUCKET = process.env.REPLAY_BUCKET!;
 
 async function readTrace(matchId: string, uuid: string):
-		Promise<{ samples: unknown[]; events: unknown[] } | null> {
+		Promise<{ samples: unknown[]; events: unknown[]; entityTypes: string[]; entities: unknown[] } | null> {
 	try {
 		const obj = await s3.send(new GetObjectCommand({
 			Bucket: REPLAY_BUCKET,
@@ -38,8 +38,19 @@ async function readTrace(matchId: string, uuid: string):
 		// { samples, events }. Both are real and both must load - the
 		// old ones are somebody's actual matches.
 		return Array.isArray(parsed)
-			? { samples: parsed, events: [] }
-			: { samples: parsed.samples ?? [], events: parsed.events ?? [] };
+			? { samples: parsed, events: [], entityTypes: [], entities: [] }
+			: {
+				samples: parsed.samples ?? [],
+				events: parsed.events ?? [],
+				// Three object shapes are live now: a bare sample array,
+				// { samples, events }, and this one. Defaulting rather
+				// than branching keeps every older replay watchable -
+				// they are somebody's actual matches, and a replay that
+				// 404s because it predates a feature is a worse outcome
+				// than one that plays with an empty world.
+				entityTypes: parsed.entityTypes ?? [],
+				entities: parsed.entities ?? [],
+			};
 	} catch (err: any) {
 		// A missing trace is ordinary: a player who quit before the
 		// upload, or a match that predates recording. Absent, not an
@@ -98,6 +109,8 @@ export const handler = async (
 			username: p.username,
 			samples: t?.samples ?? null,
 			events: t?.events ?? [],
+			entityTypes: t?.entityTypes ?? [],
+			entities: t?.entities ?? [],
 		};
 	}
 

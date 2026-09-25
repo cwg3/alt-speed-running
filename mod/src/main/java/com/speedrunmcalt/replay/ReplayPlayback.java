@@ -128,6 +128,11 @@ public final class ReplayPlayback {
 	}
 
 	public static void begin(ReplayData replay, String watchUuid) {
+		// Not clear() - reset(). The entity index is keyed by which
+		// player it was built for, and watching the same player in a
+		// DIFFERENT match would match that key and replay the previous
+		// match's mobs over this one's terrain.
+		ReplayEntities.reset();
 		data = replay;
 		watching = watchUuid;
 		positionMillis = 0;
@@ -326,6 +331,19 @@ public final class ReplayPlayback {
 		}
 		int cameraDimension = dimensionOf(client);
 
+		// Everything that is not a player: mobs, items, projectiles.
+		// Only the WATCHED player's track - entity ids are per-client,
+		// so merging both recordings would double every shared mob and
+		// scramble the ids that tie one zombie together across samples.
+		// Free-roam keeps watching the same track for the same reason;
+		// the camera moving does not change whose recording this is.
+		ReplayData.Track watched = watching == null ? null : data.tracks.get(watching);
+		if (watched != null) {
+			ReplayEntities.drive(client, watching, watched, atMillis, cameraDimension);
+		} else {
+			ReplayEntities.clear();
+		}
+
 		for (java.util.Map.Entry<String, ReplayData.Track> e : data.tracks.entrySet()) {
 			String uuid = e.getKey();
 			ReplayData.Track track = e.getValue();
@@ -378,6 +396,7 @@ public final class ReplayPlayback {
 	}
 
 	private static void clearGhosts() {
+		ReplayEntities.clear();
 		for (net.minecraft.client.network.OtherClientPlayerEntity g : ghosts.values()) {
 			g.remove();
 		}

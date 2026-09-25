@@ -24,6 +24,10 @@ interface ReplayRequest {
 	samples: Sample[];
 	/** [t, type, detail]. Absent from clients built before events existed. */
 	events?: [number, string, string][];
+	/** Type ids, referenced by index from `entities`. */
+	entityTypes?: string[];
+	/** [t, entityId, typeIndex, dim, x, y, z, yaw]. */
+	entities?: [number, number, number, number, number, number, number, number][];
 }
 
 export const handler = async (
@@ -71,6 +75,37 @@ export const handler = async (
 		};
 	}
 
+	// Everything else that was in the world. Absent from clients built
+	// before entity tracks existed, which the version gate does not
+	// exclude because it enforces a minimum rather than an exact build.
+	//
+	// The cap matches the recorder's own MAX_ROWS. A client sending more
+	// than that is not a client this build produced.
+	const entityTypes = body.entityTypes ?? [];
+	const entities = body.entities ?? [];
+	if (!Array.isArray(entityTypes) || entityTypes.length > 256
+			|| !entityTypes.every((t) => typeof t === 'string' && t.length <= 100)) {
+		return {
+			statusCode: 400,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ error: 'entityTypes must be up to 256 short strings' }),
+		};
+	}
+	if (!Array.isArray(entities) || entities.length > 150000
+			|| !entities.every((e) => Array.isArray(e) && e.length === 8
+				&& e.every(Number.isFinite)
+				// A type index outside the table would render as nothing and
+				// read as a gap in the recording rather than a bad upload.
+				&& e[2] >= 0 && e[2] < entityTypes.length)) {
+		return {
+			statusCode: 400,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				error: 'entities must be [t, id, typeIndex, dim, x, y, z, yaw] with a valid typeIndex',
+			}),
+		};
+	}
+
 	if (!body.samples.every((s) => Array.isArray(s)
 			&& (s.length === 5 || s.length === 7) && s.every(Number.isFinite))) {
 		return {
@@ -104,6 +139,8 @@ export const handler = async (
 		Body: gzipSync(JSON.stringify({
 			samples: body.samples,
 			events: body.events ?? [],
+			entityTypes,
+			entities,
 		})),
 		ContentType: 'application/json',
 		ContentEncoding: 'gzip',
@@ -146,6 +183,7 @@ export const handler = async (
 		body: JSON.stringify({
 			stored: true,
 			sampleCount: result.sampleCount,
+			entityRowCount: entities.length,
 			findings: result.findings,
 		}),
 	};

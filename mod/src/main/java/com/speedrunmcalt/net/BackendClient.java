@@ -300,9 +300,33 @@ public final class BackendClient {
 							row.get(1).getAsString(), row.get(2).getAsString()));
 				}
 			}
+			// Type table first: a row's type index is meaningless
+			// without it, and an index past its end would draw nothing
+			// and read as a gap in the recording.
+			java.util.List<String> typeNames = new java.util.ArrayList<>();
+			if (t.has("entityTypes") && t.get("entityTypes").isJsonArray()) {
+				for (com.google.gson.JsonElement tn : t.getAsJsonArray("entityTypes")) {
+					typeNames.add(tn.getAsString());
+				}
+			}
+			java.util.List<ReplayData.EntityRow> ents = new java.util.ArrayList<>();
+			if (t.has("entities") && t.get("entities").isJsonArray()) {
+				for (com.google.gson.JsonElement enEl : t.getAsJsonArray("entities")) {
+					JsonArray row = enEl.getAsJsonArray();
+					int typeIdx = row.get(2).getAsInt();
+					if (typeIdx < 0 || typeIdx >= typeNames.size()) {
+						continue;
+					}
+					ents.add(new ReplayData.EntityRow(
+							row.get(0).getAsLong(), row.get(1).getAsInt(), typeIdx,
+							row.get(3).getAsInt(), row.get(4).getAsDouble(),
+							row.get(5).getAsDouble(), row.get(6).getAsDouble(),
+							row.get(7).getAsFloat()));
+				}
+			}
 			tracks.put(e.getKey(), new ReplayData.Track(
 					t.has("username") ? t.get("username").getAsString() : "player",
-					samples, evs));
+					samples, evs, typeNames, ents));
 		}
 
 		java.util.Map<String, java.util.Map<String, Long>> splits =
@@ -382,7 +406,9 @@ public final class BackendClient {
 	 */
 	public static void uploadReplay(String sessionToken, String matchId,
 			java.util.List<com.speedrunmcalt.match.ReplayRecorder.Sample> samples,
-			java.util.List<com.speedrunmcalt.match.ReplayRecorder.Event> events)
+			java.util.List<com.speedrunmcalt.match.ReplayRecorder.Event> events,
+			java.util.List<com.speedrunmcalt.match.EntityTracks.Row> tracks,
+			java.util.List<String> entityTypes)
 			throws IOException {
 		JsonArray packed = new JsonArray();
 		for (com.speedrunmcalt.match.ReplayRecorder.Sample s : samples) {
@@ -412,10 +438,34 @@ public final class BackendClient {
 			packedEvents.add(row);
 		}
 
+		// Everything else that was in the world. Type names are sent
+		// once in their own table and referenced by index: repeating
+		// "minecraft:zombified_piglin" on every row would cost more
+		// than the position it decorates.
+		JsonArray packedTypes = new JsonArray();
+		for (String name : entityTypes) {
+			packedTypes.add(name);
+		}
+		JsonArray packedTracks = new JsonArray();
+		for (com.speedrunmcalt.match.EntityTracks.Row r : tracks) {
+			JsonArray row = new JsonArray();
+			row.add(r.t);
+			row.add(r.id);
+			row.add(r.type);
+			row.add(r.dim);
+			row.add(Math.round(r.x * 10.0) / 10.0);
+			row.add(Math.round(r.y * 10.0) / 10.0);
+			row.add(Math.round(r.z * 10.0) / 10.0);
+			row.add(Math.round(r.yaw));
+			packedTracks.add(row);
+		}
+
 		JsonObject body = new JsonObject();
 		body.addProperty("matchId", matchId);
 		body.add("samples", packed);
 		body.add("events", packedEvents);
+		body.add("entityTypes", packedTypes);
+		body.add("entities", packedTracks);
 		post(API_BASE + "/matches/replay", body, sessionToken);
 	}
 

@@ -45,16 +45,55 @@ public final class ReplayData {
 		}
 	}
 
+	/**
+	 * One other entity, at one moment.
+	 *
+	 * Recorded rather than re-simulated because the replay world spawns
+	 * no mobs at all: SpawnHelper's player lookup excludes spectators,
+	 * and the viewer is one. See EntityTracks for the whole argument.
+	 */
+	public static final class EntityRow {
+		public final long t;
+		/** The recording client's network id - stable for one entity's life. */
+		public final int id;
+		/** Index into the track's typeNames. */
+		public final int type;
+		public final int dim;
+		public final double x;
+		public final double y;
+		public final double z;
+		public final float yaw;
+
+		public EntityRow(long t, int id, int type, int dim,
+				double x, double y, double z, float yaw) {
+			this.t = t;
+			this.id = id;
+			this.type = type;
+			this.dim = dim;
+			this.x = x;
+			this.y = y;
+			this.z = z;
+			this.yaw = yaw;
+		}
+	}
+
 	public static final class Track {
 		public final String username;
 		public final List<Sample> samples;
 		/** Empty for traces recorded before events existed. */
 		public final List<Event> events;
+		/** Entity type ids, referenced by index from entities. */
+		public final List<String> typeNames;
+		/** Empty for traces recorded before entity tracks existed. */
+		public final List<EntityRow> entities;
 
-		public Track(String username, List<Sample> samples, List<Event> events) {
+		public Track(String username, List<Sample> samples, List<Event> events,
+				List<String> typeNames, List<EntityRow> entities) {
 			this.username = username;
 			this.samples = samples;
 			this.events = events;
+			this.typeNames = typeNames;
+			this.entities = entities;
 		}
 	}
 
