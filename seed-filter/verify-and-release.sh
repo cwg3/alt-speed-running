@@ -102,6 +102,13 @@ wait_for_spot_slot() {
   done
 }
 
+# NETHER_CSV / ROUTE_CSV name a results file to join INSTEAD of launching.
+# A join bug does not invalidate the check's output, and re-running a
+# whole batch to re-test twenty lines of Python is a lot of compute for
+# nothing. Naming the file explicitly is not the hazard the stamp guard
+# below exists to stop - that one is about a stale file being picked up
+# SILENTLY - so this path says loudly which file it used.
+#
 # Only a file this launch produced may be joined. `ls -t <glob> | head -1`
 # picks the newest MATCHING file whether or not the launch wrote it, so a
 # refused launch silently re-joins an older run's verdicts and releases
@@ -156,12 +163,17 @@ if [ -n "$ONLY" ] && [ "$ONLY" != nether ]; then
 elif [ "$CLOUD" = 1 ]; then
   # held-pairs:  ow ns bx bz pairId type
   # netherlocate.txt wants: OW BX BZ NS
-  awk '{print $1, $3, $4, $2}' /tmp/held-pairs.txt > /tmp/cloud-nether.txt
-  wait_for_spot_slot || true
-  : > "$STAMP"
-  "$ROOT/cloud/run-on-spot.sh" nether /tmp/cloud-nether.txt "$WORKERS" "$ITYPE" || true
-  CLOUD_CSV=$(newest_since_launch 'nether-*.csv')
-  [ -z "$CLOUD_CSV" ] && echo "  !! nether produced no results this run" >&2
+  if [ -n "${NETHER_CSV:-}" ]; then
+    echo "  re-joining $NETHER_CSV without relaunching"
+    CLOUD_CSV="$NETHER_CSV"
+  else
+    awk '{print $1, $3, $4, $2}' /tmp/held-pairs.txt > /tmp/cloud-nether.txt
+    wait_for_spot_slot || true
+    : > "$STAMP"
+    "$ROOT/cloud/run-on-spot.sh" nether /tmp/cloud-nether.txt "$WORKERS" "$ITYPE" || true
+    CLOUD_CSV=$(newest_since_launch 'nether-*.csv')
+    [ -z "$CLOUD_CSV" ] && echo "  !! nether produced no results this run" >&2
+  fi
   python3 - "$CLOUD_CSV" <<'JOIN'
 import csv, pathlib, sys
 # Re-attach pairId and type, which the cloud row does not carry.
@@ -194,12 +206,17 @@ if [ -n "$ONLY" ] && [ "$ONLY" != route ]; then
 elif [ "$CLOUD" = 1 ]; then
   # held-routes is already the shape routecheck.txt wants, minus the
   # trailing pair id the hook ignores.
-  awk '{print $1, $2, $3, $4, $5, $6, $7}' /tmp/held-routes.txt > /tmp/cloud-route.txt
-  wait_for_spot_slot || true
-  : > "$STAMP"
-  "$ROOT/cloud/run-on-spot.sh" route /tmp/cloud-route.txt "$WORKERS" "$ITYPE" || true
-  CLOUD_CSV=$(newest_since_launch 'route-*.csv')
-  [ -z "$CLOUD_CSV" ] && echo "  !! route produced no results this run" >&2
+  if [ -n "${ROUTE_CSV:-}" ]; then
+    echo "  re-joining $ROUTE_CSV without relaunching"
+    CLOUD_CSV="$ROUTE_CSV"
+  else
+    awk '{print $1, $2, $3, $4, $5, $6, $7}' /tmp/held-routes.txt > /tmp/cloud-route.txt
+    wait_for_spot_slot || true
+    : > "$STAMP"
+    "$ROOT/cloud/run-on-spot.sh" route /tmp/cloud-route.txt "$WORKERS" "$ITYPE" || true
+    CLOUD_CSV=$(newest_since_launch 'route-*.csv')
+    [ -z "$CLOUD_CSV" ] && echo "  !! route produced no results this run" >&2
+  fi
   python3 - "$CLOUD_CSV" <<'JOIN'
 import csv, pathlib, sys, os
 byseed = {}
@@ -210,14 +227,30 @@ for line in pathlib.Path('/tmp/held-routes.txt').read_text().split('\n'):
 out = ['pairId,type,seed,lava,chests,verdict,detail,extra']
 src = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else None
 if src:
+    # A route row is TYPE-first - type,seed,lava,chests,verdict,detail,extra
+    # - while a nether row is SEED-first. Both joins tested field 0 for a
+    # seed, so this one rejected every row it was given: on 2026-09-25 the
+    # check ran clean, returned 188 PASS rows, and the join wrote an empty
+    # file. The release step then read them as inconclusive and, correctly,
+    # released nothing - which is the only reason a silent empty join did
+    # not cost anything.
+    #
+    # This is the same defect as the SEEDFIELD=2 fix in cloud/run-checks.sh:
+    # that one taught the DISPATCH where route keeps its seed, and this
+    # kept the old assumption. run-check.sh's header says it outright -
+    # THE SHAPES ARE NOT IDENTICAL - and it is worth believing.
     for r in csv.reader(open(src)):
-        if not r or not r[0].lstrip('-').isdigit():
+        if len(r) < 6 or not r[1].lstrip('-').isdigit():
             continue
-        pid, t = byseed.get(r[0], ('', ''))
-        out.append(','.join([pid, t] + r))
+        # r[0] is the type too, but the held table's is authoritative.
+        pid, t = byseed.get(r[1], ('', ''))
+        out.append(','.join([pid, t] + r[1:]))
 pathlib.Path(os.environ.get('ROOT', '.') + '/mod/run/routes-all.csv'
              ).write_text('\n'.join(out) + '\n')
 print(f'  {len(out)-1} rows -> mod/run/routes-all.csv')
+if src and len(out) == 1:
+    print('  !! the route CSV had rows but NONE joined - check the column '
+          'shape, not the check', file=sys.stderr)
 JOIN
 else
   "$ROOT/seed-filter/verify-routes.sh" /tmp/held-routes.txt 1
