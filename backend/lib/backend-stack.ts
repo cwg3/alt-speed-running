@@ -33,6 +33,18 @@ export class BackendStack extends cdk.Stack {
 		const playersTable = new Table(this, 'PlayersTable', {
 			partitionKey: { name: 'uuid', type: AttributeType.STRING },
 			billingMode: BillingMode.PAY_PER_REQUEST,
+			// Continuous backup, restorable to any second in the last 35
+			// days.
+			//
+			// A snapshot protects against losing the account. This
+			// protects against the likelier thing: a bad deploy or a
+			// stray script corrupting live data between snapshots, where
+			// the damage is only noticed later and the most recent
+			// snapshot is already hours old.
+			//
+			// Declared here rather than switched on in the console, so
+			// it survives a redeploy instead of being invisible drift.
+			pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
 		});
 
 		const sessionsTable = new Table(this, 'SessionsTable', {
@@ -71,6 +83,18 @@ export class BackendStack extends cdk.Stack {
 		const matchesTable = new Table(this, 'MatchesTable', {
 			partitionKey: { name: 'matchId', type: AttributeType.STRING },
 			billingMode: BillingMode.PAY_PER_REQUEST,
+			// Continuous backup, restorable to any second in the last 35
+			// days.
+			//
+			// A snapshot protects against losing the account. This
+			// protects against the likelier thing: a bad deploy or a
+			// stray script corrupting live data between snapshots, where
+			// the damage is only noticed later and the most recent
+			// snapshot is already hours old.
+			//
+			// Declared here rather than switched on in the console, so
+			// it survives a redeploy instead of being invisible drift.
+			pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
 		});
 
 		// One row per PLAYER per match, newest first.
@@ -89,6 +113,18 @@ export class BackendStack extends cdk.Stack {
 			// query time; the key itself is just the completion time.
 			sortKey: { name: 'completedAt', type: AttributeType.NUMBER },
 			billingMode: BillingMode.PAY_PER_REQUEST,
+			// Continuous backup, restorable to any second in the last 35
+			// days.
+			//
+			// A snapshot protects against losing the account. This
+			// protects against the likelier thing: a bad deploy or a
+			// stray script corrupting live data between snapshots, where
+			// the damage is only noticed later and the most recent
+			// snapshot is already hours old.
+			//
+			// Declared here rather than switched on in the console, so
+			// it survives a redeploy instead of being invisible drift.
+			pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
 		});
 
 		// Populated offline by scripts/loadSeedPool.ts from the Phase 1
@@ -100,6 +136,18 @@ export class BackendStack extends cdk.Stack {
 		const seedPoolTable = new Table(this, 'SeedPoolTable', {
 			partitionKey: { name: 'seedPairId', type: AttributeType.STRING },
 			billingMode: BillingMode.PAY_PER_REQUEST,
+			// Continuous backup, restorable to any second in the last 35
+			// days.
+			//
+			// A snapshot protects against losing the account. This
+			// protects against the likelier thing: a bad deploy or a
+			// stray script corrupting live data between snapshots, where
+			// the damage is only noticed later and the most recent
+			// snapshot is already hours old.
+			//
+			// Declared here rather than switched on in the console, so
+			// it survives a redeploy instead of being invisible drift.
+			pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
 		});
 
 		const queueJoinFn = new NodejsFunction(this, 'QueueJoinFunction', {
