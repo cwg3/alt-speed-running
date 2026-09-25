@@ -2,7 +2,7 @@
 # Runs a batch of seed checks in one container and writes one CSV row
 # per seed.
 #
-#   CHECK=spawn|ravine|nether|route|portalfilter
+#   CHECK=spawn|ravine|nether|route|portalfilter|village
 #   IN=/work/in.txt      one "seed [x] [z] [type]" per line
 #   OUT=/work/out.csv    one row per input line, appended
 #
@@ -21,7 +21,7 @@
 # thrown away because the caller tested only for a pass value.
 set -uo pipefail
 
-CHECK="${CHECK:?set CHECK to generate|spawn|ravine|nether|route|portalfilter}"
+CHECK="${CHECK:?set CHECK to generate|spawn|ravine|nether|route|portalfilter|village}"
 IN="${IN:?set IN to the input file}"
 OUT="${OUT:?set OUT to the output csv}"
 HEAP="${HEAP:-2G}"
@@ -57,6 +57,11 @@ case "$CHECK" in
 	nether)        INFILE=netherlocate.txt; CSV=netherlocate.csv ;;
 	route)         INFILE=routecheck.txt;   CSV=routecheck.csv   ;;
 	portalfilter)  INFILE=portalfilter.txt; CSV=portalfilter.csv ;;
+	# The blacksmith check. The hook that reads this has always been in
+	# the image - the jar ships with it - but the case was missing, so
+	# village was the one stage that had to run on somebody's laptop
+	# while everything around it ran here.
+	village)       INFILE=village.txt;      CSV=results.csv      ;;
 	*) echo "unknown CHECK '$CHECK'" >&2; exit 2 ;;
 esac
 
