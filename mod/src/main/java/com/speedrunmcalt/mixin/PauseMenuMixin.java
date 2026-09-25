@@ -50,9 +50,17 @@ public abstract class PauseMenuMixin extends Screen {
 		if (!MatchState.inMatch() || MatchState.replayMode) {
 			return;
 		}
-		// Below the vanilla buttons, clear of them. The pause menu's own
-		// rows run from height/4 + 24 downward in 24px steps.
-		this.addButton(new ButtonWidget(this.width / 2 - 102, this.height / 4 + 144, 204, 20,
+		// Below the vanilla buttons, clear of them, but never off the
+		// bottom. The pause menu's own rows run from height/4 + 24
+		// downward in 24px steps, and at height/4 + 144 ours ran past
+		// the edge of a short window - Bad seed was half drawn and
+		// unclickable, on a screen whose whole job is giving a player
+		// a way out.
+		//
+		// min() of the two: the natural position on a tall window, the
+		// bottom of the screen on a short one.
+		int forfeitY = Math.min(this.height / 4 + 144, this.height - 52);
+		this.addButton(new ButtonWidget(this.width / 2 - 102, forfeitY, 204, 20,
 				new LiteralText("Forfeit match"),
 				button -> this.client.openScreen(new ForfeitConfirmScreen((Screen) (Object) this))));
 
@@ -63,7 +71,7 @@ public abstract class PauseMenuMixin extends Screen {
 		String label = MatchState.opponentProposedBadSeed
 				? "Opponent says: bad seed - review"
 				: BadSeedVote.voted ? "Bad seed - waiting for opponent" : "Bad seed";
-		ButtonWidget badSeed = new ButtonWidget(this.width / 2 - 102, this.height / 4 + 168, 204, 20,
+		ButtonWidget badSeed = new ButtonWidget(this.width / 2 - 102, forfeitY + 24, 204, 20,
 				new LiteralText(label),
 				button -> this.client.openScreen(new BadSeedScreen((Screen) (Object) this,
 						MatchState.opponentProposedBadSeed)));
