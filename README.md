@@ -146,27 +146,26 @@ Clone with `--recurse-submodules`, or run
 
 ## Recommended settings
 
-**Brightness: set `gamma:5.0` in `options.txt`.**
+**Brightness: drag the slider to +500%.**
 
-Vanilla caps the brightness slider at 100% (`gamma:1.0`). Speedrun rules
-explicitly permit editing `options.txt` to `gamma:5.0` — 500% — and
-effectively every competitive player does, because dark underwater
-ravines and nether structures are otherwise very hard to read without
-burning time on torches.
+Vanilla caps brightness at 100% (`gamma:1.0`). Speedrun rules
+explicitly permit 500%, and effectively every competitive player runs
+it, because dark underwater ravines and nether structures are
+otherwise very hard to read.
 
-`alt` does not change lighting and does not set this for you: it is your
-config and your choice. But arriving on vanilla brightness puts you at a
-real disadvantage against anyone who knows to change it, so it is worth
-knowing that it is allowed rather than a grey area.
+`alt` unlocks the slider so you can just set it: Options → Video
+Settings → Brightness, drag to the right. It reads `+500%` at maximum.
 
-Fullbright resource packs, or mods that push past 5.0 or alter shadow
-rendering, are NOT permitted.
+Nothing is changed for you. The slider's ceiling is raised and that is
+all — `alt` does not touch lighting, shadow rendering, or your setting.
+Arriving on vanilla brightness is a real disadvantage against anyone
+who knows to change it, so it is worth knowing this is allowed rather
+than a grey area.
 
-Where the file lives:
+Fullbright resource packs, or anything pushing past 5.0 or altering
+shadow rendering, are NOT permitted.
 
-- macOS: `~/Library/Application Support/minecraft/options.txt`
-- Windows: `%appdata%\.minecraft\options.txt`
-- Linux: `~/.minecraft/options.txt`
-
-Minecraft rewrites this file when it exits, so edit it with the game
-closed or the change will be lost.
+Editing `options.txt` by hand does not work and never did: Minecraft
+clamps gamma back to 1.0 when it saves, so the change disappears the
+next time you quit. Raising the slider's own maximum is what makes the
+setting stick, which is why the mod does it that way.
