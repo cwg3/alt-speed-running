@@ -17,8 +17,20 @@ public final class MatchHud {
 	/** Cyan. Named for what it IS - see the note in Palette. */
 	private static final int ACCENT = com.speedrunmcalt.menu.Palette.CYAN;
 	private static final int DIM = com.speedrunmcalt.menu.Palette.DIM;
-	private static final int AHEAD = com.speedrunmcalt.menu.Palette.CYAN;
-	private static final int BEHIND = com.speedrunmcalt.menu.Palette.MAGENTA;
+	/**
+	 * Who won each split: green for the player who got there first,
+	 * red for the one who did not.
+	 *
+	 * Cyan and magenta before, which read as two brand colours rather
+	 * than as good and bad - and cyan now means a CLOCK everywhere
+	 * else, so a split time in cyan was saying the wrong thing twice.
+	 *
+	 * Green is the wordmark's colour and was reserved for it. That
+	 * rule loses here: won and lost is the one place on this HUD where
+	 * green and red mean something nobody has to be taught.
+	 */
+	private static final int AHEAD = com.speedrunmcalt.menu.Palette.PHOSPHOR;
+	private static final int BEHIND = com.speedrunmcalt.menu.Palette.ALERT;
 
 	private static final int X = 6;
 	private static final int Y = 6;

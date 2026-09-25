@@ -168,7 +168,11 @@ public class MatchDetailScreen extends Screen {
 					// Ahead is cyan, behind is magenta - the same pair
 					// the HUD and the end screen use for won and lost.
 					this.textRenderer.drawWithShadow(matrices, delta(dl),
-							x + 62, y, dl <= 0 ? Palette.CYAN : Palette.MAGENTA);
+							// Same green/red as the in-match HUD: a split
+							// delta is won or lost, and the two screens
+							// should not disagree about which colour
+							// says which.
+							x + 62, y, dl <= 0 ? Palette.PHOSPHOR : Palette.ALERT);
 				}
 			}
 			drawCenteredText(matrices, this.textRenderer,
