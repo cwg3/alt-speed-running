@@ -193,7 +193,7 @@ entity load has thrown off a real reading.
 
 **Shipwrecks are not checked for reachability.** Reported by a
 bad-seed vote — "shipwreck buried above ground - didn't see any
-chests" — on seed seed#ed30, structure 192,160.
+chests" — on seed#ed30, structure 192,160.
 
 All three chests existed and the normalisation correctly reported the
 wreck complete. They were at y62, y61 and y59, spread over sixteen
@@ -341,7 +341,7 @@ comes from the generator's noise, never the heightmap at the portal's
 own column: the heightmap counts the portal's obsidian and would call a
 fully buried portal above ground.
 
-**Confirmed in play 2026-09-22.** Seed seed#9796, the first
+**Confirmed in play 2026-09-22** on seed#9796, the first
 filtered ruined portal ever dealt: the player reported "the RP was
 good". Frame top y67 against terrain y64, two obsidian to place, chest
 present - and vanilla's own loot roll gave no igniter on that seed, so
@@ -606,7 +606,7 @@ restricted: Hard spreads fire faster when woodlighting a portal, and
 widens piglin aggro range for a bartering pit. Runners flip to Hard and
 straight back.
 
-**Shipwreck confirmed in play 2026-09-23**, on seed seed#e116 -
+**Shipwreck confirmed in play 2026-09-23**, on seed#e116 -
 the seed whose supply chest rolls TWO hunger points, the worst measured
 anywhere including eleven of the incumbent's. Player report: "loot &
 food = perfect, trees = perfect, magma ravine = perfect". That
@@ -931,7 +931,7 @@ underlying contention is unfixed.
 `seedtypes.c` samples biome ids every 16 blocks within 5 chunks of
 spawn and passes if any one of them is wooded. A biome is not a tree.
 
-Found in play 2026-09-22 on shipwreck seed seed#bf7f: spawn at
+Found in play 2026-09-22 on shipwreck seed#bf7f: spawn at
 -256,63,-23 in open ocean, 47,000 water blocks at spawn height, a
 jungle biome clipping the sample radius - and the only logs within 80
 blocks were the SHIPWRECK'S OWN HULL, 61 blocks out and 12 blocks under
