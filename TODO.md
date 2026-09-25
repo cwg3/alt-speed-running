@@ -4,14 +4,8 @@ Known outstanding work, roughly in the order it would matter.
 
 ## Operational
 
-- [ ] **`seed-filter/verify-and-release.sh` still says "tier 4" and
-  "tier 5".** Everything else now uses one vocabulary - the check names
-  `run-check.sh` dispatches - but this file was mid-run when the rename
-  happened and bash reads a script incrementally by byte offset, so
-  editing it would have corrupted the running job. Rename `tier 4` to
-  `nether` and `tier 5` to `route` in its header, its two `echo` banners
-  and the two `MISSING` detail strings once it is idle. Nothing parses
-  those strings; it is comments and progress output only.
+- [x] **`verify-and-release.sh` renamed too.** It was mid-run when the
+  rest of the rename happened, so it had to wait for the job to exit.
 
 - [ ] **Four cloud paths have never actually run.** Written tonight,
   logic-tested locally, but no instance has executed them:
