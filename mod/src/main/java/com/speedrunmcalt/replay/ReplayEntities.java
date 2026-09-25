@@ -164,7 +164,14 @@ public final class ReplayEntities {
 			}
 
 			Entity e = LIVE.get(r.id);
-			if (e == null || e.world != client.world) {
+			// e.removed matters as much as the world check. These are
+			// real client entities and they tick themselves: a dropped
+			// item ages out after five minutes and removes itself, and
+			// a stand-in that removed itself would stay in this map
+			// being driven invisibly for the rest of the replay - the
+			// items would quietly vanish from any run long enough to
+			// need reviewing.
+			if (e == null || e.removed || e.world != client.world) {
 				e = spawn(client, track, r);
 				if (e == null) {
 					continue;
