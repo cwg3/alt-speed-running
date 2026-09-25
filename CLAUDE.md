@@ -80,6 +80,10 @@ fifth.
   guard refuses and the check produces an empty CSV, not an error. Fixed
   in verify-and-release.sh once and left broken in run-check.sh, which is
   why the first unattended build did nothing. Default is now m7g.4xlarge.
+- **`gradlew build` does not install the mod.** The game loads from the
+  launcher's mods folder; a build only writes `mod/build/libs`. Use
+  `mod/install-local.sh`, and restart the game - a running client keeps
+  the jar it started with. "It built" is not "it is installed".
 - **Docs written during a problem outlive the fix.** The gravel stat,
   the F6 forfeit note and the "results are committed" line all survived
   the change that made them false.
