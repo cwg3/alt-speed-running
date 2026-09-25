@@ -1,0 +1,4 @@
+#!/bin/bash
+# Scans staged content. See tools/check-no-stats.sh for what and why.
+[ "${ALT_ALLOW_STATS:-0}" = 1 ] && exit 0
+exec "$(git rev-parse --show-toplevel)/tools/check-no-stats.sh" --staged

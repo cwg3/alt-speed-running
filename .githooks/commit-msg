@@ -1,0 +1,6 @@
+#!/bin/bash
+# Scans the commit MESSAGE. This is the hook that would have caught the
+# 2026-09-25 throughput leak: the figure was removed from the file and
+# written into the message instead, which is published just the same.
+[ "${ALT_ALLOW_STATS:-0}" = 1 ] && exit 0
+exec "$(git rev-parse --show-toplevel)/tools/check-no-stats.sh" --msg "$1"
