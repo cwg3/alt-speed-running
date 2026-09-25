@@ -73,6 +73,31 @@ def line_mask(text, size, gap=2):
     return rows[top:bot], width, bot - top, spans
 
 
+def thicken(rows, width, height):
+    """Widen every stroke by one base pixel, down and right.
+
+    "alt" is drawn at a much larger scale than the line beneath it, so
+    both have one-pixel strokes in the mask but nine and four pixels on
+    the card. The smaller line reads as spindly next to the mark, and
+    simply enlarging it would make it compete with the mark instead.
+
+    Dilating the mask thickens the strokes without changing the size,
+    which is the difference between a bolder wordmark and a bigger one.
+    Down and right only: a symmetric dilation grows the glyph in every
+    direction and closes the counters in "e" and "a".
+    """
+    out = [[False] * width for _ in range(height)]
+    for y in range(height):
+        for x in range(width):
+            if rows[y][x]:
+                out[y][x] = True
+                if x + 1 < width:
+                    out[y][x + 1] = True
+                if y + 1 < height:
+                    out[y + 1][x] = True
+    return out
+
+
 def paint(card, rows, width, height, x, y, scale, colours):
     """Draw a line at `scale`, nearest-neighbour, colour per x-range.
 
@@ -99,13 +124,14 @@ def main():
     rows, w, h, spans = line_mask("alt", 33)
     sc = 9
     mw, mh = w * sc, h * sc
-    ax, ay = (W - mw) // 2, 118
+    ax, ay = (W - mw) // 2, 134
     paint(card, rows, w, h, ax, ay, sc, [((0, w), G.PHOSPHOR)])
 
     # "speed-running" - one mask, three colours, so the hyphen sits on
     # the same baseline as the letters either side of it.
     text = "speed-running"
     rows, w, h, spans = line_mask(text, 33)
+    rows = thicken(rows, w, h)
     sc = 4
     cut = text.index("-")
     colours = [
@@ -118,14 +144,9 @@ def main():
     _, wh = paint(card, rows, w, h, wx, wy, sc, colours)
 
     # The line that says what it is, clear of the descender on "running".
-    # Short on purpose. The full sentence at a legible size ran the
-    # width of the card edge to edge, and GitHub prints the repository
-    # description directly beneath this image anyway - the card does
-    # not have to carry the whole pitch, only enough of it to be worth
-    # clicking.
-    rows, w, h, spans = line_mask("every deviation, published", 33)
-    sc = 2
-    paint(card, rows, w, h, (W - w * sc) // 2, wy + wh + 60, sc, [((0, w), DIM)])
+    # No slogan. GitHub prints the repository description directly
+    # beneath this image, so a tagline on the card says the same thing
+    # twice - and the mark carries better on its own.
 
     glow = card.filter(ImageFilter.GaussianBlur(G.BLOOM_TIGHT_RADIUS))
     card = Image.blend(card, glow, 0.35)
