@@ -58,6 +58,22 @@ public final class ReplayPlayback {
 	/** Spectator is set once, after the world finishes loading. */
 	private static volatile boolean prepared = false;
 
+	/**
+	 * The OTHER player, drawn as a figure in the world.
+	 *
+	 * Switching into somebody's eyes tells you where they were. Seeing
+	 * them move as a body tells you what they were doing - and lets you
+	 * fly around and watch them from outside, which is most of the
+	 * value of a replay over a split list.
+	 *
+	 * A client-side entity with no server behind it: it never ticks
+	 * itself, takes no damage and collides with nothing. Its position
+	 * is written from the trace every frame, the same way the camera
+	 * is.
+	 */
+	private static net.minecraft.client.network.OtherClientPlayerEntity ghost;
+	private static int ghostEntityId = -424242;
+
 	private ReplayPlayback() {
 	}
 
@@ -118,6 +134,10 @@ public final class ReplayPlayback {
 	}
 
 	public static void stop() {
+		if (ghost != null) {
+			ghost.remove();
+			ghost = null;
+		}
 		data = null;
 		watching = null;
 		MatchState.replayMode = false;
@@ -127,6 +147,12 @@ public final class ReplayPlayback {
 	public static void watch(String uuid) {
 		if (data != null && data.tracks.containsKey(uuid)) {
 			watching = uuid;
+			// The figure is whoever is NOT being watched, so switching
+			// perspective swaps which body is drawn.
+			if (ghost != null) {
+				ghost.remove();
+				ghost = null;
+			}
 		}
 	}
 
@@ -181,6 +207,7 @@ public final class ReplayPlayback {
 		if (s == null) {
 			return;
 		}
+		driveGhost(client, positionMillis);
 
 		net.minecraft.server.MinecraftServer server = client.getServer();
 		if (server == null) {
@@ -191,6 +218,7 @@ public final class ReplayPlayback {
 		// but the camera is the viewer's. Spectator flight is already
 		// active, so the whole implementation is to do nothing.
 		if (camera == Camera.FREE) {
+			driveGhost(client, positionMillis);
 			return;
 		}
 
@@ -235,6 +263,82 @@ public final class ReplayPlayback {
 		p.pitch = s.pitch;
 		p.prevYaw = s.yaw;
 		p.prevPitch = s.pitch;
+	}
+
+	/**
+	 * Draw the player we are NOT watching, at their own position.
+	 *
+	 * Runs whatever the camera mode is: in free-roam the whole point is
+	 * to fly around and watch them, so the figure must keep moving even
+	 * though the camera has stopped following anybody.
+	 */
+	private static void driveGhost(MinecraftClient client, long atMillis) {
+		if (data == null || client.world == null) {
+			return;
+		}
+		String otherUuid = null;
+		for (String uuid : data.tracks.keySet()) {
+			if (!uuid.equals(watching)) {
+				otherUuid = uuid;
+				break;
+			}
+		}
+		ReplayData.Track other = otherUuid == null ? null : data.tracks.get(otherUuid);
+		if (other == null || other.samples == null || other.samples.isEmpty()) {
+			return;
+		}
+		ReplayData.Sample s = sampleAt(other.samples, atMillis);
+		if (s == null) {
+			return;
+		}
+
+		// Only while they are in the same dimension as the camera.
+		// Otherwise they would be drawn at nether coordinates in the
+		// overworld - a figure standing in the sky, the same mistake
+		// the camera used to make.
+		int cameraDimension = dimensionOf(client);
+		if (s.dim != cameraDimension) {
+			if (ghost != null) {
+				ghost.remove();
+				ghost = null;
+			}
+			return;
+		}
+
+		if (ghost == null || ghost.world != client.world) {
+			com.mojang.authlib.GameProfile profile = new com.mojang.authlib.GameProfile(
+					java.util.UUID.nameUUIDFromBytes(("replay:" + other.username).getBytes()),
+					other.username);
+			ghost = new net.minecraft.client.network.OtherClientPlayerEntity(
+					client.world, profile);
+			client.world.addEntity(ghostEntityId, ghost);
+		}
+
+		ghost.updatePosition(s.x, s.y, s.z);
+		ghost.prevX = ghost.getX();
+		ghost.prevY = ghost.getY();
+		ghost.prevZ = ghost.getZ();
+		ghost.yaw = s.yaw;
+		ghost.headYaw = s.yaw;
+		ghost.prevYaw = s.yaw;
+		ghost.prevHeadYaw = s.yaw;
+		ghost.pitch = s.pitch;
+		ghost.prevPitch = s.pitch;
+	}
+
+	private static int dimensionOf(MinecraftClient client) {
+		if (client.world == null) {
+			return 0;
+		}
+		net.minecraft.util.registry.RegistryKey<net.minecraft.world.World> key =
+				client.world.getRegistryKey();
+		if (net.minecraft.world.World.NETHER.equals(key)) {
+			return 1;
+		}
+		if (net.minecraft.world.World.END.equals(key)) {
+			return 2;
+		}
+		return 0;
 	}
 
 	/**

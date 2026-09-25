@@ -26,6 +26,9 @@ public final class ReplayLauncher {
 	private static volatile String error;
 	private static volatile boolean loading;
 
+	/** Set by exit(), acted on by the next tick. */
+	private static volatile boolean exiting = false;
+
 	private ReplayLauncher() {
 	}
 
@@ -112,6 +115,19 @@ public final class ReplayLauncher {
 	}
 
 	private static void tick(MinecraftClient client) {
+		if (exiting) {
+			if (client.world != null) {
+				client.world.disconnect();
+				client.disconnect(new net.minecraft.client.gui.screen.SaveLevelScreen(
+						new net.minecraft.text.TranslatableText("menu.savingLevel")));
+				return;   // world gone next tick
+			}
+			exiting = false;
+			MatchState.reset();
+			client.openScreen(new TitleScreen());
+			return;
+		}
+
 		ReplayData data = pending;
 		if (data == null) {
 			return;
@@ -147,15 +163,21 @@ public final class ReplayLauncher {
 				data.overworldSeed, data.netherSeed);
 	}
 
-	/** Leaves a replay and returns to the title screen. */
+	/**
+	 * Leaves a replay. The work happens on the next TICK, not here.
+	 *
+	 * This is called from a button, and disconnect() ends in
+	 * `while (!server.isStopping()) render(false)` - a nested render
+	 * loop. Run straight from a button callback it never returned and
+	 * the client hung on "Saving world", which is the third time this
+	 * shape of bug has appeared in this codebase. A tick is the one
+	 * place disconnect behaves.
+	 */
 	public static void exit(MinecraftClient client) {
 		ReplayPlayback.stop();
-		MatchState.reset();
-		if (client.world != null) {
-			client.world.disconnect();
-			client.disconnect(new net.minecraft.client.gui.screen.SaveLevelScreen(
-					new net.minecraft.text.TranslatableText("menu.savingLevel")));
-		}
-		client.openScreen(new TitleScreen());
+		exiting = true;
+		// Close the timeline immediately so the click feels answered
+		// while the world unloads on the next tick.
+		client.openScreen(null);
 	}
 }
