@@ -13,7 +13,9 @@ Known outstanding work, roughly in the order it would matter.
 ## Before testers
 
 - [ ] **Repo visibility.** Private, so the draft GitHub release is not
-  downloadable by anyone invited.
+  downloadable by anyone invited. Nothing technical blocks publishing
+  any more — see *Kept out of the repository* below for what was
+  removed and why.
 - [ ] **Pool depth.** Thin types run out fast: a player never draws
   the same seed twice, so a type with four seeds lasts four matches
   and then silently drops out of their draw. Land types are cheap to
@@ -23,14 +25,40 @@ Known outstanding work, roughly in the order it would matter.
 
 ## Housekeeping
 
-- [ ] **Match worlds are never cleaned up.** Every match leaves ~40MB
-  on disk forever. Replay worlds got this treatment already
-  (`ReplayWorlds`); match worlds did not.
+- [x] **Match worlds are cleaned up.** `MatchWorlds` keeps the three
+  most recent plus the live one, trimming a few per match off the game
+  thread. The current match is always spared — a player who crashes
+  mid-run rejoins the SAME world and needs it intact. The shared
+  delete lives in `world/GeneratedWorlds`, used by both this and the
+  replay cleaner.
 - [x] **"Experimental settings" warning.** Documented in INSTALL.md
   rather than silenced — the warning is accurate, and a project that
   publishes every deviation should explain an accurate warning instead
   of suppressing it. Revisit only if testers report it as confusing
   despite the note.
+
+## Kept out of the repository
+
+Done, and recorded here so none of it gets quietly undone. The
+pipeline is public; its output is not.
+
+- [x] **The seed pool.** Purged from every commit. Publishing it would
+  let a player memorise the worlds they are about to be dealt, which
+  defeats the rule that nobody draws the same seed twice. Nine
+  drawable seeds had been quoted in the docs with their coordinates;
+  seeds now appear as tags like `seed#3fcb`.
+- [x] **Anti-cheat thresholds.** In `split-rules.local.json`, not the
+  repo. What is checked stays published; the numbers would hand anyone
+  faking a run the minimum that survives.
+- [x] **Filter yield rates.** Removed from SPEC, TODO and the scripts.
+  Together they said what a pool costs to build and which types are
+  expensive. The reasoning was kept, the numbers were not.
+- [x] **A reference to the naming scrub**, which pointed at the thing
+  the scrub existed to avoid drawing attention to.
+
+Deliberately still published: the vanilla probabilities in
+DEVIATIONS.md. Those are public Minecraft facts, and quoting them is
+the entire function of that file.
 
 ## Deferred by decision
 
