@@ -46,6 +46,13 @@ public final class MatchHud {
 			"dragon",
 	};
 
+	/** Vanilla's hotbar art, so the controls look like a hotbar. */
+	private static final net.minecraft.util.Identifier WIDGETS =
+			new net.minecraft.util.Identifier("textures/gui/widgets.png");
+
+	/** One hotbar slot, in the texture and on screen. */
+	private static final int SLOT = 20;
+
 	private MatchHud() {
 	}
 
@@ -225,48 +232,91 @@ public final class MatchHud {
 		return ("kill".equals(e.type) ? "killed " : "") + d;
 	}
 
+	/**
+	 * The replay controls, drawn as a hotbar.
+	 *
+	 * Spectator hides the real hotbar, so that strip of screen is free
+	 * and 1-9 mean nothing - which is why the controls live on the
+	 * number keys. Drawing them as a row of loose text left the
+	 * mapping implicit: the labels were there but nothing tied "3" to
+	 * the third thing along.
+	 *
+	 * A hotbar makes the mapping the picture. Slot one is key one, and
+	 * a player who has spent any time in Minecraft already knows that
+	 * without being told.
+	 *
+	 * Six slots, not nine. The bar texture is 182px of 9 slots at 20px
+	 * inside a 1px border, so the left 121px gives the border plus six
+	 * slots and the last column of the source supplies the right cap.
+	 * Stretching a 9-slot bar under 6 controls would leave three empty
+	 * boxes inviting keys 7, 8 and 9 to do something.
+	 */
 	private static void renderReplayControls(MatrixStack matrices, MinecraftClient client) {
 		String[] labels = com.speedrunmcalt.replay.ReplayKeys.LABELS;
+		int slots = labels.length;
 		int screenW = client.getWindow().getScaledWidth();
 		int screenH = client.getWindow().getScaledHeight();
 
-		// Measure first so the strip is centred as a whole rather than
-		// each slot being centred on its own.
-		int gap = 10;
-		int total = 0;
-		for (int i = 0; i < labels.length; i++) {
-			total += client.textRenderer.getWidth((i + 1) + " " + labels[i]) + gap;
-		}
-		int x = (screenW - total) / 2;
+		int barW = 1 + slots * SLOT + 1;
+		int x = (screenW - barW) / 2;
 		int y = screenH - 22;
 
-		for (int i = 0; i < labels.length; i++) {
-			String num = String.valueOf(i + 1);
-			String text = labels[i];
-			drawShadowed(matrices, client, num, x, y, com.speedrunmcalt.menu.Palette.YELLOW);
-			x += client.textRenderer.getWidth(num) + 2;
+		com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+		client.getTextureManager().bindTexture(WIDGETS);
+		// Left border plus the slots, then the source's own right
+		// border so the bar ends the way a hotbar ends.
+		net.minecraft.client.gui.DrawableHelper.drawTexture(
+				matrices, x, y, 0f, 0f, 1 + slots * SLOT, 22, 256, 256);
+		net.minecraft.client.gui.DrawableHelper.drawTexture(
+				matrices, x + 1 + slots * SLOT, y, 181f, 0f, 1, 22, 256, 256);
 
-			// The two that have a state worth showing say what it is
-			// rather than only what it does.
+		for (int i = 0; i < slots; i++) {
+			int slotX = x + 1 + i * SLOT;
+			String text = labels[i];
 			int colour = com.speedrunmcalt.menu.Palette.DIM;
-			if (i == 0 && com.speedrunmcalt.replay.ReplayPlayback.paused()) {
-				text = "paused";
-				colour = com.speedrunmcalt.menu.Palette.CYAN;
+
+			// The three with a state worth showing say what it IS, not
+			// only what the key does - a speed control that always
+			// reads "speed" cannot tell you that you are at 4x.
+			if (i == 0) {
+				boolean paused = com.speedrunmcalt.replay.ReplayPlayback.paused();
+				text = paused ? "||" : ">";
+				colour = paused ? com.speedrunmcalt.menu.Palette.CYAN
+						: com.speedrunmcalt.menu.Palette.PHOSPHOR;
+			} else if (i == 1) {
+				text = "-10";
+			} else if (i == 2) {
+				text = "+10";
 			} else if (i == 3) {
 				float sp = com.speedrunmcalt.replay.ReplayPlayback.speed();
 				text = (sp == (long) sp ? String.valueOf((long) sp) : String.valueOf(sp)) + "x";
-				if (sp != 1f) {
-					colour = com.speedrunmcalt.menu.Palette.CYAN;
-				}
-			} else if (i == 4
-					&& com.speedrunmcalt.replay.ReplayPlayback.camera()
-							== com.speedrunmcalt.replay.ReplayPlayback.Camera.FREE) {
-				text = "free";
-				colour = com.speedrunmcalt.menu.Palette.CYAN;
+				colour = sp != 1f ? com.speedrunmcalt.menu.Palette.CYAN
+						: com.speedrunmcalt.menu.Palette.DIM;
+			} else if (i == 4) {
+				boolean free = com.speedrunmcalt.replay.ReplayPlayback.camera()
+						== com.speedrunmcalt.replay.ReplayPlayback.Camera.FREE;
+				text = free ? "free" : "lock";
+				colour = free ? com.speedrunmcalt.menu.Palette.CYAN
+						: com.speedrunmcalt.menu.Palette.DIM;
+			} else if (i == 5) {
+				text = "swap";
 			}
-			drawShadowed(matrices, client, text, x, y, colour);
-			x += client.textRenderer.getWidth(text) + gap;
+
+			// Centred in the slot, and the key number just above the
+			// bar rather than crammed in beside it - two lines inside
+			// an 18px slot is a smaller thing to read, not a clearer
+			// one.
+			int tw = client.textRenderer.getWidth(text);
+			drawShadowed(matrices, client, text,
+					slotX + (SLOT - tw) / 2, y + 7, colour);
+
+			String num = String.valueOf(i + 1);
+			int nw = client.textRenderer.getWidth(num);
+			drawShadowed(matrices, client, num,
+					slotX + (SLOT - nw) / 2, y - 10,
+					com.speedrunmcalt.menu.Palette.YELLOW);
 		}
+		com.mojang.blaze3d.systems.RenderSystem.disableBlend();
 	}
 
 	private static void render(MatrixStack matrices, float tickDelta) {
