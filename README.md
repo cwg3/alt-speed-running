@@ -12,7 +12,7 @@ real play. Expect rough edges.
 
 ## Get started
 
-1. **Make sure you are invited.** Alpha testing is **invite-only**:
+1. **Make sure you are invited.** Pre-alpha testing is **invite-only**:
    logging in checks your Minecraft account against an allowlist.
    [Open an issue](../../issues/new) with the Minecraft username you
    want to play on, and ask for an invite.
