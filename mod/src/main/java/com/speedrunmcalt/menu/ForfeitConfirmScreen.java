@@ -20,7 +20,10 @@ public class ForfeitConfirmScreen extends Screen {
 	/** What the forfeit costs you: the consequence line. */
 	private static final int ALERT = Palette.YELLOW;
 	/** Irreversibility, which is the part worth hesitating over. */
-	private static final int FINAL = Palette.MAGENTA;
+	// Orange, the colour a forfeit carries everywhere else now - the
+	// history row, the match detail header. The screen that asks and
+	// the record that results should agree.
+	private static final int FINAL = Palette.ORANGE;
 
 	private final Screen parent;
 

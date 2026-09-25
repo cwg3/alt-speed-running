@@ -139,7 +139,9 @@ public class MatchDetailScreen extends Screen {
 				new int[] { Palette.DIM, Palette.YELLOW });
 		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, 28,
 				new String[] { d.seedType.replace('_', ' '), d.forfeited ? "   forfeited" : "" },
-				new int[] { Palette.PURPLE, Palette.MAGENTA });
+				// Orange for forfeited, the same orange the history
+				// screen uses for it.
+				new int[] { Palette.PURPLE, Palette.ORANGE });
 
 		// Two columns of times with the split name between them, which
 		// is what makes a row readable left-to-right as a comparison

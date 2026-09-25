@@ -18,8 +18,11 @@ public class MatchEndScreen extends Screen {
 	/** Cyan. Named for what it IS - see the note in Palette. */
 	private static final int ACCENT = com.speedrunmcalt.menu.Palette.CYAN;
 	private static final int DIM = com.speedrunmcalt.menu.Palette.DIM;
-	private static final int WIN = com.speedrunmcalt.menu.Palette.CYAN;
-	private static final int LOSS = com.speedrunmcalt.menu.Palette.MAGENTA;
+	// The same green and red as every other won/lost in the mod. Cyan
+	// and magenta read as two brand colours rather than as a result,
+	// and cyan now means a CLOCK everywhere else.
+	private static final int WIN = com.speedrunmcalt.menu.Palette.EMERALD;
+	private static final int LOSS = com.speedrunmcalt.menu.Palette.ALERT;
 
 	private final boolean won;
 	private final String opponent;

@@ -186,8 +186,14 @@ public class MatchHistoryScreen extends Screen {
 					&& e.forfeitedBy.equals(com.speedrunmcalt.menu.AltSession.uuid());
 			String verdict = e.won ? "WON" : (iQuit ? "FORFEIT" : "LOST");
 			this.textRenderer.drawWithShadow(matrices, verdict,
-					left, y, e.won ? Palette.CYAN
-							: (iQuit ? Palette.ALERT : Palette.MAGENTA));
+					// Won, lost, gave up - three outcomes, three
+					// colours. Forfeit gets ORANGE rather than the
+					// loss red: giving up and being beaten are
+					// different things and a player scanning their own
+					// history should not have to read the word to tell
+					// them apart.
+					left, y, e.won ? Palette.EMERALD
+							: (iQuit ? Palette.ORANGE : Palette.ALERT));
 			if (e.won && e.forfeitedBy != null) {
 				// Won because they quit, not because you were faster.
 				this.textRenderer.drawWithShadow(matrices, "ff",
@@ -203,7 +209,7 @@ public class MatchHistoryScreen extends Screen {
 
 			String ratingText = (e.ratingDelta >= 0 ? "+" : "") + e.ratingDelta;
 			this.textRenderer.drawWithShadow(matrices, ratingText,
-					left + 232, y, e.ratingDelta >= 0 ? Palette.CYAN : Palette.MAGENTA);
+					left + 232, y, e.ratingDelta >= 0 ? Palette.EMERALD : Palette.ALERT);
 
 			this.textRenderer.drawWithShadow(matrices, ago(e.completedAt),
 					left + 262, y, Palette.DIM);
