@@ -32,11 +32,31 @@ public final class ReplayPlayback {
 	private static long lastTickMillis = 0;
 
 	/**
-	 * Free look: the camera holds position but the viewer turns it.
+	 * Locked to the player, or flying free.
 	 *
-	 * Off by default, because the point is to see what the player saw.
+	 * LOCKED takes both position and view angle from the trace: what
+	 * the player actually saw, which is the point of the feature and
+	 * so the default.
+	 *
+	 * FREE drives nothing. The camera is already in spectator, so not
+	 * touching it IS free flight - ordinary movement keys, ordinary
+	 * mouse look, anywhere in the world. Useful for looking at terrain
+	 * or a structure on your own terms rather than through somebody
+	 * else's run.
+	 *
+	 * Playback keeps running either way: leaving the camera behind does
+	 * not stop the clock, and switching back to LOCKED snaps to
+	 * wherever the trace has got to.
 	 */
-	private static volatile boolean freeLook = false;
+	public enum Camera { LOCKED, FREE }
+
+	private static volatile Camera camera = Camera.LOCKED;
+
+	/** Which dimension the camera is currently IN, to spot a change. */
+	private static volatile int cameraDim = -1;
+
+	/** Spectator is set once, after the world finishes loading. */
+	private static volatile boolean prepared = false;
 
 	private ReplayPlayback() {
 	}
@@ -69,8 +89,8 @@ public final class ReplayPlayback {
 		return speed;
 	}
 
-	public static boolean freeLook() {
-		return freeLook;
+	public static Camera camera() {
+		return camera;
 	}
 
 	public static long durationMillis() {
@@ -91,7 +111,9 @@ public final class ReplayPlayback {
 		positionMillis = 0;
 		paused = false;
 		speed = 1.0f;
-		freeLook = false;
+		camera = Camera.LOCKED;
+		cameraDim = -1;
+		prepared = false;
 		lastTickMillis = System.currentTimeMillis();
 	}
 
@@ -112,8 +134,13 @@ public final class ReplayPlayback {
 		paused = !paused;
 	}
 
-	public static void toggleFreeLook() {
-		freeLook = !freeLook;
+	public static void toggleCamera() {
+		camera = camera == Camera.LOCKED ? Camera.FREE : Camera.LOCKED;
+		// Force a re-teleport on the next tick when locking back on:
+		// the viewer may have flown to another dimension entirely.
+		if (camera == Camera.LOCKED) {
+			cameraDim = -1;
+		}
 	}
 
 	public static void setSpeed(float s) {
@@ -155,16 +182,59 @@ public final class ReplayPlayback {
 			return;
 		}
 
+		net.minecraft.server.MinecraftServer server = client.getServer();
+		if (server == null) {
+			return;
+		}
+
+		// Free-roam: the clock still runs and the timeline still moves,
+		// but the camera is the viewer's. Spectator flight is already
+		// active, so the whole implementation is to do nothing.
+		if (camera == Camera.FREE) {
+			return;
+		}
+
+		// Spectator, once. Without it the camera collides with terrain,
+		// suffocates inside blocks and falls - a survival body being
+		// dragged along a path rather than a camera following it.
+		if (!prepared) {
+			prepared = true;
+			server.execute(() -> {
+				net.minecraft.server.network.ServerPlayerEntity sp =
+						server.getPlayerManager().getPlayer(client.player.getUuid());
+				if (sp != null) {
+					sp.setGameMode(net.minecraft.world.GameMode.SPECTATOR);
+				}
+			});
+		}
+
+		// A dimension change is a teleport between worlds, not a move.
+		// Following nether coordinates while still standing in the
+		// overworld puts the camera eight times too far out, drifting
+		// through empty sky - which is exactly what it did.
+		if (s.dim != cameraDim) {
+			cameraDim = s.dim;
+			final ReplayData.Sample at = s;
+			server.execute(() -> {
+				net.minecraft.server.network.ServerPlayerEntity sp =
+						server.getPlayerManager().getPlayer(client.player.getUuid());
+				net.minecraft.server.world.ServerWorld target =
+						server.getWorld(worldKeyFor(at.dim));
+				if (sp != null && target != null) {
+					sp.teleport(target, at.x, at.y, at.z, at.yaw, at.pitch);
+				}
+			});
+			return;   // let the teleport land before driving the camera
+		}
+
 		ClientPlayerEntity p = client.player;
 		// Interpolating between samples is what makes 10Hz look like
 		// motion rather than teleporting ten times a second.
 		p.updatePosition(s.x, s.y, s.z);
-		if (!freeLook) {
-			p.yaw = s.yaw;
-			p.pitch = s.pitch;
-			p.prevYaw = s.yaw;
-			p.prevPitch = s.pitch;
-		}
+		p.yaw = s.yaw;
+		p.pitch = s.pitch;
+		p.prevYaw = s.yaw;
+		p.prevPitch = s.pitch;
 	}
 
 	/**
@@ -205,6 +275,18 @@ public final class ReplayPlayback {
 				a.z + (b.z - a.z) * f,
 				(float) (a.yaw + shortestAngle(a.yaw, b.yaw) * f),
 				(float) (a.pitch + (b.pitch - a.pitch) * f));
+	}
+
+	/** The dimension index the trace stores, as a world key. */
+	private static net.minecraft.util.registry.RegistryKey<net.minecraft.world.World>
+			worldKeyFor(int dim) {
+		if (dim == 1) {
+			return net.minecraft.world.World.NETHER;
+		}
+		if (dim == 2) {
+			return net.minecraft.world.World.END;
+		}
+		return net.minecraft.world.World.OVERWORLD;
 	}
 
 	/** Turning from 350 to 10 degrees is 20 degrees, not -340. */

@@ -54,6 +54,18 @@ public class ReplayTimelineScreen extends Screen {
 		this.addButton(new ButtonWidget(cx - 48, row, 40, 20,
 				new LiteralText("+10s"), b -> ReplayPlayback.nudge(10_000)));
 
+		// Locked vs free-roam. Named for what you get, not for what it
+		// toggles.
+		this.addButton(new ButtonWidget(cx - 156, row - 24, 120, 20,
+				new LiteralText(ReplayPlayback.camera() == ReplayPlayback.Camera.LOCKED
+						? "Camera: locked" : "Camera: free"),
+				b -> {
+					ReplayPlayback.toggleCamera();
+					b.setMessage(new LiteralText(
+							ReplayPlayback.camera() == ReplayPlayback.Camera.LOCKED
+									? "Camera: locked" : "Camera: free"));
+				}));
+
 		this.addButton(new ButtonWidget(cx - 4, row, 60, 20,
 				new LiteralText(speedLabel()),
 				b -> {
