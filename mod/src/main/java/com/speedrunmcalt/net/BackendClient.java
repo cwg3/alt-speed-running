@@ -305,6 +305,46 @@ public final class BackendClient {
 				tracks);
 	}
 
+	/** One match's splits, both players, in route order. */
+	public static MatchDetail getMatchDetail(String sessionToken, String matchId)
+			throws IOException {
+		JsonObject resp = get(API_BASE + "/matches/" + matchId + "/detail", sessionToken);
+
+		java.util.List<MatchDetail.Player> players = new java.util.ArrayList<>();
+		for (com.google.gson.JsonElement el : resp.getAsJsonArray("players")) {
+			JsonObject p = el.getAsJsonObject();
+			players.add(new MatchDetail.Player(
+					p.get("uuid").getAsString(), str(p, "username", "player")));
+		}
+
+		java.util.List<MatchDetail.Row> rows = new java.util.ArrayList<>();
+		for (com.google.gson.JsonElement el : resp.getAsJsonArray("rows")) {
+			JsonObject r = el.getAsJsonObject();
+			java.util.Map<String, Long> times = new java.util.LinkedHashMap<>();
+			JsonObject t = r.getAsJsonObject("times");
+			for (java.util.Map.Entry<String, com.google.gson.JsonElement> e : t.entrySet()) {
+				times.put(e.getKey(), e.getValue().isJsonNull() ? null : e.getValue().getAsLong());
+			}
+			java.util.Map<String, Long> deltas = null;
+			if (r.has("deltas") && !r.get("deltas").isJsonNull()) {
+				deltas = new java.util.LinkedHashMap<>();
+				for (java.util.Map.Entry<String, com.google.gson.JsonElement> e
+						: r.getAsJsonObject("deltas").entrySet()) {
+					deltas.put(e.getKey(), e.getValue().getAsLong());
+				}
+			}
+			rows.add(new MatchDetail.Row(r.get("split").getAsString(), times, deltas));
+		}
+
+		return new MatchDetail(
+				resp.get("matchId").getAsString(), players,
+				resp.get("winnerUuid").isJsonNull() ? null : resp.get("winnerUuid").getAsString(),
+				str(resp, "seedType", "unknown"),
+				resp.has("forfeited") && !resp.get("forfeited").isJsonNull()
+						&& resp.get("forfeited").getAsBoolean(),
+				num(resp, "worldSetupVersion"), rows);
+	}
+
 	public static void forfeit(String sessionToken, String matchId) throws IOException {
 		JsonObject body = new JsonObject();
 		body.addProperty("matchId", matchId);

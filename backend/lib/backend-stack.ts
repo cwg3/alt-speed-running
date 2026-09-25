@@ -382,6 +382,26 @@ export class BackendStack extends cdk.Stack {
 			integration: new HttpLambdaIntegration('GetReplayIntegration', getReplayFn),
 		});
 
+		const matchDetailFn = new NodejsFunction(this, 'MatchDetailFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'matchDetail.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			timeout: cdk.Duration.seconds(10),
+			memorySize: 256,
+			environment: {
+				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				MATCHES_TABLE_NAME: matchesTable.tableName,
+			},
+		});
+		sessionsTable.grantReadData(matchDetailFn);
+		matchesTable.grantReadData(matchDetailFn);
+
+		api.addRoutes({
+			path: '/matches/{matchId}/detail',
+			methods: [HttpMethod.GET],
+			integration: new HttpLambdaIntegration('MatchDetailIntegration', matchDetailFn),
+		});
+
 		new cdk.CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
 		new cdk.CfnOutput(this, 'MatchHistoryTableName', { value: matchHistoryTable.tableName });
 		new cdk.CfnOutput(this, 'ReplayBucketName', { value: replayBucket.bucketName });

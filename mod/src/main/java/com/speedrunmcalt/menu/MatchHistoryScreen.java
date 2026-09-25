@@ -127,10 +127,12 @@ public class MatchHistoryScreen extends Screen {
 			int index = (int) ((mouseY - rowsTop) / ROW_HEIGHT);
 			if (index >= 0 && index < entries.size()
 					&& mouseX >= rowsLeft && mouseX <= rowsLeft + 300) {
+				// Detail first, replay from there. Deciding to watch
+				// follows from seeing where the time went, not the
+				// other way round - and a match with no replay still
+				// has splits worth reading.
 				MatchHistoryEntry e = entries.get(index);
-				com.speedrunmcalt.replay.ReplayLauncher.clearError();
-				com.speedrunmcalt.replay.ReplayLauncher.open(
-						this.client, e.matchId, AltSession.uuid());
+				this.client.openScreen(new MatchDetailScreen(this, e.matchId));
 				return true;
 			}
 		}
@@ -207,7 +209,7 @@ public class MatchHistoryScreen extends Screen {
 		String page = before == 0 ? "newest" : "older";
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText(page + (atEnd ? " - end of history" : "")
-						+ "   -   click a match to watch it"),
+						+ "   -   click a match for splits and replay"),
 				cx, this.height - 44, Palette.DIM);
 
 		super.render(matrices, mouseX, mouseY, delta);
