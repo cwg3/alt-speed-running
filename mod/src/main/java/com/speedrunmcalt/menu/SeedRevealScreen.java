@@ -84,7 +84,13 @@ public class SeedRevealScreen extends Screen {
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText("YOUR SEED"), cx, y, DIM);
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText(typeName(MatchState.seedType)), cx, y + 16, ACCENT);
+				// Purple, not cyan. The countdown on this same screen is
+				// cyan, so the seed type sat in the timer's colour and
+				// the two read as one kind of information. The match
+				// history screen already draws the type in purple -
+				// this makes the seed type one colour everywhere it
+				// appears, and leaves cyan meaning "clock".
+				new LiteralText(typeName(MatchState.seedType)), cx, y + 16, Palette.PURPLE);
 
 		// Who you are actually racing.
 		//
