@@ -848,9 +848,14 @@ times in a row before the draw was made random.
 `seedtypes` picks a random start seed on each run, so a rebuild
 produces a different, equally valid set - not the same seeds. The
 candidate JSON in `seed-filter/output/` is gitignored, so the exact
-seeds currently live exist only in DynamoDB. The `nether` check's
-results ARE committed, in `seed-filter/results/`. Commit that directory
-deliberately if a specific pool ever needs to be reproducible.
+seeds currently live exist only in DynamoDB. `seed-filter/results/` is
+gitignored too, and this said the opposite until 2026-09-25: the verdict
+CSVs were tracked before the seed purge, and the line describing them
+outlived the change that stopped it being true. They stay out, because a
+verdict row carries the seed it judged - publishing them would hand over
+the pool the purge existed to withhold. A specific pool can still be
+made reproducible by committing that directory deliberately; just know
+that doing so publishes its seeds.
 
 **Load held, verify, then release.** Every check up to the type checks
 verifies a SEED; `nether` and `route` verify a PAIR, and a pair does not
