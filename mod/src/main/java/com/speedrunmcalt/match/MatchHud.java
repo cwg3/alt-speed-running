@@ -507,23 +507,56 @@ public final class MatchHud {
 				continue; // neither player has reached this yet
 			}
 
-			String line = LABELS[i] + "  "
-					+ (mine == null ? "--:--" : MatchState.formatTime(mine))
-					+ "  /  "
-					+ (theirs == null ? "--:--" : MatchState.formatTime(theirs));
+			String label = LABELS[i];
+			String mineText = mine == null ? "--:--" : MatchState.formatTime(mine);
+			String theirsText = theirs == null ? "--:--" : MatchState.formatTime(theirs);
+			String sep = "  /  ";
 
-			int color = DIM;
+			// The TIMES carry won and lost; the label does not. A whole
+			// line in red said "you are behind" about the word "rod",
+			// which is not a thing that can be behind - and it made the
+			// two numbers, the only part that is actually a race, the
+			// least distinguishable thing on the row.
+			int mineColour;
+			int theirsColour;
 			if (mine != null && theirs != null) {
-				color = mine <= theirs ? AHEAD : BEHIND;
+				boolean iWon = mine <= theirs;
+				mineColour = iWon ? AHEAD : BEHIND;
+				theirsColour = iWon ? BEHIND : AHEAD;
 			} else if (mine != null) {
-				color = AHEAD;   // reached it first
+				// Reached it first by virtue of being the only one there.
+				mineColour = AHEAD;
+				theirsColour = DIM;
 			} else {
-				color = BEHIND;  // opponent got there first
+				mineColour = DIM;
+				theirsColour = AHEAD;
 			}
 
-			drawShadowed(matrices, client, line, X, y, color);
+			// One background for the row, then the pieces on top -
+			// drawShadowed fills behind each call, so four of them
+			// would stack four boxes with visible seams.
+			String whole = label + "  " + mineText + sep + theirsText;
+			DrawableHelper.fill(matrices, X - 2, y - 2,
+					X + client.textRenderer.getWidth(whole) + 2, y + 9, 0x70000000);
+
+			int lx = X;
+			lx = plain(matrices, client, label, lx, y, com.speedrunmcalt.menu.Palette.ORANGE);
+			lx = plain(matrices, client, "  ", lx, y, DIM);
+			lx = plain(matrices, client, mineText, lx, y, mineColour);
+			lx = plain(matrices, client, sep, lx, y, DIM);
+			plain(matrices, client, theirsText, lx, y, theirsColour);
 			y += LINE;
 		}
+	}
+
+	/**
+	 * One piece of a multi-coloured line, with no background of its
+	 * own. Returns where the next piece starts.
+	 */
+	private static int plain(MatrixStack matrices, MinecraftClient client,
+			String text, int x, int y, int color) {
+		client.textRenderer.drawWithShadow(matrices, text, x, y, color);
+		return x + client.textRenderer.getWidth(text);
 	}
 
 	private static void drawShadowed(MatrixStack matrices, MinecraftClient client,
