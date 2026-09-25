@@ -75,8 +75,10 @@ public final class ReplayPlayback {
 	 * is written from the trace every frame, the same way the camera
 	 * is.
 	 */
-	private static net.minecraft.client.network.OtherClientPlayerEntity ghost;
-	private static int ghostEntityId = -424242;
+	private static final java.util.Map<String,
+			net.minecraft.client.network.OtherClientPlayerEntity> ghosts =
+			new java.util.HashMap<>();
+	private static int nextGhostId = -424242;
 
 	private ReplayPlayback() {
 	}
@@ -143,10 +145,7 @@ public final class ReplayPlayback {
 			mc.options.perspective = savedPerspective;
 			perspectiveSaved = false;
 		}
-		if (ghost != null) {
-			ghost.remove();
-			ghost = null;
-		}
+		clearGhosts();
 		data = null;
 		watching = null;
 		MatchState.replayMode = false;
@@ -156,12 +155,9 @@ public final class ReplayPlayback {
 	public static void watch(String uuid) {
 		if (data != null && data.tracks.containsKey(uuid)) {
 			watching = uuid;
-			// The figure is whoever is NOT being watched, so switching
-			// perspective swaps which body is drawn.
-			if (ghost != null) {
-				ghost.remove();
-				ghost = null;
-			}
+			// Which bodies are drawn depends on who is watched, so
+			// rebuild them on the next tick.
+			clearGhosts();
 		}
 	}
 
@@ -187,8 +183,10 @@ public final class ReplayPlayback {
 
 	public static void toggleCamera() {
 		camera = camera == Camera.LOCKED ? Camera.FREE : Camera.LOCKED;
-		// Force a re-teleport on the next tick when locking back on:
-		// the viewer may have flown to another dimension entirely.
+		// Which bodies are drawn changes with the mode, and locking
+		// back on needs a re-teleport because the viewer may have flown
+		// to another dimension entirely.
+		clearGhosts();
 		if (camera == Camera.LOCKED) {
 			cameraDim = -1;
 		}
@@ -232,7 +230,7 @@ public final class ReplayPlayback {
 		if (s == null) {
 			return;
 		}
-		driveGhost(client, positionMillis);
+		driveGhosts(client, positionMillis);
 
 		net.minecraft.server.MinecraftServer server = client.getServer();
 		if (server == null) {
@@ -249,7 +247,7 @@ public final class ReplayPlayback {
 				client.options.perspective = savedPerspective;
 				perspectiveSaved = false;
 			}
-			driveGhost(client, positionMillis);
+			driveGhosts(client, positionMillis);
 			return;
 		}
 
@@ -322,58 +320,68 @@ public final class ReplayPlayback {
 	 * to fly around and watch them, so the figure must keep moving even
 	 * though the camera has stopped following anybody.
 	 */
-	private static void driveGhost(MinecraftClient client, long atMillis) {
+	private static void driveGhosts(MinecraftClient client, long atMillis) {
 		if (data == null || client.world == null) {
 			return;
 		}
-		String otherUuid = null;
-		for (String uuid : data.tracks.keySet()) {
-			if (!uuid.equals(watching)) {
-				otherUuid = uuid;
-				break;
-			}
-		}
-		ReplayData.Track other = otherUuid == null ? null : data.tracks.get(otherUuid);
-		if (other == null || other.samples == null || other.samples.isEmpty()) {
-			return;
-		}
-		ReplayData.Sample s = sampleAt(other.samples, atMillis);
-		if (s == null) {
-			return;
-		}
-
-		// Only while they are in the same dimension as the camera.
-		// Otherwise they would be drawn at nether coordinates in the
-		// overworld - a figure standing in the sky, the same mistake
-		// the camera used to make.
 		int cameraDimension = dimensionOf(client);
-		if (s.dim != cameraDimension) {
-			if (ghost != null) {
-				ghost.remove();
-				ghost = null;
+
+		for (java.util.Map.Entry<String, ReplayData.Track> e : data.tracks.entrySet()) {
+			String uuid = e.getKey();
+			ReplayData.Track track = e.getValue();
+
+			// Whose body to draw depends on where the camera is.
+			//
+			// LOCKED puts the camera inside somebody, so drawing their
+			// own body would put a head in front of the lens - only the
+			// other player is drawn.
+			//
+			// FREE puts the camera nowhere in particular, so BOTH are
+			// drawn. Flying out to watch two runners converge on a
+			// portal is the reason free-roam exists, and it does not
+			// work if one of them is invisible because you happened to
+			// be "watching" them.
+			boolean draw = camera == Camera.FREE || !uuid.equals(watching);
+			ReplayData.Sample s = (track.samples == null || track.samples.isEmpty())
+					? null : sampleAt(track.samples, atMillis);
+
+			if (!draw || s == null || s.dim != cameraDimension) {
+				net.minecraft.client.network.OtherClientPlayerEntity gone = ghosts.remove(uuid);
+				if (gone != null) {
+					gone.remove();
+				}
+				continue;
 			}
-			return;
-		}
 
-		if (ghost == null || ghost.world != client.world) {
-			com.mojang.authlib.GameProfile profile = new com.mojang.authlib.GameProfile(
-					java.util.UUID.nameUUIDFromBytes(("replay:" + other.username).getBytes()),
-					other.username);
-			ghost = new net.minecraft.client.network.OtherClientPlayerEntity(
-					client.world, profile);
-			client.world.addEntity(ghostEntityId, ghost);
-		}
+			net.minecraft.client.network.OtherClientPlayerEntity g = ghosts.get(uuid);
+			if (g == null || g.world != client.world) {
+				com.mojang.authlib.GameProfile profile = new com.mojang.authlib.GameProfile(
+						java.util.UUID.nameUUIDFromBytes(("replay:" + track.username).getBytes()),
+						track.username);
+				g = new net.minecraft.client.network.OtherClientPlayerEntity(
+						client.world, profile);
+				client.world.addEntity(nextGhostId--, g);
+				ghosts.put(uuid, g);
+			}
 
-		ghost.updatePosition(s.x, s.y, s.z);
-		ghost.prevX = ghost.getX();
-		ghost.prevY = ghost.getY();
-		ghost.prevZ = ghost.getZ();
-		ghost.yaw = s.yaw;
-		ghost.headYaw = s.yaw;
-		ghost.prevYaw = s.yaw;
-		ghost.prevHeadYaw = s.yaw;
-		ghost.pitch = s.pitch;
-		ghost.prevPitch = s.pitch;
+			g.updatePositionAndAngles(s.x, s.y, s.z, s.yaw, s.pitch);
+			g.prevX = s.x;
+			g.prevY = s.y;
+			g.prevZ = s.z;
+			g.yaw = s.yaw;
+			g.headYaw = s.yaw;
+			g.prevYaw = s.yaw;
+			g.prevHeadYaw = s.yaw;
+			g.pitch = s.pitch;
+			g.prevPitch = s.pitch;
+		}
+	}
+
+	private static void clearGhosts() {
+		for (net.minecraft.client.network.OtherClientPlayerEntity g : ghosts.values()) {
+			g.remove();
+		}
+		ghosts.clear();
 	}
 
 	private static int dimensionOf(MinecraftClient client) {
