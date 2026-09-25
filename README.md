@@ -121,9 +121,9 @@ be argued with.
 
 ## Known rough edges
 
-- Dying mid-run has no defined behaviour yet
-- Quitting to the title screen without pressing F6 leaves the match
-  unresolved
+- Quitting to the title screen without forfeiting leaves the match
+  pending until your opponent's client claims it or the abandonment
+  sweep voids it
 - If nobody else is queuing you will wait indefinitely, with only a
   timer for feedback
 - The seed pool is finite; matches fail with an error once it runs out
