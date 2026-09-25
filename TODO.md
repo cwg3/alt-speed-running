@@ -2,6 +2,14 @@
 
 Known outstanding work, roughly in the order it would matter.
 
+## Operational
+
+- [ ] **`backend/split-rules.local.json` is not in git.** It holds the
+  anti-cheat thresholds and is read at `cdk synth` time. Losing it does
+  not break a deploy - checking silently degrades to loose defaults and
+  `cdk synth` warns - so it fails quietly. Copy is in the backup bundle
+  under `secrets/`. Any new machine needs it before its first deploy.
+
 ## Before testers
 
 - [ ] **Repo visibility.** Private, so the draft GitHub release is not
