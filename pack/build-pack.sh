@@ -24,6 +24,16 @@ API_URL="https://cdn.modrinth.com/data/P7dR8mSH/versions/0.18.0%2Bbuild.387-1.16
 echo "=== building the mod ==="
 (cd "$ROOT/mod" && ./gradlew build -q)
 
+# A green build is not a loadable jar. Mixin targets resolve when the
+# target class loads, so a mixin naming a method that does not exist
+# builds, packs, and uploads, then kills the game at startup - which is
+# exactly how a broken ReplayPickupMixin reached a release. Launch the
+# thing before handing it to anybody.
+"$ROOT/mod/mixin-smoke.sh" || {
+  echo "refusing to package: the jar does not load" >&2
+  exit 1
+}
+
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/overrides/mods"
 
