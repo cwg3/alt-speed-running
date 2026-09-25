@@ -27,12 +27,20 @@ Known outstanding work, roughly in the order it would matter.
   near and practically unreachable; ruined portal loses most of its at
   the frame check. One multiplier cannot serve both, so the thin types
   stay thin and the next night tries again.
-- [ ] **Release assets go stale silently.** v0.1.0's jar was built
-  hours before it was published and predated the fountain ending — a
-  tester on it would have killed the dragon and waited forever for a
-  result the backend no longer sends. Rebuild and re-upload as part of
-  publishing, and check the packed jar actually contains the mixins
-  you expect rather than trusting that the build ran.
+- [ ] **Release assets go stale silently.** It has now happened twice:
+  v0.1.0's jar predated the fountain ending, and then predated the
+  leaderboard by a day. Both times the code was pushed and the download
+  was not. Rebuild and re-upload as part of publishing, and check the
+  packed jar actually contains the classes you expect rather than
+  trusting that the build ran — `pack/build-pack.sh` smoke-tests the jar
+  before packaging, which is the only reason this is a staleness problem
+  and not a broken-download one.
+
+- [ ] **Backups were run by hand and stopped happening.** The last one
+  predated the leaderboard, the ladder reset, the publish guard and the
+  whole top-up pipeline. `tools/backup.sh` now does it in one command —
+  tables, replays, the gitignored `*.local.json` files and the pack. Run
+  it after anything that changes the pool or the schema.
 - [ ] **`backend/split-rules.local.json` is not in git.** It holds the
   anti-cheat thresholds and is read at `cdk synth` time. Losing it does
   not break a deploy - checking silently degrades to loose defaults and
