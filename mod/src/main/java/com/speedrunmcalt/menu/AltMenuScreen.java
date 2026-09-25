@@ -81,21 +81,15 @@ public class AltMenuScreen extends Screen {
 		// Centring it on the string is what the geometry says and it
 		// reads as off by several pixels: "speed" is five characters
 		// against "running"'s seven, so the hyphen is well left of
-		// centre, and the eye lines "alt" up with the hyphen and sees
-		// the error. That was true when only those two were green and
-		// it is more true now that the whole wordmark is.
+		// centre, and since the hyphen and "alt" are both phosphor
+		// green the eye lines those two up and sees the error.
 		String[] wordmark = { "speed", "-", "running" };
 		drawCenteredText(matrices, this.textRenderer, new LiteralText("alt"),
 				Palette.segmentCenterX(this.textRenderer, cx, wordmark, 1),
 				top, Palette.PHOSPHOR);
 		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, top + 12,
 				wordmark,
-				// All one colour now. The three-part split existed to
-				// pick the hyphen out in green against purple; with the
-				// wordmark entirely phosphor there is nothing to pick
-				// out, and the segment layout is kept only because
-				// "alt" is positioned from it.
-				new int[] { Palette.PHOSPHOR, Palette.PHOSPHOR, Palette.PHOSPHOR });
+				new int[] { Palette.PURPLE, Palette.PHOSPHOR, Palette.PURPLE });
 
 		String status;
 		String detail = null;

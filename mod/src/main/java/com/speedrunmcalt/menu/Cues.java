@@ -131,6 +131,23 @@ public final class Cues {
 						"[speedrunmcalt] cue {} skipped - no sound manager", sound.getId());
 				return;
 			}
+			// Duck the background music first.
+			//
+			// Every cue here is a moment that matters - an opponent
+			// found, the seed revealed, a match won or lost - and all
+			// four were competing with whatever track happened to be
+			// playing. The beacon pair especially: they were chosen for
+			// being long and resonant, which is exactly what music
+			// masks.
+			//
+			// stop() adds 100 ticks to the next-song timer, so one call
+			// buys five seconds of silence - comfortably longer than
+			// the longest cue, defeat's beacon at 3.50s - and the music
+			// comes back on its own afterwards. Nothing to restore and
+			// nothing to leak if a cue never fires.
+			if (client.getMusicTracker() != null) {
+				client.getMusicTracker().stop();
+			}
 			client.getSoundManager().play(PositionedSoundInstance.master(sound, pitch, volume));
 			// Logged so "did it fire?" is answerable from the log rather
 			// than from whether someone heard it. A cue that silently
