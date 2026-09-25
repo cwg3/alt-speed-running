@@ -92,9 +92,9 @@ fi
 #
 # A piece name is not a chest: a taiga village satisfies "has a
 # weaponsmith piece" and can generate no smith chest whatever. SPEC.md
-# is the rule - blacksmith present, 3 iron in its chest (the golem
-# adds 4, for the 7 that enters the nether). Only 41% of jigsaw
-# passers survive it.
+# is the rule, and the half that belongs HERE is "blacksmith
+# present" - roughly 41% of jigsaw passers. The 3 iron in its chest
+# is guaranteed later by LootTopUp, so it is not a seed criterion.
 python3 - <<'PY'
 import json, pathlib
 d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
@@ -117,11 +117,17 @@ if bad:
     print(f'  ABORT: {len(bad)} of {len(rows)} village checks returned no verdict')
     print('  These are crashes, not failures. Fix the cause and re-run.')
     sys.exit(1)
-ok = {r[0] for r in rows if int(r[5]) >= 1 and int(r[1]) >= 3}
+# smithChests only. The 3-iron half of the SPEC line is a GUARANTEE
+# the mod provides, not a property to filter on: LootTopUp.VILLAGE is
+# (3, INGOTS), and it tops up a smithless village too. Filtering on it
+# as well rejected 12 of 17 perfectly good villages in a real sample -
+# a 70% cut in yield for a condition that is true by the time anyone
+# plays the seed.
+ok = {r[0] for r in rows if int(r[5]) >= 1}
 d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
 before = len(d.get('village', []))
 d['village'] = [v for v in d.get('village', []) if str(v['seed']) in ok]
-print(f'  village: {before} -> {len(d["village"])} with a smith holding 3+ iron')
+print(f'  village: {before} -> {len(d["village"])} with a real smith chest')
 json.dump(d, open('/tmp/onr/output/overworld_by_type.json','w'), indent=2)
 PY
 fi
