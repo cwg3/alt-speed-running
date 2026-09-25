@@ -147,7 +147,7 @@ def main():
     # Two passes. One left it thinner than the mark above it;
     # at double the base resolution each pass adds only half as
     # much weight on the card as it did at base 33.
-    rows = thicken(rows, w, h, passes=3)
+    rows = thicken(rows, w, h, passes=2)
     sc = 2
     cut = text.index("-")
     colours = [
