@@ -243,7 +243,8 @@ public final class MatchHud {
 	 *
 	 * A hotbar makes the mapping the picture. Slot one is key one, and
 	 * a player who has spent any time in Minecraft already knows that
-	 * without being told.
+	 * without being told - which is also why the slots carry no key
+	 * numbers.
 	 *
 	 * Six slots, not nine. The bar texture is 182px of 9 slots at 20px
 	 * inside a 1px border, so the left 121px gives the border plus six
@@ -302,19 +303,13 @@ public final class MatchHud {
 				text = "swap";
 			}
 
-			// Centred in the slot, and the key number just above the
-			// bar rather than crammed in beside it - two lines inside
-			// an 18px slot is a smaller thing to read, not a clearer
-			// one.
+			// No key numbers. The hotbar already says which key each
+			// slot is - that is what a hotbar means - and printing
+			// "1 2 3 4 5 6" above it labels something nobody needed
+			// labelled.
 			int tw = client.textRenderer.getWidth(text);
 			drawShadowed(matrices, client, text,
 					slotX + (SLOT - tw) / 2, y + 7, colour);
-
-			String num = String.valueOf(i + 1);
-			int nw = client.textRenderer.getWidth(num);
-			drawShadowed(matrices, client, num,
-					slotX + (SLOT - nw) / 2, y - 10,
-					com.speedrunmcalt.menu.Palette.YELLOW);
 		}
 		com.mojang.blaze3d.systems.RenderSystem.disableBlend();
 	}
