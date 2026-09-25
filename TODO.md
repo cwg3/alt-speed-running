@@ -45,11 +45,20 @@ Known outstanding work, roughly in the order it would matter.
   5 matches an hour once replays and downtime are counted, over a 4-5
   hour session. Call it 25 matches a day at full tilt.
 
-  A seed is consumed per PLAYER, not globally - both players in a
-  match mark it seen, but a different pair can still draw it - so the
-  requirement is about 25 new seeds a day for the whole ladder rather
-  than 25 per player. It scales sublinearly with player count as long
-  as matchmaking spreads people around.
+  A seed is consumed per PLAYER: both players in a match mark it seen,
+  and it is dead for both of them afterwards even though a different
+  pair can still draw it. So one seed covers two player-consumptions,
+  and the requirement is LINEAR in player count:
+
+      N players x 25 matches = 25N player-consumptions a day
+      each seed covers 2     -> 12.5 x N seeds a day
+
+      N=2 -> 25/day      N=4 -> 50/day      N=10 -> 125/day
+
+  25 per player is a safe upper bound - the real figure is half that,
+  because you and your opponent burn the same seed in the same match.
+  At two players the two numbers coincide, which is what made an
+  earlier 'it scales sublinearly' reading look correct.
 
   Against that, a 70-seed pool is about three days for one grinder.
 
