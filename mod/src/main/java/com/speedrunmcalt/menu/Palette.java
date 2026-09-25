@@ -59,6 +59,17 @@ public final class Palette {
 	 */
 	public static final int PHOSPHOR = 0x56FF42;
 
+	/**
+	 * Won a split. A DIFFERENT green from PHOSPHOR on purpose.
+	 *
+	 * Phosphor is the trademark - it belongs to the wordmark and to
+	 * "alt" on the HUD, and spending it on a split time would make the
+	 * brand colour mean "you are ahead" half the time. This one is
+	 * deeper and less electric: still unmistakably good news, still
+	 * obviously not the logo.
+	 */
+	public static final int EMERALD = 0x35C759;
+
 	/** Secondary text: present, but not competing with the palette. */
 	public static final int DIM = 0x6B7280;
 	/** Something went wrong. */

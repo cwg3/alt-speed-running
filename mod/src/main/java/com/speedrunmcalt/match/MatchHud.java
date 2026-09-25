@@ -25,11 +25,11 @@ public final class MatchHud {
 	 * than as good and bad - and cyan now means a CLOCK everywhere
 	 * else, so a split time in cyan was saying the wrong thing twice.
 	 *
-	 * Green is the wordmark's colour and was reserved for it. That
-	 * rule loses here: won and lost is the one place on this HUD where
-	 * green and red mean something nobody has to be taught.
+	 * EMERALD, not PHOSPHOR. Phosphor is the trademark green and
+	 * belongs to the wordmark; spending it here would make the brand
+	 * colour mean "you are ahead" half the time.
 	 */
-	private static final int AHEAD = com.speedrunmcalt.menu.Palette.PHOSPHOR;
+	private static final int AHEAD = com.speedrunmcalt.menu.Palette.EMERALD;
 	private static final int BEHIND = com.speedrunmcalt.menu.Palette.ALERT;
 
 	private static final int X = 6;

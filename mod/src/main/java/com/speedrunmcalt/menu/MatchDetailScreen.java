@@ -172,7 +172,7 @@ public class MatchDetailScreen extends Screen {
 							// delta is won or lost, and the two screens
 							// should not disagree about which colour
 							// says which.
-							x + 62, y, dl <= 0 ? Palette.PHOSPHOR : Palette.ALERT);
+							x + 62, y, dl <= 0 ? Palette.EMERALD : Palette.ALERT);
 				}
 			}
 			drawCenteredText(matrices, this.textRenderer,
