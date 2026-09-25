@@ -11,9 +11,9 @@ import net.minecraft.text.LiteralText;
 import java.util.List;
 
 /**
- * The ladder standings.
+ * The ladder leaderboard.
  *
- * A ladder with no visible standings is a rating nobody can see the
+ * A ladder with no visible leaderboard is a rating nobody can see the
  * point of. This is the answer to "am I getting better" and "who should
  * I be trying to beat", and neither is answerable from your own match
  * history alone.
@@ -39,7 +39,7 @@ public class LeaderboardScreen extends Screen {
 	private volatile boolean loading = true;
 
 	public LeaderboardScreen(Screen parent) {
-		super(new LiteralText("Standings"));
+		super(new LiteralText("Leaderboard"));
 		this.parent = parent;
 	}
 
@@ -88,7 +88,7 @@ public class LeaderboardScreen extends Screen {
 
 		matrices.push();
 		matrices.scale(1.5f, 1.5f, 1.0f);
-		drawCenteredText(matrices, this.textRenderer, new LiteralText("STANDINGS"),
+		drawCenteredText(matrices, this.textRenderer, new LiteralText("LEADERBOARD"),
 				(int) (cx / 1.5f), (int) (14 / 1.5f), Palette.PHOSPHOR);
 		matrices.pop();
 

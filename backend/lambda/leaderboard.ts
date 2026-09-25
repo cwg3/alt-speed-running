@@ -1,4 +1,4 @@
-// The ladder standings.
+// The ladder leaderboard.
 //
 //   GET /leaderboard?limit=50
 //
@@ -53,7 +53,7 @@ interface Row {
 export const handler = async (
 	event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyResultV2> => {
-	// Deliberately public: no session token required. The standings are
+	// Deliberately public: no session token required. The leaderboard is
 	// the most ordinary thing a ladder publishes, every field on them is
 	// already shown to both players after a match, and requiring a login
 	// to see who is winning would make the board useless to the people
@@ -138,6 +138,6 @@ export const handler = async (
 		};
 	} catch (err) {
 		console.error('[leaderboard] failed', err);
-		return { statusCode: 500, body: JSON.stringify({ error: 'could not read the standings' }) };
+		return { statusCode: 500, body: JSON.stringify({ error: 'could not read the leaderboard' }) };
 	}
 };

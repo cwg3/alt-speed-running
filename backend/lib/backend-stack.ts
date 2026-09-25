@@ -450,7 +450,7 @@ export class BackendStack extends cdk.Stack {
 			integration: new HttpLambdaIntegration('MatchHistoryIntegration', matchHistoryFn),
 		});
 
-		// The standings. No sessions table and no auth: the board is
+		// The leaderboard. No sessions table and no auth: the board is
 		// public on purpose, since requiring a login to see who is winning
 		// would hide it from exactly the people deciding whether to ask
 		// for an invite.

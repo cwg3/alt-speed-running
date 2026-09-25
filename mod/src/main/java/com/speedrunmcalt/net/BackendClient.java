@@ -262,7 +262,7 @@ public final class BackendClient {
 	}
 
 	/**
-	 * The ladder standings, best first.
+	 * The ladder leaderboard, best first.
 	 *
 	 * Takes no session token, because the endpoint takes none: the board
 	 * is public. That also means this works on the title screen before a

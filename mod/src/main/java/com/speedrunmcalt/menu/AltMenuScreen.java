@@ -33,7 +33,7 @@ public class AltMenuScreen extends Screen {
 				cx - 100, this.height / 2 + 14, 200, 20,
 				new LiteralText("..."), button -> onAction()));
 
-		// Matches and Standings share a row rather than stacking, so
+		// Matches and Leaderboard share a row rather than stacking, so
 		// adding the board did not push Back another 28px down and off a
 		// short window. Both are "look at results", so they read as a
 		// pair.
@@ -47,7 +47,7 @@ public class AltMenuScreen extends Screen {
 
 		this.addButton(new ButtonWidget(
 				cx + 2, this.height / 2 + 42, 98, 20,
-				new LiteralText("Standings"),
+				new LiteralText("Leaderboard"),
 				button -> this.client.openScreen(new LeaderboardScreen(this))));
 
 		this.addButton(new ButtonWidget(

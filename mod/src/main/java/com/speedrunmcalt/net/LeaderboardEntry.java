@@ -1,6 +1,6 @@
 package com.speedrunmcalt.net;
 
-/** One row of the ladder standings. */
+/** One row of the ladder leaderboard. */
 public class LeaderboardEntry {
 	public final int rank;
 	public final String uuid;
