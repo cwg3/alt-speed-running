@@ -304,11 +304,23 @@ public final class MatchHud {
 				// line simply disappears and nothing replaces it until
 				// the match world finishes loading.
 				//
-				// Yellow, like the MATCH FOUND title and the menu line:
-				// anything about a match being found is yellow.
-				line = "match found vs " + com.speedrunmcalt.menu.Matchmaker.opponent()
-						+ "  - loading world";
-				colour = com.speedrunmcalt.menu.Palette.YELLOW;
+				// Drawn in three pieces like the menu's version: the
+				// opponent's NAME in yellow, the sentence around it in
+				// purple. It is the one word being looked for.
+				int x = X + client.textRenderer.getWidth("alt  ");
+				drawShadowed(matrices, client, "alt", X, Y,
+						com.speedrunmcalt.menu.Palette.PHOSPHOR);
+				String lead = "match found vs ";
+				String name = com.speedrunmcalt.menu.Matchmaker.opponent();
+				drawShadowed(matrices, client, lead, x, Y,
+						com.speedrunmcalt.menu.Palette.PURPLE);
+				x += client.textRenderer.getWidth(lead);
+				drawShadowed(matrices, client, name, x, Y,
+						com.speedrunmcalt.menu.Palette.YELLOW);
+				x += client.textRenderer.getWidth(name);
+				drawShadowed(matrices, client, "  - loading world", x, Y,
+						com.speedrunmcalt.menu.Palette.PURPLE);
+				return;
 			}
 			if (line != null) {
 				drawShadowed(matrices, client, "alt", X, Y,

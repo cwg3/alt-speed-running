@@ -141,16 +141,20 @@ public class AltMenuScreen extends Screen {
 		if (AltSession.state() == AltSession.State.READY) {
 			String queue = null;
 			int queueColor = DIM;
+			// The opponent's NAME is the one thing on this line a
+			// player is actually looking for, so it gets yellow - the
+			// same yellow their own name carries above - and the
+			// sentence around it stays purple. All-yellow made the
+			// whole line read as one shout and the name disappeared
+			// into it.
+			String[] foundParts = null;
 			switch (Matchmaker.state()) {
 				case SEARCHING:
 					queue = "searching for opponent... " + Matchmaker.searchSeconds() + "s";
 					break;
 				case LAUNCHING:
-					queue = "match found vs " + Matchmaker.opponent() + " - loading world";
-					// Yellow, like the MATCH FOUND title and its vs line
-					// a moment earlier. Anything about a match being
-					// found is yellow; cyan is for ordinary status.
-					queueColor = Palette.YELLOW;
+					foundParts = new String[] {
+						"match found vs ", Matchmaker.opponent(), "  - loading world" };
 					break;
 				case ERROR:
 					queue = "error: " + Matchmaker.error();
@@ -159,7 +163,11 @@ public class AltMenuScreen extends Screen {
 				default:
 					break;
 			}
-			if (queue != null) {
+			if (foundParts != null) {
+				Palette.drawCenteredSegments(matrices, this.textRenderer, cx, top + 64,
+						foundParts,
+						new int[] { Palette.PURPLE, Palette.YELLOW, Palette.PURPLE });
+			} else if (queue != null) {
 				drawCenteredText(matrices, this.textRenderer, new LiteralText(fit(queue)), cx, top + 64, queueColor);
 			}
 		}
