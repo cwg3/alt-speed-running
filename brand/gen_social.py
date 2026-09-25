@@ -129,10 +129,21 @@ def main():
 
     # "speed-running" - one mask, three colours, so the hyphen sits on
     # the same baseline as the letters either side of it.
+    # Rendered at twice the base size and enlarged half as much.
+    #
+    # At 33 each curve in 'g' and 'r' is described by a handful of
+    # pixels, and enlarging that four times magnifies every jag -
+    # 'running' came out choppy. Doubling the base size doubles the
+    # resolution of the letterforms before anything is enlarged.
+    #
+    # The gap doubles with it. Letter spacing is measured in base
+    # pixels, so leaving it at 2 would halve the visual gap and pack
+    # the glyphs together - which, with the dilation below, is what
+    # made 'running' look squashed.
     text = "speed-running"
-    rows, w, h, spans = line_mask(text, 33)
+    rows, w, h, spans = line_mask(text, 66, gap=4)
     rows = thicken(rows, w, h)
-    sc = 4
+    sc = 2
     cut = text.index("-")
     colours = [
         ((spans[0][0], spans[cut - 1][1]), PURPLE),
