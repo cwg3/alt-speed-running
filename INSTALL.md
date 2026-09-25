@@ -94,6 +94,22 @@ learn.
 and we publish exactly how it differs. If you find behaviour that is
 not on that list, it is a bug and we want to know.
 
+**Note — "Worlds using Experimental Settings are not supported".**
+Minecraft shows this if you open an old match world from the
+Singleplayer list. It is expected and safe to click through.
+
+A match world gives the Nether its own seed, separate from the
+Overworld's, so both players get an identical Nether without either of
+them being able to infer it from the Overworld. That is a custom
+dimension setup, and Minecraft flags any world using one — it has no
+way to tell a deliberate one from an experimental snapshot feature.
+
+You will never see it during a match: the world is created and entered
+directly, so the prompt has nowhere to appear. It only shows up when
+you go back to a finished match world by hand. Nothing is wrong with
+the world, and the warning is technically accurate, which is why we
+have not silenced it.
+
 ## If Java crashes when you QUIT (macOS)
 
 You may see a crash dialog after closing the game, with
