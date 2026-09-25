@@ -133,18 +133,18 @@ public class MatchDetailScreen extends Screen {
 		// Header: who won, what it was, whether it was given up.
 		MatchDetail.Player winner = d.players.stream()
 				.filter(p -> p.uuid.equals(d.winnerUuid)).findFirst().orElse(null);
-		// The winner's NAME is the headline, so it is drawn like one:
-		// double size and emerald, the colour this mod already uses for
-		// winning a split. Yellow at body size made the one fact this
-		// screen exists to deliver look like another label.
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("winner"), cx, 10, Palette.DIM);
+		// WINNER is the headline: double size, emerald - the colour
+		// this mod already uses for winning. The name sits under it at
+		// body size in yellow, which is what a player name is
+		// everywhere else here.
 		matrices.push();
 		matrices.scale(2.0f, 2.0f, 1.0f);
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText(winner == null ? "-" : winner.username),
-				cx / 2, 21 / 2, Palette.EMERALD);
+				new LiteralText("WINNER"), cx / 2, 12 / 2, Palette.EMERALD);
 		matrices.pop();
+		drawCenteredText(matrices, this.textRenderer,
+				new LiteralText(winner == null ? "-" : winner.username),
+				cx, 28, Palette.YELLOW);
 
 		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, 42,
 				new String[] { d.seedType.replace('_', ' '), d.forfeited ? "   forfeited" : "" },
