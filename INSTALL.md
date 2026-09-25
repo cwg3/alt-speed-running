@@ -6,7 +6,9 @@ vanilla multiplayer server uses — we never see your password or access
 token.
 
 Testing is **invite-only** right now. If you have not been invited,
-login will refuse with a message saying so.
+login will refuse with a message saying so — so sort that out before
+installing anything: [open an issue](https://github.com/cwg3/alt-speed-running/issues/new)
+with the Minecraft username you want to play on.
 
 ## 1. Pick a launcher
 

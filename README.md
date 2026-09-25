@@ -8,22 +8,26 @@ kills the dragon first wins. Ratings move, seasons reset.
 **Status: pre-alpha.** It works end to end, but it has had very little
 real play. Expect rough edges.
 
-**Playing is invite-only.** Logging in checks your Minecraft account
-against an allowlist, so ask first — the client installs fine without
-an invite, but matchmaking will refuse you.
-
 ---
 
 ## Get started
 
-1. **[Download the latest release](../../releases/latest)** — take
+1. **Make sure you are invited.** Alpha testing is **invite-only**:
+   logging in checks your Minecraft account against an allowlist.
+   [Open an issue](../../issues/new) with the Minecraft username you
+   want to play on, and ask for an invite.
+
+   Do this first. The client installs fine without one and nothing
+   warns you — it is **matchmaking** that refuses you, so an uninvited
+   account gets all the way to Find Match before finding out.
+2. **[Download the latest release](../../releases/latest)** — take
    `alt-<version>.mrpack` for Prism, MultiMC, Modrinth App or ATLauncher;
    take the two `.jar` files if you use the official Minecraft
    launcher.
-2. **[Follow INSTALL.md](INSTALL.md)** for the exact steps, including
+3. **[Follow INSTALL.md](INSTALL.md)** for the exact steps, including
    which Fabric and Fabric API versions are required and why they are
    exact.
-3. **[Read DEVIATIONS.md](DEVIATIONS.md)** before you play. A match is
+4. **[Read DEVIATIONS.md](DEVIATIONS.md)** before you play. A match is
    not pure vanilla and every difference is published. Anything that
    differs and is not on that list is a bug worth reporting.
 
