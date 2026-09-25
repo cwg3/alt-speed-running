@@ -33,13 +33,22 @@ public class AltMenuScreen extends Screen {
 				cx - 100, this.height / 2 + 14, 200, 20,
 				new LiteralText("..."), button -> onAction()));
 
-		// Between Find Match and Back: it is the second thing a player
-		// wants from this screen, and the way into a replay once those
-		// exist.
+		// Matches and Standings share a row rather than stacking, so
+		// adding the board did not push Back another 28px down and off a
+		// short window. Both are "look at results", so they read as a
+		// pair.
+		//
+		// Between Find Match and Back: they are the second thing a player
+		// wants from this screen, and Matches is the way into a replay.
 		this.addButton(new ButtonWidget(
-				cx - 100, this.height / 2 + 42, 200, 20,
+				cx - 100, this.height / 2 + 42, 98, 20,
 				new LiteralText("Matches"),
 				button -> this.client.openScreen(new MatchHistoryScreen(this))));
+
+		this.addButton(new ButtonWidget(
+				cx + 2, this.height / 2 + 42, 98, 20,
+				new LiteralText("Standings"),
+				button -> this.client.openScreen(new LeaderboardScreen(this))));
 
 		this.addButton(new ButtonWidget(
 				cx - 100, this.height / 2 + 70, 200, 20,

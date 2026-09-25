@@ -261,6 +261,33 @@ public final class BackendClient {
 		return out;
 	}
 
+	/**
+	 * The ladder standings, best first.
+	 *
+	 * Takes no session token, because the endpoint takes none: the board
+	 * is public. That also means this works on the title screen before a
+	 * player has been verified, which is where someone deciding whether
+	 * to ask for an invite would look at it.
+	 */
+	public static java.util.List<LeaderboardEntry> leaderboard(int limit) throws IOException {
+		JsonObject resp = get(API_BASE + "/leaderboard?limit=" + limit, null);
+		java.util.List<LeaderboardEntry> out = new java.util.ArrayList<>();
+		for (com.google.gson.JsonElement el : resp.getAsJsonArray("rows")) {
+			JsonObject r = el.getAsJsonObject();
+			out.add(new LeaderboardEntry(
+					num(r, "rank"),
+					str(r, "uuid", ""),
+					str(r, "username", "?"),
+					num(r, "skillRating"),
+					num(r, "seasonPoints"),
+					num(r, "wins"),
+					num(r, "losses"),
+					num(r, "forfeits"),
+					num(r, "matches")));
+		}
+		return out;
+	}
+
 	/** Absent or null fields are normal on older rows; do not throw. */
 	private static String str(JsonObject o, String key, String fallback) {
 		return o.has(key) && !o.get(key).isJsonNull() ? o.get(key).getAsString() : fallback;

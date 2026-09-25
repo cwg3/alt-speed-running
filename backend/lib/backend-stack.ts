@@ -450,6 +450,29 @@ export class BackendStack extends cdk.Stack {
 			integration: new HttpLambdaIntegration('MatchHistoryIntegration', matchHistoryFn),
 		});
 
+		// The standings. No sessions table and no auth: the board is
+		// public on purpose, since requiring a login to see who is winning
+		// would hide it from exactly the people deciding whether to ask
+		// for an invite.
+		const leaderboardFn = new NodejsFunction(this, 'LeaderboardFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'leaderboard.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			timeout: cdk.Duration.seconds(15),
+			environment: {
+				PLAYERS_TABLE_NAME: playersTable.tableName,
+			},
+		});
+		// Read only. A board that could write to the players table would
+		// be the most attractive unauthenticated endpoint in the stack.
+		playersTable.grantReadData(leaderboardFn);
+
+		api.addRoutes({
+			path: '/leaderboard',
+			methods: [HttpMethod.GET],
+			integration: new HttpLambdaIntegration('LeaderboardIntegration', leaderboardFn),
+		});
+
 		const getReplayFn = new NodejsFunction(this, 'GetReplayFunction', {
 			entry: path.join(__dirname, '..', 'lambda', 'getReplay.ts'),
 			runtime: Runtime.NODEJS_24_X,

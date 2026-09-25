@@ -199,17 +199,33 @@ export async function applyMatchCompletion(
 		Math.round(SEASON_POINTS_BASE + (loser.skillRating - winner.skillRating) / 20),
 	);
 
+	// Record counts as well as rating. A leaderboard that shows only a
+	// rating cannot say whether 1229 came from two matches or two
+	// hundred, and the match history table is keyed per player, so
+	// counting from it would mean scanning every player's rows.
+	//
+	// ADD treats a missing attribute as 0, so rows written before these
+	// counters existed start at zero rather than failing the update.
+	//
+	// A forfeit is counted apart from a loss. The rating change is
+	// identical - the opponent still wins - but giving up on a bad seed
+	// and being beaten to the dragon are different things, and the match
+	// history screen already refuses to conflate them.
 	await ddb.send(new UpdateCommand({
 		TableName: playersTableName,
 		Key: { uuid: winner.uuid },
-		UpdateExpression: 'SET skillRating = skillRating + :delta, seasonPoints = seasonPoints + :points',
-		ExpressionAttributeValues: { ':delta': winnerDelta, ':points': seasonPoints },
+		UpdateExpression: 'SET skillRating = skillRating + :delta, seasonPoints = seasonPoints + :points '
+			+ 'ADD wins :one, matches :one',
+		ExpressionAttributeValues: { ':delta': winnerDelta, ':points': seasonPoints, ':one': 1 },
 	}));
 	await ddb.send(new UpdateCommand({
 		TableName: playersTableName,
 		Key: { uuid: loser.uuid },
-		UpdateExpression: 'SET skillRating = skillRating + :delta',
-		ExpressionAttributeValues: { ':delta': loserDelta },
+		UpdateExpression: 'SET skillRating = skillRating + :delta '
+			+ (forfeitedBy === loser.uuid
+				? 'ADD forfeits :one, matches :one'
+				: 'ADD losses :one, matches :one'),
+		ExpressionAttributeValues: { ':delta': loserDelta, ':one': 1 },
 	}));
 
 	// Keep the deltas on the match so a result screen can show what the
