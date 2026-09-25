@@ -1,6 +1,6 @@
 // Builds a plausible replay trace for the pace bot.
 //
-//   npx tsx scripts/synthTrace.ts <finishSeconds> [hz]
+//   npx tsx scripts/synthTrace.ts <finishSeconds> [hz] [startX] [startZ]
 //
 // Prints the packed sample rows on stdout for pace-bot.sh to upload.
 //
@@ -49,10 +49,18 @@ function dimensionAt(tSec: number, finish: number): number {
 function main() {
 	const finish = parseFloat(process.argv[2] ?? '240');
 	const hz = parseInt(process.argv[3] ?? '10', 10);
+	// Start near the match's own structure, not at the world origin.
+	//
+	// Starting at 0,0 put the bot's whole run hundreds of blocks from
+	// where the match actually happened - so in a replay its body was
+	// drawn correctly and was simply too far away to see. A synthetic
+	// opponent that runs somewhere else is not much of a test.
+	const startX = parseFloat(process.argv[4] ?? '0');
+	const startZ = parseFloat(process.argv[5] ?? '0');
 	const step = 1 / hz;
 
 	const rows: string[] = [];
-	let x = 0, z = 0, y = 64;
+	let x = startX, z = startZ, y = 64;
 	let heading = 0;
 	let prevDim = OVERWORLD;
 
@@ -69,6 +77,7 @@ function main() {
 			} else if (prevDim === NETHER) {
 				x = x * 8; z = z * 8; y = 64;
 			} else if (dim === END) {
+				// The end island is always around the origin.
 				x = 100; z = 0; y = 50;
 			}
 			prevDim = dim;

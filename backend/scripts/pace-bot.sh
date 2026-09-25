@@ -95,6 +95,12 @@ for _ in $(seq 1 60); do
   MATCHED=$(python3 -c "import json,sys;print(json.load(sys.stdin).get('matched',False))" <<<"$RESP" 2>/dev/null)
   if [ "$MATCHED" = "True" ]; then
     MATCH_ID=$(python3 -c "import json,sys;print(json.load(sys.stdin)['matchId'])" <<<"$RESP")
+    # Where the match's structure is, so the synthetic trace can run
+    # near it. Starting at the world origin put the bot's whole run
+    # hundreds of blocks from where the match happened - drawn
+    # faithfully in a replay, and far too far away to see.
+    STRUCT_X=$(python3 -c "import json,sys;print(json.load(sys.stdin).get('structureX',0))" <<<"$RESP")
+    STRUCT_Z=$(python3 -c "import json,sys;print(json.load(sys.stdin).get('structureZ',0))" <<<"$RESP")
     OPPONENT=$(python3 -c "import json,sys;print(json.load(sys.stdin)['opponent']['username'])" <<<"$RESP")
     break
   fi
@@ -161,7 +167,8 @@ done
 # a fixture that trips the anti-cheat would be useless for testing the
 # real upload path.
 if [ -n "${MATCH_ID:-}" ]; then
-  TRACE=$(npx tsx "$(dirname "$0")/synthTrace.ts" "$FINISH" 10 2>/dev/null)
+  TRACE=$(npx tsx "$(dirname "$0")/synthTrace.ts" "$FINISH" 10 \
+      "${STRUCT_X:-0}" "${STRUCT_Z:-0}" 2>/dev/null)
   if [ -n "$TRACE" ]; then
     BODY=$(printf '{"matchId":"%s","samples":%s}' "$MATCH_ID" "$TRACE")
     RESP=$(curl -s --globoff -X POST "$API/matches/replay" \
