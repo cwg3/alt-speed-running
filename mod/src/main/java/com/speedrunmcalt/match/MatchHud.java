@@ -58,6 +58,57 @@ public final class MatchHud {
 		HudRenderCallback.EVENT.register(MatchHud::render);
 	}
 
+	/**
+	 * Both clocks, top right, the one being watched highlighted.
+	 *
+	 * Top right rather than the match HUD's top left: it is a different
+	 * readout answering a different question, and putting it somewhere
+	 * else stops it being read as the live one.
+	 */
+	private static void renderReplay(MatrixStack matrices, MinecraftClient client) {
+		com.speedrunmcalt.net.ReplayData data = com.speedrunmcalt.replay.ReplayPlayback.data();
+		if (data == null) {
+			return;
+		}
+		long at = com.speedrunmcalt.replay.ReplayPlayback.positionMillis();
+		String watched = com.speedrunmcalt.replay.ReplayPlayback.watching();
+
+		int y = Y;
+		int right = client.getWindow().getScaledWidth() - X;
+		for (java.util.Map.Entry<String, com.speedrunmcalt.net.ReplayData.Track> e
+				: data.tracks.entrySet()) {
+			boolean isWatched = e.getKey().equals(watched);
+			com.speedrunmcalt.net.ReplayData.Track t = e.getValue();
+			// A track that ends before the current time has stopped -
+			// a forfeit, or a player who quit. Showing their last
+			// timestamp rather than the playhead says so.
+			long shown = at;
+			boolean ended = false;
+			if (t.samples != null && !t.samples.isEmpty()) {
+				long last = t.samples.get(t.samples.size() - 1).t;
+				if (at > last) {
+					shown = last;
+					ended = true;
+				}
+			} else {
+				ended = true;
+				shown = 0;
+			}
+
+			String line = t.username + "  " + MatchState.formatTime(shown) + (ended ? " *" : "");
+			int w = client.textRenderer.getWidth(line);
+			drawShadowed(matrices, client, line, right - w, y,
+					isWatched ? com.speedrunmcalt.menu.Palette.YELLOW
+							: com.speedrunmcalt.menu.Palette.DIM);
+			y += LINE;
+		}
+
+		String hint = "Esc for the timeline";
+		drawShadowed(matrices, client, hint,
+				right - client.textRenderer.getWidth(hint), y,
+				com.speedrunmcalt.menu.Palette.DIM);
+	}
+
 	private static void render(MatrixStack matrices, float tickDelta) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client == null || client.options.hudHidden || client.textRenderer == null) {
@@ -70,6 +121,14 @@ public final class MatchHud {
 		// away from. Without it there is no way to tell a live search
 		// from one that silently died, and no reminder that a match is
 		// coming.
+		// A replay gets its own readout: both players' clocks, because
+		// the question while watching is not "how long have I been
+		// going" but "where is the gap". The match HUD below would be
+		// answering the wrong question with the wrong numbers.
+		if (MatchState.replayMode && com.speedrunmcalt.replay.ReplayPlayback.active()) {
+			renderReplay(matrices, client);
+			return;
+		}
 		if (!MatchState.inMatch() || MatchState.replayMode) {
 			if (com.speedrunmcalt.menu.Matchmaker.state()
 					== com.speedrunmcalt.menu.Matchmaker.State.SEARCHING) {
