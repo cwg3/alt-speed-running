@@ -101,7 +101,25 @@ aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null || {
 }
 
 # --- role -------------------------------------------------------------
-aws iam get-role --role-name "$ROLE" >/dev/null 2>&1 || {
+# "I cannot see it" is not "it is not there". The check used to be
+# `get-role || create-role`, so an identity without iam:GetRole fell
+# straight through to CreateRole and failed with AccessDenied on the
+# CREATE - which reads as though the role were missing when it has
+# existed for days. The nightly runner hit exactly that, and the real
+# problem was one missing read permission.
+#
+# Creating a role is a SETUP step. A scheduled runner should not have
+# that power, so when it cannot confirm the role it must say which of the
+# two situations it is in and stop.
+_role_err=$(aws iam get-role --role-name "$ROLE" 2>&1 >/dev/null) || _role_missing=1
+if [ "${_role_missing:-0}" = 1 ] && ! printf '%s' "$_role_err" | grep -q NoSuchEntity; then
+  echo "ERROR: cannot verify IAM role $ROLE." >&2
+  printf '  %s\n' "$_role_err" >&2
+  echo "  The role probably exists and this identity lacks iam:GetRole on it." >&2
+  echo "  Creating roles is a setup step; run this once from an identity that can." >&2
+  exit 1
+fi
+[ "${_role_missing:-0}" = 1 ] && {
   echo "creating IAM role $ROLE"
   aws iam create-role --role-name "$ROLE" --assume-role-policy-document \
     '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null

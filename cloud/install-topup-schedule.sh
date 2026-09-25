@@ -52,6 +52,9 @@ RUNNER_POLICY=$(cat <<JSON
    "ec2:DescribeInstanceTypes","ec2:DescribeImages","ec2:CreateTags",
    "ec2:TerminateInstances"],"Resource":"*"},
  {"Effect":"Allow","Action":"iam:PassRole","Resource":"arn:aws:iam::${ACCT}:role/alt-*"},
+ {"Effect":"Allow","Action":["iam:GetRole","iam:GetInstanceProfile"],
+  "Resource":["arn:aws:iam::${ACCT}:role/alt-*",
+              "arn:aws:iam::${ACCT}:instance-profile/alt-*"]},
  {"Effect":"Allow","Action":["ecr:GetAuthorizationToken","ecr:BatchGetImage",
    "ecr:GetDownloadUrlForLayer","ecr:BatchCheckLayerAvailability"],"Resource":"*"}]}
 JSON
