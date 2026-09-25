@@ -281,26 +281,32 @@ public final class MatchHud {
 			// reads "speed" cannot tell you that you are at 4x.
 			if (i == 0) {
 				boolean paused = com.speedrunmcalt.replay.ReplayPlayback.paused();
-				text = paused ? "||" : ">";
-				colour = paused ? com.speedrunmcalt.menu.Palette.CYAN
-						: com.speedrunmcalt.menu.Palette.PHOSPHOR;
+				// U+2016, not U+23F8. The pause glyph was added in
+				// Unicode 7.0 and Minecraft's unicode font predates
+				// it, so it would draw as an empty box - which looks
+				// exactly like a bug in the control, not a missing
+				// character.
+				text = paused ? "\u25B6" : "\u2016";
+				colour = paused ? com.speedrunmcalt.menu.Palette.PHOSPHOR
+						: com.speedrunmcalt.menu.Palette.CYAN;
 			} else if (i == 1) {
-				text = "-10";
+				text = "\u25C0\u25C0";
 			} else if (i == 2) {
-				text = "+10";
+				text = "\u25B6\u25B6";
 			} else if (i == 3) {
 				float sp = com.speedrunmcalt.replay.ReplayPlayback.speed();
-				text = (sp == (long) sp ? String.valueOf((long) sp) : String.valueOf(sp)) + "x";
+				text = (sp == (long) sp ? String.valueOf((long) sp) : String.valueOf(sp))
+						+ "\u00D7";
 				colour = sp != 1f ? com.speedrunmcalt.menu.Palette.CYAN
 						: com.speedrunmcalt.menu.Palette.DIM;
 			} else if (i == 4) {
 				boolean free = com.speedrunmcalt.replay.ReplayPlayback.camera()
 						== com.speedrunmcalt.replay.ReplayPlayback.Camera.FREE;
-				text = free ? "free" : "lock";
+				text = free ? "\u25C7" : "\u25C6";
 				colour = free ? com.speedrunmcalt.menu.Palette.CYAN
 						: com.speedrunmcalt.menu.Palette.DIM;
 			} else if (i == 5) {
-				text = "swap";
+				text = "\u21C4";
 			}
 
 			// No key numbers. The hotbar already says which key each
