@@ -1,10 +1,9 @@
 package com.speedrunmcalt.mixin;
 
+import com.speedrunmcalt.match.PendingPickup;
 import com.speedrunmcalt.match.ReplayRecorder;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -18,30 +17,34 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * chest being emptied: the items arriving. "Three ender pearls at
  * 4:12" is the beat somebody rewinds to find.
  *
- * TWO HOOKS, and the reason is subtle enough that the first version
- * recorded nothing at all while appearing to work.
+ * TWO HOOKS, for a reason subtle enough that the first version
+ * recorded nothing while appearing to work. Vanilla's
+ * ItemEntity.onPlayerCollision does this, in this order:
  *
- * Vanilla ItemEntity.onPlayerCollision does this, in this order:
- *
- *     insertStack(stack)      // MUTATES stack, draining it to empty
+ *     insertStack(stack)           // MUTATES stack, draining it empty
  *     player.sendPickup(this, i)   // i is the ORIGINAL count
  *
  * So at sendPickup the entity's stack is already empty and its item is
- * AIR - which is why vanilla passes the count as a separate argument.
- * Reading the stack there and skipping empties, as the first version
- * did, skips every SUCCESSFUL pickup: a complete pickup is the empty
- * case. It ran for a whole match and produced eleven kills and zero
- * pickups on a run that crafted a pickaxe and a sword.
+ * AIR - which is exactly why vanilla passes the count separately.
+ * Reading the stack here and skipping empties skips every SUCCESSFUL
+ * pickup: a complete pickup IS the empty case. It ran a whole match
+ * and produced eleven kills and zero pickups on a run that crafted a
+ * pickaxe and a sword.
  *
- * So the item is read at HEAD of onPlayerCollision, while the stack
- * still has something in it, and the event is only emitted from
- * sendPickup - which vanilla calls only when the insert succeeded.
- * A pickup blocked by a full inventory records nothing, which is
- * right: it did not happen.
+ * So the name is read at HEAD of onPlayerCollision, while the stack
+ * still holds something, and the event is emitted from sendPickup,
+ * which vanilla calls only when the insert succeeded. A pickup blocked
+ * by a full inventory records nothing, which is right: it did not
+ * happen.
  *
- * The handoff is a plain static because both halves run on the server
- * thread inside one synchronous call, and it is keyed by entity id so
- * a stale value can never be attributed to the wrong item.
+ * The handoff lives in com.speedrunmcalt.match.PendingPickup, NOT in
+ * this package. Anything under com.speedrunmcalt.mixin.* is owned by
+ * speedrunmcalt.mixins.json; mixin merges those classes into their
+ * targets, so referencing one directly fails at class load. Parking
+ * the handoff here as a nested class took the game down with
+ * IllegalClassLoadError on the first block broken - and did it only
+ * then, because nothing loads the class until an item is collected.
+ * check-mixin-refs.sh now fails the build on that shape.
  */
 @Mixin(ServerPlayerEntity.class)
 public abstract class ReplayPickupMixin {
@@ -50,39 +53,10 @@ public abstract class ReplayPickupMixin {
 		if (!(item instanceof ItemEntity)) {
 			return;
 		}
-		String name = PickupNames.take(item.getEntityId());
+		String name = PendingPickup.take(item.getEntityId());
 		if (name == null) {
 			return;
 		}
 		ReplayRecorder.event("pickup", count + "x " + name);
-	}
-
-	/**
-	 * Remembers what an item entity held before the inventory drained
-	 * it. Not an inner class of the mixin: mixin classes are merged
-	 * into the target and are not a place to keep state.
-	 */
-	static final class PickupNames {
-		private static int pendingId = -1;
-		private static String pendingName = null;
-
-		private PickupNames() {
-		}
-
-		static void put(int entityId, String name) {
-			pendingId = entityId;
-			pendingName = name;
-		}
-
-		/** Reads once, and only for the entity it was stored against. */
-		static String take(int entityId) {
-			if (entityId != pendingId) {
-				return null;
-			}
-			String name = pendingName;
-			pendingId = -1;
-			pendingName = null;
-			return name;
-		}
 	}
 }

@@ -29,7 +29,7 @@ public abstract class ReplayPickupNameMixin {
 		if (stack.isEmpty()) {
 			return;
 		}
-		ReplayPickupMixin.PickupNames.put(self.getEntityId(),
+		com.speedrunmcalt.match.PendingPickup.put(self.getEntityId(),
 				stack.getItem().getTranslationKey());
 	}
 }
