@@ -29,6 +29,14 @@ echo "=== building the mod ==="
 # builds, packs, and uploads, then kills the game at startup - which is
 # exactly how a broken ReplayPickupMixin reached a release. Launch the
 # thing before handing it to anybody.
+# Static first: it is instant, and it catches a class the launch test
+# cannot reach. A mixin-package reference only fails when something
+# actually loads that class - the one that shipped did it on the first
+# block broken, long after any smoke test would have passed.
+"$ROOT/mod/check-mixin-refs.sh" || {
+  echo "refusing to package: a reference crosses into the mixin package" >&2
+  exit 1
+}
 "$ROOT/mod/mixin-smoke.sh" || {
   echo "refusing to package: the jar does not load" >&2
   exit 1
