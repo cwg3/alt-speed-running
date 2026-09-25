@@ -185,7 +185,50 @@ export async function claimSeedPair(
 		return { ok: false, reason: 'all_seen' };
 	}
 
-	for (const item of unseen) {
+	// Draw a TYPE first, then a seed inside it.
+	//
+	// The shuffle above is uniform over SEEDS, which makes a type's
+	// share of the draw its share of the pool. That is not a property
+	// anyone wants and it drifts every time the pool is rebuilt:
+	// filling a shipwreck shortage took shipwreck from 6 of 49 to 27
+	// of 70, so it went from the rarest opening at 12% to 39% of every
+	// draw, and a player got it three matches running.
+	//
+	// Picking the type first makes variety independent of depth. A
+	// type with four seeds and a type with thirty are equally likely
+	// until the four are used up, which is the whole point of having
+	// five types.
+	//
+	// Only types that still have something unseen for THIS pair are
+	// candidates, so a thin type degrades by dropping out of the draw
+	// rather than by returning nothing and stalling the queue - which
+	// is how a bias pinned to village once deadlocked matchmaking for
+	// four minutes.
+	const byType = new Map<string, typeof unseen>();
+	for (const i of unseen) {
+		const t = String(i.seedType ?? 'village');
+		const list = byType.get(t);
+		if (list) {
+			list.push(i);
+		} else {
+			byType.set(t, [i]);
+		}
+	}
+	const types = Array.from(byType.keys());
+	// Same crypto source as the shuffle: which type comes next is as
+	// competitively meaningful as which seed, and a predictable
+	// rotation would tell a player the opening before it is dealt.
+	for (let i = types.length - 1; i > 0; i--) {
+		const j = randomInt(i + 1);
+		[types[i], types[j]] = [types[j], types[i]];
+	}
+	// Types in random order, seeds already shuffled within each. The
+	// flattened list stays a full fallback order, so if every seed of
+	// the first type fails to claim the draw walks on instead of
+	// giving up.
+	const ordered = types.flatMap((t) => byType.get(t) ?? []);
+
+	for (const item of ordered) {
 		try {
 			// No conditional claim any more. Two concurrent matches
 			// drawing the same seed is now legal - it is only unfair if
