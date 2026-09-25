@@ -789,6 +789,51 @@ reviewed by the maintainers — never surfaced to players — via
 attached, and a cluster in one seed type points straight at that type's
 filter stage. A pool that silently shrinks teaches nothing.
 
+## Leaderboard
+
+`GET /leaderboard`, ranked by skill rating, with season points beside it.
+The two answer different questions - rating is how good you are, points
+are how much you played this season - and a board showing one without
+the other invites the wrong comparison.
+
+**Public, no session token.** Requiring a login to see who is winning
+hides the board from the people deciding whether to ask for an invite.
+The Lambda has read-only access to the players table; an unauthenticated
+endpoint that could write to it would be the most attractive thing in
+the stack.
+
+**Bots race but do not rank.** PaceBot exists so a solo player has an
+opponent. Its rating moves like anyone's, so left in it would hold a
+place on a ladder it is not competing on - and with few humans playing
+it could top it. The response says how many were hidden, and the screen
+prints that, because a board claiming to be everyone should not drop
+rows in silence.
+
+**Players with no finished match are omitted**, not listed last: that is
+an absence of a result rather than a result. Equal ratings share a rank
+and the next one skips, because calling one of two players on the same
+rating "second" asserts an order the rating does not support.
+
+**Wins, losses and forfeits are counters on the player row**, not
+derived. The match history table is keyed per player, so counting from
+it would mean scanning every player's rows. A forfeit is counted apart
+from a loss - identical rating change, different result - which is the
+same distinction the history screen makes.
+
+It is a Scan. The players table has no index that can read in rating
+order, and a GSI to sort a handful of rows would be machinery in place
+of arithmetic. That stops being true in the low thousands of players,
+and the fix then is a GSI on a constant partition key sorted by rating.
+
+**The ladder was reset on 2026-09-25**, before any tester saw it.
+Development had played a small number of real matches against the bot
+and generated many more to exercise the history screen, and the rating
+that came out of that measured nothing: it was moved by games nobody
+played, against an opponent that is not ranked. Ratings went back to
+1500, records to zero, and every history row was deleted. `splitStats`
+went with it - it is the anti-cheat baseline, and a baseline learned
+from synthetic runs would judge real ones against fiction.
+
 ## Pool
 
 ### The checks
@@ -819,18 +864,31 @@ Two steps in the pipeline are not checks and are not named like them:
 **load held** puts candidates in the table with `used=true` so nothing
 is drawable, and **release** clears the flag on whatever passed.
 
-**31 live seeds**, rebuilt 2026-09-22, with 11 quarantined:
+**284 drawable seeds**, rebuilt 2026-09-25, with 62 quarantined:
 
-| type | live | quarantined |
+| type | drawable | quarantined |
 |---|---|---|
-| village | 9 | 1 |
-| shipwreck | 8 | 2 |
-| desert temple | 6 | 3 |
-| ruined portal | 6 | 3 |
-| buried treasure | 2 | 2 |
+| desert temple | 100 | 28 |
+| buried treasure | 65 | 11 |
+| ruined portal | 49 | 4 |
+| village | 43 | 9 |
+| shipwreck | 27 | 10 |
 
-Buried treasure is short because far fewer candidates pass the
-two-magma-ravine check than shipwreck does.
+Shipwreck is now the thin type. Its spawns are the ones where a wooded
+biome can be technically near and practically unreachable - the only
+wood within range being the ship's own hull, which the `spawn` check
+refuses to count - so most candidates die there rather than at the
+ravine. Buried treasure was the starved type until 2026-09-25 and is no
+longer; its constraint is the two-magma-ravine rule, which is the
+expensive one to satisfy but not the one that empties a pool fastest.
+
+**Topping up is automatic, or meant to be.** `seed-filter/topup.sh`
+compares each type against a floor and builds only the shortfall,
+because replenishment is a RATE - a seed is consumed per player, so
+demand is linear in player count - while a fixed nightly quota pays for
+seeds whether or not anybody played. `cloud/topup-userdata.sh` runs that
+on an instance rather than a laptop, and `cloud/install-topup-schedule.sh`
+puts it on a nightly schedule.
 
 **`nether` and `route` rejected 7 of 23 freshly filtered pairs -
 30%.** Six

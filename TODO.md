@@ -7,14 +7,26 @@ Known outstanding work, roughly in the order it would matter.
 - [x] **`verify-and-release.sh` renamed too.** It was mid-run when the
   rest of the rename happened, so it had to wait for the job to exit.
 
-- [ ] **Four cloud paths have never actually run.** Written tonight,
-  logic-tested locally, but no instance has executed them:
-  `run-check.sh` CLOUD=1, `verify-and-release.sh` CLOUD=1,
-  `CHECK=village`, and the `CHECK=route` seed-field fix. The route bug
-  they were written alongside is exactly this shape - a second path
-  nobody exercises stays broken until someone uses it. The current
-  pool batch exercises all four; if it is abandoned, they are still
-  unproven.
+- [x] **The four cloud paths have now run**, and three were broken -
+  which was the whole worry. `run-check.sh` CLOUD=1 passed no instance
+  type, so every check silently refused to launch; the `route` join read
+  the wrong column and discarded all 188 rows it was given; and the role
+  check read "cannot see it" as "not there". All fixed, all exercised
+  against real batches.
+
+- [ ] **Install the nightly top-up schedule.** `topup.sh`,
+  `cloud/topup-userdata.sh` and `cloud/install-topup-schedule.sh` are
+  written and the runner has been driven by hand. The recurring schedule
+  is NOT installed - install it once a full unattended run has completed
+  end to end.
+
+- [ ] **Per-type candidate headroom.** `HEADROOM` is one number for
+  every type, and the types differ enormously in how many candidates
+  survive. A shipwreck batch loses most of its candidates at the `spawn`
+  check because ocean spawns are where a wooded biome is technically
+  near and practically unreachable; ruined portal loses most of its at
+  the frame check. One multiplier cannot serve both, so the thin types
+  stay thin and the next night tries again.
 - [ ] **Release assets go stale silently.** v0.1.0's jar was built
   hours before it was published and predated the fountain ending — a
   tester on it would have killed the dragon and waited forever for a
@@ -28,6 +40,21 @@ Known outstanding work, roughly in the order it would matter.
   under `secrets/`. Any new machine needs it before its first deploy.
 
 ## Shipped
+
+- [x] **Leaderboard.** `GET /leaderboard`, public, ranked by rating with
+  season points and a W-L-F record. Bots race but do not rank, and the
+  screen says how many were hidden rather than dropping rows silently.
+  Win/loss/forfeit counters live on the player row.
+
+- [x] **The ladder was reset** on 2026-09-25, before any tester saw it.
+  The old rating had been moved by matches nobody played, against an
+  opponent that is not ranked. Everyone starts at 1500 with an empty
+  history.
+
+- [x] **A guard against publishing pool statistics.**
+  `tools/check-no-stats.sh`, from both pre-commit and commit-msg. A
+  commit message is published as surely as a file is, which is how a
+  throughput figure reached GitHub after being scrubbed from the docs.
 
 - [x] **The repo is public** and **v0.1.0 is released** — the pack,
   the mod jar and Fabric API are downloadable. Login is still

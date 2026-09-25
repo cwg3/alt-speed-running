@@ -50,6 +50,11 @@ The rest of this file is what the project is and how it works.
    green means you are ahead, red means behind.
 6. First to kill the dragon wins. Ratings update automatically.
 
+**Leaderboard** on the alt menu shows where everyone stands — rating,
+season points and a win-loss-forfeit record. Everyone starts at 1500.
+PaceBot races but is not ranked, since a bot holding a place on a ladder
+it is not competing on would be meaningless.
+
 **Press F6 to forfeit** if you want out of a bad seed. It asks for
 confirmation first. Your opponent wins and your rating moves as it would
 for any loss, but the match is recorded and shown as a **forfeit**, not
