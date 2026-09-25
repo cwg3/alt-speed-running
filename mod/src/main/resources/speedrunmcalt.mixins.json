@@ -33,7 +33,8 @@
     "PauseMenuMixin",
     "LoadingScreenLogoMixin",
     "SpectatorSlotMixin",
-    "ReplaySkinMixin"
+    "ReplaySkinMixin",
+    "GammaLabelMixin"
   ],
   "injectors": {
     "defaultRequire": 1
