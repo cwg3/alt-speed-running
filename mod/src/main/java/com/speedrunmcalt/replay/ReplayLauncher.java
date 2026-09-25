@@ -173,7 +173,13 @@ public final class ReplayLauncher {
 		}
 
 		ReplayPlayback.begin(data, watch);
-		MatchWorldCreator.createMatchWorld(client, "replay-" + data.matchId,
+		// Before creating it. Minecraft opens an existing directory of
+		// that name rather than generating a new one, so without this a
+		// replay is frozen at whatever the mod did the first time it
+		// was watched - which is how a fixed nether redirect kept
+		// showing no bastion.
+		ReplayWorlds.clearFor(client, data.matchId);
+		MatchWorldCreator.createMatchWorld(client, ReplayWorlds.nameFor(data.matchId),
 				data.overworldSeed, data.netherSeed);
 	}
 
