@@ -517,6 +517,10 @@ public final class MatchHud {
 			// which is not a thing that can be behind - and it made the
 			// two numbers, the only part that is actually a race, the
 			// least distinguishable thing on the row.
+			//
+			// Labels are purple, the same purple as the seed type on
+			// the reveal screen: both name WHAT this is rather than how
+			// it went.
 			int mineColour;
 			int theirsColour;
 			if (mine != null && theirs != null) {
@@ -540,7 +544,7 @@ public final class MatchHud {
 					X + client.textRenderer.getWidth(whole) + 2, y + 9, 0x70000000);
 
 			int lx = X;
-			lx = plain(matrices, client, label, lx, y, com.speedrunmcalt.menu.Palette.ORANGE);
+			lx = plain(matrices, client, label, lx, y, com.speedrunmcalt.menu.Palette.PURPLE);
 			lx = plain(matrices, client, "  ", lx, y, DIM);
 			lx = plain(matrices, client, mineText, lx, y, mineColour);
 			lx = plain(matrices, client, sep, lx, y, DIM);
