@@ -21,12 +21,12 @@ import org.lwjgl.glfw.GLFW;
 public final class ReplayKeys {
 	/** What each slot does, in order. Rendered by MatchHud. */
 	public static final String[] LABELS = {
-		"play/pause", "-10s", "+10s", "speed", "camera", "switch",
+		"play/pause", "-10s", "+10s", "speed", "camera", "player 1", "player 2",
 	};
 
 	private static final int[] KEYS = {
 		GLFW.GLFW_KEY_1, GLFW.GLFW_KEY_2, GLFW.GLFW_KEY_3,
-		GLFW.GLFW_KEY_4, GLFW.GLFW_KEY_5, GLFW.GLFW_KEY_6,
+		GLFW.GLFW_KEY_4, GLFW.GLFW_KEY_5, GLFW.GLFW_KEY_6, GLFW.GLFW_KEY_7,
 	};
 
 	/** Edge detection: act on the press, not once per tick while held. */
@@ -75,8 +75,18 @@ public final class ReplayKeys {
 				ReplayPlayback.toggleCamera();
 				break;
 			case 5:
-				ReplayPlayback.watchOther();
+			case 6: {
+				// A slot each, rather than one key that swaps. With two
+				// players a toggle is the same number of presses, but
+				// it does not say who you are about to watch - and the
+				// slot does, because it has their face on it.
+				java.util.List<String> uuids = ReplayPlayback.trackUuids();
+				int which = slot - 5;
+				if (which < uuids.size()) {
+					ReplayPlayback.watch(uuids.get(which));
+				}
 				break;
+			}
 			default:
 				break;
 		}

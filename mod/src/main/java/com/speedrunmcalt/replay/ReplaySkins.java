@@ -29,6 +29,7 @@ import java.util.UUID;
 public final class ReplaySkins {
 	private static final Map<String, Identifier> LOADED = new HashMap<>();
 	private static final Map<String, String> MODELS = new HashMap<>();
+	private static final Map<String, Identifier> CAPES = new HashMap<>();
 	private static final Map<String, Boolean> REQUESTED = new HashMap<>();
 
 	private ReplaySkins() {
@@ -44,6 +45,7 @@ public final class ReplaySkins {
 		synchronized (LOADED) {
 			LOADED.clear();
 			MODELS.clear();
+			CAPES.clear();
 			REQUESTED.clear();
 		}
 	}
@@ -73,6 +75,13 @@ public final class ReplaySkins {
 		return DefaultSkinHelper.getTexture(parsed);
 	}
 
+	/** That player's cape, or null if they have none. */
+	public static Identifier capeFor(String uuid) {
+		synchronized (LOADED) {
+			return CAPES.get(uuid);
+		}
+	}
+
 	/** "default" or "slim", falling back to the uuid's usual answer. */
 	public static String modelFor(String uuid) {
 		synchronized (LOADED) {
@@ -94,6 +103,16 @@ public final class ReplaySkins {
 			client.getSkinProvider().loadSkin(
 					new GameProfile(parsed, username == null ? "player" : username),
 					(type, id, texture) -> {
+						if (type == com.mojang.authlib.minecraft.MinecraftProfileTexture.Type.CAPE
+								&& id != null) {
+							// Capes are rare and the people who have
+							// them notice. The model-parts bitmask
+							// already enables the cape layer, so this
+							// is the only piece that was missing.
+							synchronized (LOADED) {
+								CAPES.put(key, id);
+							}
+						}
 						if (type == com.mojang.authlib.minecraft.MinecraftProfileTexture.Type.SKIN
 								&& id != null) {
 							synchronized (LOADED) {

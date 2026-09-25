@@ -331,14 +331,50 @@ public final class MatchHud {
 							: net.minecraft.item.Items.COMPASS), iconX, iconY);
 					break;
 				}
-				default:
-					icon(client,
-							new net.minecraft.item.ItemStack(net.minecraft.item.Items.PLAYER_HEAD),
-							iconX, iconY);
+				default: {
+					// Slots 6 and 7 are the two players, with their own
+					// faces on them. A single "switch" key is the same
+					// number of presses but never says who you are
+					// about to watch; a face does.
+					java.util.List<String> uuids =
+							com.speedrunmcalt.replay.ReplayPlayback.trackUuids();
+					int which = i - 5;
+					if (which < uuids.size()) {
+						String uuid = uuids.get(which);
+						head(matrices, client, uuid, iconX, iconY);
+						// The one being watched gets the hotbar's own
+						// selection frame, which is what that frame
+						// already means everywhere else in the game.
+						if (uuid.equals(com.speedrunmcalt.replay.ReplayPlayback.watching())) {
+							client.getTextureManager().bindTexture(WIDGETS);
+							net.minecraft.client.gui.DrawableHelper.drawTexture(
+									matrices, slotX - 1, y - 1, 0f, 22f, 24, 24, 256, 256);
+						}
+					}
 					break;
+				}
 			}
 		}
 		com.mojang.blaze3d.systems.RenderSystem.disableBlend();
+	}
+
+	/**
+	 * A player's face, from their actual skin.
+	 *
+	 * Both layers, in the order the game draws them: the head at
+	 * (8,8) and the hat overlay at (40,8) of a 64x64 skin. Skipping
+	 * the overlay is how a hooded skin ends up bare-headed - the same
+	 * mistake the ghost bodies were making.
+	 */
+	private static void head(MatrixStack matrices, MinecraftClient client, String uuid,
+			int x, int y) {
+		net.minecraft.util.Identifier skin = com.speedrunmcalt.replay.ReplaySkins.forPlayer(
+				uuid, com.speedrunmcalt.replay.ReplayPlayback.usernameFor(uuid));
+		client.getTextureManager().bindTexture(skin);
+		net.minecraft.client.gui.DrawableHelper.drawTexture(
+				matrices, x, y, 16, 16, 8f, 8f, 8, 8, 64, 64);
+		net.minecraft.client.gui.DrawableHelper.drawTexture(
+				matrices, x, y, 16, 16, 40f, 8f, 8, 8, 64, 64);
 	}
 
 	private static void icon(MinecraftClient client, net.minecraft.item.ItemStack stack,

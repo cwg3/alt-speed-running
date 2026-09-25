@@ -126,6 +126,21 @@ public final class ReplayPlayback {
 		return t == null ? null : t.username;
 	}
 
+	/**
+	 * The two players, in a stable order.
+	 *
+	 * Stable matters: these are hotbar slots 6 and 7, and a control
+	 * that swaps which player it selects between frames is worse than
+	 * no control. LinkedHashMap ordering comes from the payload, which
+	 * is the same for both viewers.
+	 */
+	public static java.util.List<String> trackUuids() {
+		if (data == null) {
+			return java.util.Collections.emptyList();
+		}
+		return new java.util.ArrayList<>(data.tracks.keySet());
+	}
+
 	public static String watching() {
 		return watching;
 	}
@@ -413,6 +428,23 @@ public final class ReplayPlayback {
 						track.username);
 				g = new net.minecraft.client.network.OtherClientPlayerEntity(
 						client.world, profile);
+				// Turn every skin overlay on.
+				//
+				// PLAYER_MODEL_PARTS is a bitmask of which outer layers
+				// to draw - hat, jacket, sleeves, trouser legs, cape -
+				// and a client-spawned body starts at zero, meaning
+				// none. The ghost wore the base layer of its skin and
+				// nothing else, so anything on the outer layer was
+				// missing: a hood, a jacket, red boxing gloves.
+				//
+				// 0x7F is all seven. A replay cannot know which parts
+				// the player had switched off in their own options, and
+				// showing all of them is much closer to right than
+				// showing none.
+				g.getDataTracker().set(
+						com.speedrunmcalt.mixin.PlayerModelPartsAccessor
+								.speedrunmcalt$modelParts(),
+						(byte) 0x7F);
 				client.world.addEntity(nextGhostId--, g);
 				ghosts.put(uuid, g);
 			}

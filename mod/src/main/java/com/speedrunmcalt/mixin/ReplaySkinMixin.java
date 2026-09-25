@@ -37,6 +37,19 @@ public abstract class ReplaySkinMixin {
 				uuid, com.speedrunmcalt.replay.ReplayPlayback.usernameFor(uuid)));
 	}
 
+	@Inject(method = "getCapeTexture", at = @At("HEAD"), cancellable = true)
+	private void speedrunmcalt$ghostCape(CallbackInfoReturnable<Identifier> cir) {
+		String uuid = com.speedrunmcalt.replay.ReplayPlayback.ghostUuid(
+				(AbstractClientPlayerEntity) (Object) this);
+		if (uuid == null) {
+			return;
+		}
+		// Null is a valid answer - most players have no cape - and
+		// returning it is still better than vanilla's, which cannot
+		// find a tab list entry and so says null for everyone.
+		cir.setReturnValue(com.speedrunmcalt.replay.ReplaySkins.capeFor(uuid));
+	}
+
 	@Inject(method = "getModel", at = @At("HEAD"), cancellable = true)
 	private void speedrunmcalt$ghostModel(CallbackInfoReturnable<String> cir) {
 		String uuid = com.speedrunmcalt.replay.ReplayPlayback.ghostUuid(
