@@ -122,47 +122,25 @@ def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "."
     card = Image.new("RGB", (W, H), G.SCREEN_BG)
 
-    # "alt" - the mark.
+    # Just the mark, as large as the card will carry.
+    #
+    # GitHub prints the repository name and description directly
+    # beneath this image, so the card does not have to say what the
+    # project is called or what it does. It only has to be recognisable
+    # at thumbnail size, and a single word at full height does that
+    # better than a lockup with a second line competing for room.
     rows, w, h, spans = line_mask("alt", 33)
-    sc = 9
+
+    # Largest whole-number scale that leaves a margin. Whole numbers
+    # only: the glyphs were rendered with antialiasing off so they sit
+    # on a hard pixel grid, and a fractional scale resamples that into
+    # mush.
+    margin_x, margin_y = 150, 90
+    sc = min((W - margin_x * 2) // w, (H - margin_y * 2) // h)
+
     mw, mh = w * sc, h * sc
-    ax, ay = (W - mw) // 2, 134
-    paint(card, rows, w, h, ax, ay, sc, [((0, w), G.PHOSPHOR)])
-
-    # "speed-running" - one mask, three colours, so the hyphen sits on
-    # the same baseline as the letters either side of it.
-    # Rendered at twice the base size and enlarged half as much.
-    #
-    # At 33 each curve in 'g' and 'r' is described by a handful of
-    # pixels, and enlarging that four times magnifies every jag -
-    # 'running' came out choppy. Doubling the base size doubles the
-    # resolution of the letterforms before anything is enlarged.
-    #
-    # The gap doubles with it. Letter spacing is measured in base
-    # pixels, so leaving it at 2 would halve the visual gap and pack
-    # the glyphs together - which, with the dilation below, is what
-    # made 'running' look squashed.
-    text = "speed-running"
-    rows, w, h, spans = line_mask(text, 66, gap=4)
-    # Two passes. One left it thinner than the mark above it;
-    # at double the base resolution each pass adds only half as
-    # much weight on the card as it did at base 33.
-    rows = thicken(rows, w, h, passes=2)
-    sc = 2
-    cut = text.index("-")
-    colours = [
-        ((spans[0][0], spans[cut - 1][1]), PURPLE),
-        ((spans[cut][0], spans[cut][1]), G.PHOSPHOR),
-        ((spans[cut + 1][0], spans[-1][1]), PURPLE),
-    ]
-    wx = (W - w * sc) // 2
-    wy = ay + mh + 46
-    _, wh = paint(card, rows, w, h, wx, wy, sc, colours)
-
-    # The line that says what it is, clear of the descender on "running".
-    # No slogan. GitHub prints the repository description directly
-    # beneath this image, so a tagline on the card says the same thing
-    # twice - and the mark carries better on its own.
+    paint(card, rows, w, h, (W - mw) // 2, (H - mh) // 2, sc,
+          [((0, w), G.PHOSPHOR)])
 
     glow = card.filter(ImageFilter.GaussianBlur(G.BLOOM_TIGHT_RADIUS))
     card = Image.blend(card, glow, 0.35)
@@ -171,7 +149,7 @@ def main():
     card = G.vignette(card, G.VIGNETTE_STRENGTH)
 
     card.save(f"{out}/social_preview.png")
-    print(f"wrote {out}/social_preview.png  {card.size[0]}x{card.size[1]}")
+    print(f"wrote {out}/social_preview.png  {card.size[0]}x{card.size[1]}  scale {sc}")
 
 
 if __name__ == "__main__":
