@@ -107,6 +107,19 @@ public final class MatchHud {
 		drawShadowed(matrices, client, hint,
 				right - client.textRenderer.getWidth(hint), y,
 				com.speedrunmcalt.menu.Palette.DIM);
+		y += LINE;
+
+		// Say so when the rebuild did not match. A replay world that
+		// could not find its structure never had its loot topped up,
+		// so its chests hold different contents than the ones that
+		// were actually opened - and it looks completely normal.
+		// Silence here is what let that ship.
+		if (MatchState.setupFailure != null) {
+			String warn = "\u26a0 " + MatchState.setupFailure;
+			drawShadowed(matrices, client, warn,
+					right - client.textRenderer.getWidth(warn), y,
+					com.speedrunmcalt.menu.Palette.ALERT);
+		}
 
 		renderLastSplit(matrices, client, data, at, watched);
 		renderEventFeed(matrices, client, data, at, watched);

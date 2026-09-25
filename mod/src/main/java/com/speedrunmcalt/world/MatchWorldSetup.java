@@ -375,6 +375,19 @@ public final class MatchWorldSetup {
 		VillageSmith.Village structure = VillageSmith.inspect(
 				world.getServer().getStructureManager(), seed, feature, x, z);
 		if (!structure.exists()) {
+			// Not just a log line. A world whose loot was never topped
+			// up is a DIFFERENT world from the one this seed promises,
+			// and it looked completely normal - the replay launcher
+			// shipped without these coordinates for weeks and the only
+			// evidence was setup finishing in 10ms instead of 1700.
+			//
+			// In a match this reaches the player as the bad-seed
+			// prompt, which is the one route that ends a match with no
+			// rating change. In a replay it reaches the viewer as a
+			// warning that what they are looking at is not what was
+			// played.
+			MatchState.setupFailure = "no " + seedType + " found at " + x + "," + z
+					+ " - chest loot is not what the match had";
 			SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] No {} structure at {},{} - loot not topped up",
 					seedType, x, z);
 			return;
@@ -462,6 +475,8 @@ public final class MatchWorldSetup {
 				StructureFeature.BASTION_REMNANT,
 				MatchState.bastionX, MatchState.bastionZ, true);
 		if (!bastion.exists()) {
+			MatchState.setupFailure = "no bastion found at " + MatchState.bastionX + ","
+					+ MatchState.bastionZ + " - chest loot is not what the match had";
 			SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] No bastion at {},{} - loot not topped up",
 					MatchState.bastionX, MatchState.bastionZ);
 			return;
