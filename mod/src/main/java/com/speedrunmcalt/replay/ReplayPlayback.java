@@ -95,6 +95,37 @@ public final class ReplayPlayback {
 		return data;
 	}
 
+	/**
+	 * The real account uuid behind a ghost body, or null if this is
+	 * not one of ours.
+	 *
+	 * Ghosts are built with a SYNTHETIC profile uuid derived from the
+	 * username, so the entity cannot be asked who it really is. The
+	 * ghosts map is keyed by the replay payload's real uuid, which is
+	 * the one that resolves to an account and therefore to a skin.
+	 */
+	public static String ghostUuid(net.minecraft.entity.Entity entity) {
+		if (entity == null) {
+			return null;
+		}
+		for (java.util.Map.Entry<String,
+				net.minecraft.client.network.OtherClientPlayerEntity> e : ghosts.entrySet()) {
+			if (e.getValue() == entity) {
+				return e.getKey();
+			}
+		}
+		return null;
+	}
+
+	/** The username on a track, for resolving that player's skin. */
+	public static String usernameFor(String uuid) {
+		if (data == null || uuid == null) {
+			return null;
+		}
+		ReplayData.Track t = data.tracks.get(uuid);
+		return t == null ? null : t.username;
+	}
+
 	public static String watching() {
 		return watching;
 	}

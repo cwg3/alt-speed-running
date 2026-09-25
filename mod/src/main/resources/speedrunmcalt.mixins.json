@@ -31,7 +31,8 @@
     "GammaUnlockMixin",
     "PauseMenuMixin",
     "LoadingScreenLogoMixin",
-    "SpectatorSlotMixin"
+    "SpectatorSlotMixin",
+    "ReplaySkinMixin"
   ],
   "injectors": {
     "defaultRequire": 1
