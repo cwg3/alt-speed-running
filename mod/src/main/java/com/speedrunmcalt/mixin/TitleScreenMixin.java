@@ -35,7 +35,29 @@ public abstract class TitleScreenMixin extends Screen {
 		int singleplayerTop = this.height / 4 + 48;
 		this.addButton(new ButtonWidget(
 				this.width / 2 - 100, singleplayerTop - 24, 200, 20,
-				new LiteralText("alt  speed-running"),
+				// The wordmark's own colours, on the one button that is
+				// ours. Plain white it was indistinguishable from
+				// Singleplayer and Multiplayer, which is the wrong
+				// thing for the only row on this screen that is not
+				// Mojang's.
+				//
+				// A Text with styled siblings works because TextRenderer
+				// takes the colour passed by ButtonWidget only as a
+				// DEFAULT - any run carrying its own style wins. Same
+				// split as the menu: alt and the hyphen phosphor, the
+				// two words purple.
+				new LiteralText("alt  ").styled(st -> st.withColor(
+								net.minecraft.text.TextColor.fromRgb(
+										com.speedrunmcalt.menu.Palette.PHOSPHOR)))
+						.append(new LiteralText("speed").styled(st -> st.withColor(
+								net.minecraft.text.TextColor.fromRgb(
+										com.speedrunmcalt.menu.Palette.PURPLE))))
+						.append(new LiteralText("-").styled(st -> st.withColor(
+								net.minecraft.text.TextColor.fromRgb(
+										com.speedrunmcalt.menu.Palette.PHOSPHOR))))
+						.append(new LiteralText("running").styled(st -> st.withColor(
+								net.minecraft.text.TextColor.fromRgb(
+										com.speedrunmcalt.menu.Palette.PURPLE)))),
 				button -> this.client.openScreen(new AltMenuScreen(this))));
 	}
 }
