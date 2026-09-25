@@ -100,11 +100,15 @@ export async function claimSeedPair(
 	// inside the 400KB item limit, but it wants a plan before it is
 	// one.
 	const seen = new Set<string>();
-	if (playerUuids.length > 0) {
+	// Filtered on the READ as well, not just the write: a synthetic
+	// player's existing row would otherwise keep excluding seeds it
+	// recorded before this exemption existed.
+	const realUuids = playerUuids.filter((uuid) => !isSyntheticPlayer(uuid));
+	if (realUuids.length > 0) {
 		const got = await ddb.send(new BatchGetCommand({
 			RequestItems: {
 				[playersTableName]: {
-					Keys: playerUuids.map((uuid) => ({ uuid })),
+					Keys: realUuids.map((uuid) => ({ uuid })),
 					ProjectionExpression: 'seenSeeds',
 				},
 			},
@@ -276,15 +280,42 @@ export async function claimSeedPair(
  * the exact thing the whole scheme exists to prevent - so the caller
  * treats a failure here as a failed match, not a warning.
  */
+/**
+ * Players whose seed history is not worth keeping.
+ *
+ * "Never deal a player the same seed twice" exists so nobody arrives
+ * at a world they have already learned. PaceBot is a script that
+ * reports splits on a timer; it does not learn a world, and it has no
+ * rating to protect.
+ *
+ * Counting it cost real testing time. Exclusion is the UNION of both
+ * players, so once the bot had personally played 58 of 70 seeds it had
+ * exhausted four of the five types single-handed - and a human who had
+ * played six matches got the same seed type four times running,
+ * because one type was all the pair had left. The draw was working
+ * correctly on a list of one.
+ *
+ * Exempt here rather than by clearing the row periodically: clearing
+ * is a chore that gets forgotten, and forgetting looks exactly like a
+ * broken draw.
+ */
+const SYNTHETIC_PLAYERS = new Set(['bot-rival']);
+
+export function isSyntheticPlayer(uuid: string): boolean {
+	return SYNTHETIC_PLAYERS.has(uuid);
+}
+
 export async function recordSeedsSeen(
 	playersTableName: string,
 	playerUuids: string[],
 	seedPairId: string,
 ): Promise<void> {
-	await Promise.all(playerUuids.map((uuid) => ddb.send(new UpdateCommand({
-		TableName: playersTableName,
-		Key: { uuid },
-		UpdateExpression: 'ADD seenSeeds :s',
-		ExpressionAttributeValues: { ':s': new Set([seedPairId]) },
-	}))));
+	await Promise.all(playerUuids
+		.filter((uuid) => !isSyntheticPlayer(uuid))
+		.map((uuid) => ddb.send(new UpdateCommand({
+			TableName: playersTableName,
+			Key: { uuid },
+			UpdateExpression: 'ADD seenSeeds :s',
+			ExpressionAttributeValues: { ':s': new Set([seedPairId]) },
+		}))));
 }
