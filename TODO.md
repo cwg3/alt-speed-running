@@ -40,11 +40,26 @@ Known outstanding work, roughly in the order it would matter.
 
 ## Before testers
 
-- [ ] **Pool depth.** The one thing still genuinely short. A player
-  never draws the same seed twice, so a thin type lasts as many
-  matches as it has seeds and then silently drops out of that player's
-  draw. Land types are cheap to build; ocean types need the
-  two-magma-ravine check and cost considerably more.
+- [ ] **Pool REPLENISHMENT, not pool depth.** The framing that
+  matters: a strong runner averages about 9 minutes, which is roughly
+  5 matches an hour once replays and downtime are counted, over a 4-5
+  hour session. Call it 25 matches a day at full tilt.
+
+  A seed is consumed per PLAYER, not globally - both players in a
+  match mark it seen, but a different pair can still draw it - so the
+  requirement is about 25 new seeds a day for the whole ladder rather
+  than 25 per player. It scales sublinearly with player count as long
+  as matchmaking spreads people around.
+
+  Against that, a 70-seed pool is about three days for one grinder.
+
+  Production is not the constraint: 620 land candidates took about 75
+  minutes on one spot instance. Buried treasure is, because the
+  two-magma-ravine check is where the yield collapses - a grinder
+  would exhaust BT first and watch it silently leave their draw while
+  the other four types kept working.
+
+  So the work is a repeatable top-up, not one big batch.
 
   This matters more now than it did yesterday: with the release out,
   more than one person will be drawing from the same pool.
