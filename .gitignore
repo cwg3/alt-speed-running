@@ -40,3 +40,14 @@ credentials.json
 brand/venv/
 pack/*.mrpack
 pack/*.jar
+
+# Seed data stays out of the repository.
+#
+# The PIPELINE is public - how a seed is chosen, what it is checked
+# against, why. The OUTPUT is not. Publishing the pool would let a
+# player memorise the worlds they are about to be dealt, which defeats
+# the rule that nobody draws the same seed twice, and it hands away the
+# compute that produced it for nothing in return.
+seed-filter/output/
+seed-filter/output-backup/
+seed-filter/results/
