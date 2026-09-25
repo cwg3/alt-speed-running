@@ -3,6 +3,7 @@ package com.speedrunmcalt.menu;
 import com.speedrunmcalt.SpeedrunMcAlt;
 import com.speedrunmcalt.net.BackendClient;
 import com.speedrunmcalt.net.LeaderboardEntry;
+import com.speedrunmcalt.net.LeaderboardResult;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
@@ -37,7 +38,7 @@ public class LeaderboardScreen extends Screen {
 
 	private final Screen parent;
 
-	private volatile List<LeaderboardEntry> rows;
+	private volatile LeaderboardResult result;
 	private volatile String error;
 	private volatile boolean loading = true;
 
@@ -51,7 +52,7 @@ public class LeaderboardScreen extends Screen {
 		int cx = this.width / 2;
 		this.addButton(new ButtonWidget(cx - 100, this.height - 28, 200, 20,
 				new LiteralText("Back"), b -> this.client.openScreen(parent)));
-		if (rows == null) {
+		if (result == null) {
 			load();
 		}
 	}
@@ -61,7 +62,7 @@ public class LeaderboardScreen extends Screen {
 		error = null;
 		Thread t = new Thread(() -> {
 			try {
-				rows = BackendClient.leaderboard(50);
+				result = BackendClient.leaderboard(50);
 			} catch (Exception e) {
 				error = e.getMessage();
 				SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Leaderboard failed", e);
@@ -77,11 +78,45 @@ public class LeaderboardScreen extends Screen {
 		return Math.max(1, (this.height - ROWS_TOP - FOOTER_RESERVE) / ROW_HEIGHT);
 	}
 
-	/** "12-3", or "12-3-1" when there are forfeits to show. */
+	/**
+	 * "12-3-1", always three parts.
+	 *
+	 * The first version dropped the forfeits when there were none, so
+	 * the column held two numbers on some rows and three on others under
+	 * a header that said "W-L" - which was simply wrong wherever a
+	 * forfeit existed. A board is read by scanning DOWN a column, and a
+	 * column whose format changes per row cannot be scanned. Showing the
+	 * zero is cheaper than that.
+	 */
 	private static String record(LeaderboardEntry e) {
-		return e.forfeits > 0
-				? e.wins + "-" + e.losses + "-" + e.forfeits
-				: e.wins + "-" + e.losses;
+		return e.wins + "-" + e.losses + "-" + e.forfeits;
+	}
+
+	private static String plural(int n, String one, String many) {
+		return n + " " + (n == 1 ? one : many);
+	}
+
+	/**
+	 * What is on the board, and what is deliberately not.
+	 *
+	 * PaceBot is the case this exists for: a solo player races it
+	 * constantly and then cannot find it here. Unexplained, that reads
+	 * as a bug in the board rather than a rule about it - and a ladder
+	 * that publishes every deviation from vanilla should not be coy
+	 * about which rows it drops.
+	 */
+	private static String footer(LeaderboardResult r) {
+		if (r == null) {
+			return "";
+		}
+		StringBuilder sb = new StringBuilder(plural(r.totalRanked, "ranked player", "ranked players"));
+		if (r.botsHidden > 0) {
+			sb.append("   ").append(plural(r.botsHidden, "bot", "bots")).append(" not ranked");
+		}
+		if (r.unranked > 0) {
+			sb.append("   ").append(r.unranked).append(" yet to finish a match");
+		}
+		return sb.toString();
 	}
 
 	@Override
@@ -112,7 +147,8 @@ public class LeaderboardScreen extends Screen {
 			return;
 		}
 
-		List<LeaderboardEntry> list = rows;
+		LeaderboardResult r = result;
+		List<LeaderboardEntry> list = r == null ? null : r.rows;
 		if (list == null || list.isEmpty()) {
 			// Not an error, and worth saying why rather than showing an
 			// empty box: nobody has finished a ranked match yet.
@@ -122,24 +158,33 @@ public class LeaderboardScreen extends Screen {
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText("finish a match and you are on the board"),
 					cx, this.height / 2 + 6, Palette.DIM);
+			// The footer belongs here MOST of all. An empty board with a
+			// bot excluded is the case where a reader is likeliest to
+			// conclude the page is broken.
+			drawCenteredText(matrices, this.textRenderer, new LiteralText(footer(r)),
+					cx, this.height - 44, Palette.DIM);
 			super.render(matrices, mouseX, mouseY, delta);
 			return;
 		}
 
 		// Columns are laid out from the centre so the board stays put as
 		// the window resizes, rather than drifting with the left edge.
-		int xRank = cx - 150;
-		int xName = cx - 128;
-		int xRating = cx + 20;
-		int xPoints = cx + 74;
-		int xRecord = cx + 118;
+		// A Minecraft username is at most 16 characters, which is about
+		// 96px in this font. The name column was 148px wide, so every
+		// board carried 50px of gap that read as a layout fault rather
+		// than as spacing - most visibly with one row on it.
+		int xRank = cx - 132;
+		int xName = cx - 110;
+		int xRating = cx - 2;
+		int xPoints = cx + 52;
+		int xRecord = cx + 96;
 
 		int y = ROWS_TOP - 14;
 		this.textRenderer.drawWithShadow(matrices, "#", xRank, y, Palette.DIM);
 		this.textRenderer.drawWithShadow(matrices, "player", xName, y, Palette.DIM);
 		this.textRenderer.drawWithShadow(matrices, "rating", xRating, y, Palette.DIM);
 		this.textRenderer.drawWithShadow(matrices, "points", xPoints, y, Palette.DIM);
-		this.textRenderer.drawWithShadow(matrices, "W-L", xRecord, y, Palette.DIM);
+		this.textRenderer.drawWithShadow(matrices, "W-L-F", xRecord, y, Palette.DIM);
 
 		String me = AltSession.uuid();
 		y = ROWS_TOP;
@@ -162,7 +207,7 @@ public class LeaderboardScreen extends Screen {
 					xPoints, y, Palette.PURPLE);
 			this.textRenderer.drawWithShadow(matrices, record(e), xRecord, y, Palette.DIM);
 			if (isMe) {
-				this.textRenderer.drawWithShadow(matrices, "you", xRecord + 46, y, ACCENT);
+				this.textRenderer.drawWithShadow(matrices, "you", xRecord + 52, y, ACCENT);
 			}
 			y += ROW_HEIGHT;
 		}
@@ -170,8 +215,11 @@ public class LeaderboardScreen extends Screen {
 		if (list.size() > shown) {
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText((list.size() - shown) + " more - resize the window to see them"),
-					cx, this.height - 44, Palette.DIM);
+					cx, this.height - 56, Palette.DIM);
 		}
+
+		drawCenteredText(matrices, this.textRenderer, new LiteralText(footer(r)),
+				cx, this.height - 44, Palette.DIM);
 
 		super.render(matrices, mouseX, mouseY, delta);
 	}

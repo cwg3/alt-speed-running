@@ -269,7 +269,7 @@ public final class BackendClient {
 	 * player has been verified, which is where someone deciding whether
 	 * to ask for an invite would look at it.
 	 */
-	public static java.util.List<LeaderboardEntry> leaderboard(int limit) throws IOException {
+	public static LeaderboardResult leaderboard(int limit) throws IOException {
 		JsonObject resp = get(API_BASE + "/leaderboard?limit=" + limit, null);
 		java.util.List<LeaderboardEntry> out = new java.util.ArrayList<>();
 		for (com.google.gson.JsonElement el : resp.getAsJsonArray("rows")) {
@@ -285,7 +285,8 @@ public final class BackendClient {
 					num(r, "forfeits"),
 					num(r, "matches")));
 		}
-		return out;
+		return new LeaderboardResult(out, num(resp, "totalRanked"),
+				num(resp, "unranked"), num(resp, "botsHidden"));
 	}
 
 	/** Absent or null fields are normal on older rows; do not throw. */
