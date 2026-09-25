@@ -73,7 +73,7 @@ def line_mask(text, size, gap=2):
     return rows[top:bot], width, bot - top, spans
 
 
-def thicken(rows, width, height):
+def thicken(rows, width, height, passes=1):
     """Widen every stroke by one base pixel, down and right.
 
     "alt" is drawn at a much larger scale than the line beneath it, so
@@ -86,16 +86,18 @@ def thicken(rows, width, height):
     Down and right only: a symmetric dilation grows the glyph in every
     direction and closes the counters in "e" and "a".
     """
-    out = [[False] * width for _ in range(height)]
-    for y in range(height):
-        for x in range(width):
-            if rows[y][x]:
-                out[y][x] = True
-                if x + 1 < width:
-                    out[y][x + 1] = True
-                if y + 1 < height:
-                    out[y + 1][x] = True
-    return out
+    for _ in range(passes):
+        out = [[False] * width for _ in range(height)]
+        for y in range(height):
+            for x in range(width):
+                if rows[y][x]:
+                    out[y][x] = True
+                    if x + 1 < width:
+                        out[y][x + 1] = True
+                    if y + 1 < height:
+                        out[y + 1][x] = True
+        rows = out
+    return rows
 
 
 def paint(card, rows, width, height, x, y, scale, colours):
@@ -142,7 +144,10 @@ def main():
     # made 'running' look squashed.
     text = "speed-running"
     rows, w, h, spans = line_mask(text, 66, gap=4)
-    rows = thicken(rows, w, h)
+    # Two passes. One left it thinner than the mark above it;
+    # at double the base resolution each pass adds only half as
+    # much weight on the card as it did at base 33.
+    rows = thicken(rows, w, h, passes=3)
     sc = 2
     cut = text.index("-")
     colours = [
