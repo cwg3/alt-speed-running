@@ -35,7 +35,7 @@ public abstract class TitleScreenMixin extends Screen {
 		int singleplayerTop = this.height / 4 + 48;
 		this.addButton(new ButtonWidget(
 				this.width / 2 - 100, singleplayerTop - 24, 200, 20,
-				new LiteralText("alt  -  speed-running"),
+				new LiteralText("alt  speed-running"),
 				button -> this.client.openScreen(new AltMenuScreen(this))));
 	}
 }
