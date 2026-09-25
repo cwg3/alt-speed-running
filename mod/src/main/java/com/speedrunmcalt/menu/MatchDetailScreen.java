@@ -129,7 +129,6 @@ public class MatchDetailScreen extends Screen {
 		}
 
 		MatchDetail d = detail;
-		String me = AltSession.uuid();
 
 		// Header: who won, what it was, whether it was given up.
 		MatchDetail.Player winner = d.players.stream()
@@ -152,8 +151,13 @@ public class MatchDetailScreen extends Screen {
 		for (int i = 0; i < d.players.size() && i < 2; i++) {
 			MatchDetail.Player p = d.players.get(i);
 			int x = i == 0 ? left : cx + 96;
-			this.textRenderer.drawWithShadow(matrices, p.username, x, y,
-					p.uuid.equals(me) ? Palette.YELLOW : Palette.DIM);
+			// Both names yellow. A player name is yellow everywhere
+			// else in the mod - the HUD, the history list, the winner
+			// line directly above this - and greying the opponent made
+			// the one screen built for comparing two players treat one
+			// of them as secondary. Which column is yours is already
+			// said by the winner line and by the left/right split.
+			this.textRenderer.drawWithShadow(matrices, p.username, x, y, Palette.YELLOW);
 		}
 		y += 16;
 
@@ -167,8 +171,6 @@ public class MatchDetailScreen extends Screen {
 				this.textRenderer.drawWithShadow(matrices, clock(t), x, y,
 						t == null ? Palette.DIM : Palette.CYAN);
 				if (dl != null) {
-					// Ahead is cyan, behind is magenta - the same pair
-					// the HUD and the end screen use for won and lost.
 					this.textRenderer.drawWithShadow(matrices, delta(dl),
 							// Same green/red as the in-match HUD: a split
 							// delta is won or lost, and the two screens
@@ -177,8 +179,13 @@ public class MatchDetailScreen extends Screen {
 							x + 62, y, dl <= 0 ? Palette.EMERALD : Palette.ALERT);
 				}
 			}
+			// Purple, the same as the split labels on the in-match HUD
+			// and the seed type on the reveal screen: all three NAME
+			// something rather than report how it went. Grey made the
+			// labels read as disabled on a screen where they are the
+			// thing you scan down.
 			drawCenteredText(matrices, this.textRenderer,
-					new LiteralText(splitLabel(row.split)), cx, y, Palette.DIM);
+					new LiteralText(splitLabel(row.split)), cx, y, Palette.PURPLE);
 			y += ROW_HEIGHT;
 		}
 
