@@ -43,9 +43,12 @@ async function main() {
 			const page: any = await ddb.send(new ScanCommand({
 				TableName: table,
 				FilterExpression: '#a = :t',
-				ExpressionAttributeNames: { '#a': 'allowed' },
+				// #u, not uuid. 'uuid' is a DynamoDB reserved keyword and a
+				// projection naming it directly is rejected outright - the
+				// listing mode of this tool had never worked.
+				ExpressionAttributeNames: { '#a': 'allowed', '#u': 'uuid' },
 				ExpressionAttributeValues: { ':t': true },
-				ProjectionExpression: 'uuid, username, invitedAt',
+				ProjectionExpression: '#u, username, invitedAt',
 				ExclusiveStartKey: startKey,
 			}));
 			rows.push(...(page.Items ?? []));
