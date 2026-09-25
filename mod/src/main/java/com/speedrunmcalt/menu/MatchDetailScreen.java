@@ -133,10 +133,20 @@ public class MatchDetailScreen extends Screen {
 		// Header: who won, what it was, whether it was given up.
 		MatchDetail.Player winner = d.players.stream()
 				.filter(p -> p.uuid.equals(d.winnerUuid)).findFirst().orElse(null);
-		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, 16,
-				new String[] { "winner  ", winner == null ? "-" : winner.username },
-				new int[] { Palette.DIM, Palette.YELLOW });
-		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, 28,
+		// The winner's NAME is the headline, so it is drawn like one:
+		// double size and emerald, the colour this mod already uses for
+		// winning a split. Yellow at body size made the one fact this
+		// screen exists to deliver look like another label.
+		drawCenteredText(matrices, this.textRenderer,
+				new LiteralText("winner"), cx, 10, Palette.DIM);
+		matrices.push();
+		matrices.scale(2.0f, 2.0f, 1.0f);
+		drawCenteredText(matrices, this.textRenderer,
+				new LiteralText(winner == null ? "-" : winner.username),
+				cx / 2, 21 / 2, Palette.EMERALD);
+		matrices.pop();
+
+		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, 42,
 				new String[] { d.seedType.replace('_', ' '), d.forfeited ? "   forfeited" : "" },
 				// Orange for forfeited, the same orange the history
 				// screen uses for it.
@@ -146,7 +156,9 @@ public class MatchDetailScreen extends Screen {
 		// is what makes a row readable left-to-right as a comparison
 		// rather than two lists that happen to be adjacent.
 		int left = cx - 190;
-		int y = 52;
+		// Below the enlarged winner line, which is twice the height of
+		// the body text it replaced.
+		int y = 60;
 
 		for (int i = 0; i < d.players.size() && i < 2; i++) {
 			MatchDetail.Player p = d.players.get(i);
