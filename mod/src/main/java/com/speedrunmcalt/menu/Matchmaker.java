@@ -99,7 +99,16 @@ public final class Matchmaker {
 		//
 		// Held for CHIME_TICKS so it is still up when the world starts
 		// tearing down, rather than vanishing first.
-		if (waited == 0 && client.inGameHud != null) {
+		// No world means no HUD, and the title overlay is drawn BY the
+		// HUD - so queueing from the menus produced a chime and an
+		// unchanged screen, which reads as a hang. Whenever the chime
+		// fires the next thing on screen says MATCH FOUND: the overlay
+		// in a world, this screen in a menu.
+		if (waited == 0 && client.world == null) {
+			client.openScreen(new MatchFoundScreen(opponent));
+		}
+
+		if (waited == 0 && client.world != null && client.inGameHud != null) {
 			String vs = opponent == null ? "opponent" : opponent;
 			client.inGameHud.setTitles(
 					// Yellow, not phosphor. The green belongs to the "alt"
