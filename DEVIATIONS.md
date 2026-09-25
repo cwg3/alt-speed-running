@@ -118,6 +118,12 @@ If you hit one of these, we want to hear what happened either way.
 - Terrain generation, structure generation and biome placement are
   vanilla for the seed, except where section 4 says otherwise
 - Combat, movement, hunger and damage are untouched
+- **Death is vanilla, and deliberately so.** Dying on purpose is a
+  real technique — it refills hunger and returns you to your spawn
+  point — so a ladder that penalised death, ended the match on it, or
+  touched the run clock would be banning a legitimate line. Nothing
+  here reacts to a death at all. It is recorded in the replay event
+  feed and that is the whole of it.
 - No advantage is given to either player over the other; every change
   applies to both sides of a match identically
 - Nothing reads or transmits anything about your machine beyond your

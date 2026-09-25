@@ -124,6 +124,10 @@ be argued with.
 - Quitting to the title screen without forfeiting leaves the match
   pending until your opponent's client claims it or the abandonment
   sweep voids it
+
+Dying is not a rough edge: it is vanilla on purpose. Deliberate death
+resets hunger and returns you to spawn, which is a real technique, so
+nothing here penalises it or ends the match on it.
 - If nobody else is queuing you will wait indefinitely, with only a
   timer for feedback
 - The seed pool is finite; matches fail with an error once it runs out
