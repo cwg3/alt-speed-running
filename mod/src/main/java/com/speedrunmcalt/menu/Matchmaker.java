@@ -177,7 +177,12 @@ public final class Matchmaker {
 			MatchState.smithX = match.smithX;
 			MatchState.smithZ = match.smithZ;
 			MatchState.runAlreadyStarted = match.runAlreadyStarted;
-			MatchWorldCreator.createMatchWorld(client, "match-" + match.matchId,
+			// Tidy up finished worlds before making another. The one we
+			// are about to enter is spared: a rejoin after a crash uses
+			// the SAME world and must find it intact.
+			com.speedrunmcalt.world.MatchWorlds.pruneOld(client, match.matchId);
+			MatchWorldCreator.createMatchWorld(client,
+					com.speedrunmcalt.world.MatchWorlds.nameFor(match.matchId),
 					match.overworldSeed, match.netherSeed);
 			LiveMatchPoller.start();
 			state = State.IDLE;

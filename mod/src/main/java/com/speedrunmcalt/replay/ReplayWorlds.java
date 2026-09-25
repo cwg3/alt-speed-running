@@ -3,12 +3,7 @@ package com.speedrunmcalt.replay;
 import com.speedrunmcalt.SpeedrunMcAlt;
 import net.minecraft.client.MinecraftClient;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
 
 /**
  * Replay worlds are a CACHE, and were being treated as a save.
@@ -59,75 +54,13 @@ public final class ReplayWorlds {
 	public static void clearFor(MinecraftClient client, String matchId) {
 		try {
 			Path saves = client.getLevelStorage().getSavesDirectory();
-			delete(saves, saves.resolve(nameFor(matchId)));
-			prune(saves);
+			com.speedrunmcalt.world.GeneratedWorlds.delete(
+					saves, saves.resolve(nameFor(matchId)), PREFIX);
+			com.speedrunmcalt.world.GeneratedWorlds.prune(saves, PREFIX, KEEP, null);
 		} catch (Exception e) {
 			SpeedrunMcAlt.LOGGER.warn(
 					"[speedrunmcalt] Could not clear cached replay worlds", e);
 		}
 	}
 
-	private static void prune(Path saves) throws IOException {
-		if (!Files.isDirectory(saves)) {
-			return;
-		}
-		List<Path> worlds = new ArrayList<>();
-		try (java.util.stream.Stream<Path> list = Files.list(saves)) {
-			for (Path p : (Iterable<Path>) list::iterator) {
-				if (Files.isDirectory(p) && p.getFileName().toString().startsWith(PREFIX)) {
-					worlds.add(p);
-				}
-			}
-		}
-		if (worlds.size() <= KEEP) {
-			return;
-		}
-		worlds.sort(Comparator.comparingLong(p -> -lastModified(p)));
-		for (Path old : worlds.subList(KEEP, worlds.size())) {
-			delete(saves, old);
-		}
-	}
-
-	private static long lastModified(Path p) {
-		try {
-			return Files.getLastModifiedTime(p).toMillis();
-		} catch (IOException e) {
-			return 0L;
-		}
-	}
-
-	/**
-	 * Deletes one replay world, or refuses.
-	 *
-	 * Both conditions are load-bearing and neither is redundant. The
-	 * prefix says this is ours; the parent check says a crafted match
-	 * id cannot walk the path somewhere else. A recursive delete that
-	 * takes its target from a server response deserves both.
-	 */
-	private static void delete(Path saves, Path world) throws IOException {
-		Path resolved = world.toAbsolutePath().normalize();
-		if (!resolved.getFileName().toString().startsWith(PREFIX)
-				|| !resolved.getParent().equals(saves.toAbsolutePath().normalize())) {
-			SpeedrunMcAlt.LOGGER.warn(
-					"[speedrunmcalt] Refusing to delete {} - not a replay world", resolved);
-			return;
-		}
-		if (!Files.isDirectory(resolved)) {
-			return;
-		}
-		try (java.util.stream.Stream<Path> walk = Files.walk(resolved)) {
-			List<Path> all = new ArrayList<>();
-			for (Path p : (Iterable<Path>) walk::iterator) {
-				all.add(p);
-			}
-			// Deepest first: a directory will not delete while it has
-			// anything in it.
-			all.sort(Comparator.reverseOrder());
-			for (Path p : all) {
-				Files.deleteIfExists(p);
-			}
-		}
-		SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Cleared cached replay world {}",
-				resolved.getFileName());
-	}
 }
