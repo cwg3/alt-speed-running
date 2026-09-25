@@ -252,7 +252,11 @@ public final class ReplayPlayback {
 				client.options.perspective = savedPerspective;
 				perspectiveSaved = false;
 			}
-			driveGhosts(client, positionMillis);
+			// No driveGhosts here: the unconditional call above already
+			// ran this tick. Harmless when a ghost was two position
+			// writes, real work now that it also interpolates and
+			// spawns up to forty entities - twice, every tick, only in
+			// free-roam.
 			return;
 		}
 
