@@ -10,6 +10,7 @@ const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const SESSIONS_TABLE_NAME = process.env.SESSIONS_TABLE_NAME!;
 const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
+const MATCH_HISTORY_TABLE_NAME = process.env.MATCH_HISTORY_TABLE_NAME!;
 
 // Reaching this split ends the race, so it completes the match with
 // the reporting player as the winner.
@@ -151,7 +152,8 @@ export const handler = async (
 		[reporterUuid]: { ...mine, [body.splitName]: body.elapsedMs },
 	};
 	const result = await applyMatchCompletion(
-		MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, body.matchId, reporter, loser, finalSplits);
+		MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, body.matchId, reporter, loser, finalSplits,
+		MATCH_HISTORY_TABLE_NAME);
 
 	return {
 		statusCode: 200,

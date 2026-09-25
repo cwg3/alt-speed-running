@@ -8,6 +8,7 @@ const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 const SESSIONS_TABLE_NAME = process.env.SESSIONS_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
+const MATCH_HISTORY_TABLE_NAME = process.env.MATCH_HISTORY_TABLE_NAME!;
 const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
 
 /**
@@ -89,7 +90,7 @@ export const handler = async (
 			console.log(`match ${matchId}: ${opponent.username} silent for ${now - opponentSeen}ms - awarding to ${you.username}`);
 			await applyMatchCompletion(
 				MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, matchId,
-				you, opponent, match.Item.splits ?? {});
+				you, opponent, match.Item.splits ?? {}, MATCH_HISTORY_TABLE_NAME);
 			// Re-read so the response carries the result rather than
 			// the pending state we fetched a moment ago.
 			const after = await ddb.send(new GetCommand({

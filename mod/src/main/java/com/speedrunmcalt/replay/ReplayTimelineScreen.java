@@ -75,8 +75,14 @@ public class ReplayTimelineScreen extends Screen {
 				ReplayData.Track t = data.tracks.get(uuid);
 				boolean watching = uuid.equals(ReplayPlayback.watching());
 				boolean hasTrace = t.samples != null && !t.samples.isEmpty();
+				// Say WHY it cannot be clicked. A greyed button with a
+				// name on it reads as broken; one that says "no replay"
+				// reads as a fact about that match.
+				String label = !hasTrace
+						? t.username + " - none"
+						: (watching ? "> " : "") + t.username;
 				ButtonWidget b = new ButtonWidget(x, row, 96, 20,
-						new LiteralText((watching ? "> " : "") + t.username),
+						new LiteralText(label),
 						btn -> {
 							ReplayPlayback.watch(uuid);
 							this.init(this.client, this.width, this.height);
@@ -90,7 +96,9 @@ public class ReplayTimelineScreen extends Screen {
 			}
 		}
 
-		this.addButton(new ButtonWidget(this.width - 90, this.height - 20, 80, 20,
+		// Top right, clear of the control row and of the helper line at
+		// the bottom - those two were drawn over each other.
+		this.addButton(new ButtonWidget(this.width - 90, 10, 80, 20,
 				new LiteralText("Exit replay"), b -> ReplayLauncher.exit(this.client)));
 	}
 

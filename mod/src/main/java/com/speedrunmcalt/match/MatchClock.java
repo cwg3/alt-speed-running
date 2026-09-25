@@ -79,6 +79,13 @@ public final class MatchClock {
 	}
 
 	private static void tick(MinecraftClient client) {
+		// A replay is not a race. MatchState carries a matchId and a
+		// seed type during playback because the world has to be rebuilt
+		// from them, and without this the clock reads that as a match
+		// about to start and opens the countdown over the replay.
+		if (MatchState.replayMode) {
+			return;
+		}
 		// Only while a match is pending its start.
 		if (MatchState.matchId == null || MatchState.matchStartMillis > 0 || claiming) {
 			return;

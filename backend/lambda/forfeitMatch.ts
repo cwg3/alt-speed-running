@@ -9,6 +9,7 @@ const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const SESSIONS_TABLE_NAME = process.env.SESSIONS_TABLE_NAME!;
 const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
+const MATCH_HISTORY_TABLE_NAME = process.env.MATCH_HISTORY_TABLE_NAME!;
 
 /**
  * Gives up the current match, handing the win to the opponent.
@@ -56,7 +57,7 @@ export const handler = async (
 
 	const result = await applyMatchCompletion(
 		MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, body.matchId,
-		opponent, quitter, match.Item.splits ?? {});
+		opponent, quitter, match.Item.splits ?? {}, MATCH_HISTORY_TABLE_NAME);
 
 	if (result.alreadyCompleted) {
 		return {

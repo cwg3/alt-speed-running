@@ -198,6 +198,8 @@ export class BackendStack extends cdk.Stack {
 		sessionsTable.grantReadData(reportSplitFn);
 		playersTable.grantReadWriteData(reportSplitFn);
 		matchesTable.grantReadWriteData(reportSplitFn);
+		// The fourth settle path - a final split can complete a match.
+		matchHistoryTable.grantWriteData(reportSplitFn);
 
 		api.addRoutes({
 			path: '/matches/split',

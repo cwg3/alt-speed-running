@@ -139,7 +139,11 @@ export async function applyMatchCompletion(
 	winner: MatchPlayer,
 	loser: MatchPlayer,
 	splits: Record<string, Record<string, number>> = {},
-	historyTableName?: string,
+	// REQUIRED, not optional. It was optional, and all four call sites
+	// silently omitted it - so every match settled without writing a
+	// history row and the screen showed only backfilled ones. An
+	// optional parameter is a compile-time check declined.
+	historyTableName: string,
 ): Promise<CompletionResult> {
 	// One timestamp for both the match record and the history sort key,
 	// so a row can be found from a match and vice versa.
@@ -205,7 +209,7 @@ export async function applyMatchCompletion(
 		},
 	}));
 
-	if (historyTableName) {
+	{
 		const m = await ddb.send(new GetCommand({
 			TableName: matchesTableName,
 			Key: { matchId },
