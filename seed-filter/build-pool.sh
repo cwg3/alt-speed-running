@@ -43,8 +43,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Candidates per type.
 #
-# Measured pass rates: village ~56% (blacksmith), and for the ocean
-# types under the two-ravine rule, somewhere around 8-17% - low enough
+# Ocean types pass the two-ravine rule far less often than land types
+# pass their own checks - low enough
 # that the old 3x multiplier ran out of candidates long before the pool
 # filled. Twelve times over covers the worst measured rate with room
 # for variance.
@@ -94,7 +94,7 @@ echo "=== stage 2b: blacksmith VERIFICATION (generated worlds, ~15s each) ==="
 # Two smithless villages reached live matches that way.
 #
 # Measured: 40 raw -> 16 pass the jigsaw -> 5 have a real smith chest.
-# The pre-filter still earns its place (65ms to reject 60% beats 15s
+# The pre-filter still earns its place (milliseconds to reject beats 15s
 # each), but it cannot be the last word.
 python3 -c "
 import json, csv

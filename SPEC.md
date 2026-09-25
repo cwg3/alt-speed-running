@@ -146,7 +146,7 @@ worth blocking this on.
 
 | Guarantee | Status |
 |---|---|
-| Village: blacksmith present | built — every village seed is now verified against a generated world (41% of jigsaw-passers actually qualify) |
+| Village: blacksmith present | built — every village seed is verified against a generated world, because the jigsaw claiming a smith piece does not mean a smith chest generated |
 | Village: 3 iron in the smith's chest (+4 from the golem = 7) | built |
 | Village: **4 iron + 3 diamonds** as an alternative to the 7-iron threshold | built (verification) — the live pool predates it, see below |
 | Village: seed ships the blacksmith's position, not the village anchor | built |
@@ -348,7 +348,7 @@ present - and vanilla's own loot roll gave no igniter on that seed, so
 the flint and steel came from the top-up, which is the guarantee that
 had failed silently the same morning.
 
-Measured pass rate: 12.5% on frame alone, about 7% including the chest.
+The frame check rejects most candidates on its own, and the chest requirement rejects more.
 The buried treasure ravine filter runs at 3%, so this is well inside
 what the pipeline already tolerates - roughly 5 minutes of build time
 per accepted seed, and build time is the cheap resource.
@@ -437,7 +437,7 @@ between the two, which is what Divine Travel depends on.
 | Bastion within **14 chunks** of nether spawn, and clearly closer than any rival | built (filter) |
 | Fortress within **16 chunks of that bastion** | built (filter) |
 | Open terrain paths between spawn, bastion and fortress | **not built** |
-| Nether arrival is not in Basalt Deltas | built (filter, ~4.4% of seeds rejected) |
+| Nether arrival is not in Basalt Deltas | built (filter) |
 | Nether arrival has usable ground, not an open lava sea | built (checked on arrival, pad placed only when unrunnable) — **[ours]**; never fired in play |
 | Blaze rods: pity-capped and mirrored | built (6 per 12 kills, max 2-miss streak) — confirmed in a live match |
 | Bastion chests: 3 iron, 5 obsidian, 48–64 string, all four types | built — confirmed live on hoglin stable and bridge |
@@ -566,7 +566,7 @@ around it.
 
 Both halves were wrong at different times, in the same way: they
 answered a question next to the one the rule asks. The fortress was
-once measured from spawn, which produced a 90% failure rate that was an
+once measured from spawn, which produced a failure rate that was an
 artefact of the question. Later the search was centred on the ORIGIN
 and took the FIRST viable fortress in region scan order rather than the
 nearest to the bastion.
@@ -801,8 +801,8 @@ filter stage. A pool that silently shrinks teaches nothing.
 | ruined portal | 6 | 3 |
 | buried treasure | 2 | 2 |
 
-Buried treasure is short because only about 3% of candidates pass the
-two-magma-ravine check, against roughly 18% for shipwreck.
+Buried treasure is short because far fewer candidates pass the
+two-magma-ravine check than shipwreck does.
 
 **Tiers 4 and 5 rejected 7 of 23 freshly filtered pairs - 30%.** Six
 failed in the nether, three of those shipping a bastion coordinate 487

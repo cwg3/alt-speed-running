@@ -93,7 +93,7 @@ fi
 # A piece name is not a chest: a taiga village satisfies "has a
 # weaponsmith piece" and can generate no smith chest whatever. SPEC.md
 # is the rule, and the half that belongs HERE is "blacksmith
-# present" - roughly 41% of jigsaw passers. The 3 iron in its chest
+# present". The 3 iron in its chest
 # is guaranteed later by LootTopUp, so it is not a seed criterion.
 python3 - <<'PY'
 import json, pathlib
@@ -121,7 +121,7 @@ if bad:
 # the mod provides, not a property to filter on: LootTopUp.VILLAGE is
 # (3, INGOTS), and it tops up a smithless village too. Filtering on it
 # as well rejected 12 of 17 perfectly good villages in a real sample -
-# a 70% cut in yield for a condition that is true by the time anyone
+# a large cut in yield for a condition that is true by the time anyone
 # plays the seed.
 ok = {r[0] for r in rows if int(r[5]) >= 1}
 d = json.load(open('/tmp/onr/output/overworld_by_type.json'))

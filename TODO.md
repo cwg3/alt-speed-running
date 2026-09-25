@@ -16,10 +16,9 @@ Known outstanding work, roughly in the order it would matter.
   downloadable by anyone invited.
 - [ ] **Pool depth.** Thin types run out fast: a player never draws
   the same seed twice, so a type with four seeds lasts four matches
-  and then silently drops out of their draw. Land types are cheap
-  (~85 candidates, ~20 min, ~$1, measured 95% spawn pass rate); ocean
-  types need the two-magma-ravine check and cost ~950 candidates and
-  ~2h for buried treasure.
+  and then silently drops out of their draw. Land types are cheap to
+  build; ocean types need the two-magma-ravine check and cost
+  considerably more.
 - [ ] **Social preview image.** GitHub web UI only — no API for it.
 
 ## Housekeeping

@@ -7,7 +7,7 @@
 # seeds-file: one nether seed per line
 # output:     mod/run/nether-all.csv, and nether-qualified.txt
 #
-# Exists because cubiomes gets nether structures wrong about 30% of the
+# Exists because cubiomes gets nether structures wrong often enough of the
 # time and every consequence was silent. See check-one-nether.sh.
 #
 # Serial by default: the parallel harness is unreliable (see
