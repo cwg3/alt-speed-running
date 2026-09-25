@@ -27,11 +27,11 @@ Known outstanding work, roughly in the order it would matter.
 - [ ] **Match worlds are never cleaned up.** Every match leaves ~40MB
   on disk forever. Replay worlds got this treatment already
   (`ReplayWorlds`); match worlds did not.
-- [ ] **"Experimental settings" warning.** Loading a match world
-  manually from the world list warns, because `MatchWorldCreator`
-  marks its custom dimension registry `Lifecycle.experimental()`.
-  Never seen during an actual match. Silencing it would suppress a
-  warning that is arguably telling the truth.
+- [x] **"Experimental settings" warning.** Documented in INSTALL.md
+  rather than silenced — the warning is accurate, and a project that
+  publishes every deviation should explain an accurate warning instead
+  of suppressing it. Revisit only if testers report it as confusing
+  despite the note.
 
 ## Deferred by decision
 
