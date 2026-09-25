@@ -20,8 +20,26 @@
 # from their bad luck.
 set -uo pipefail
 TABLE="${1:-BackendStack-SeedPoolTableB4C21150-12O8ZBQS8FM8L}"
+
+# CLOUD=1 runs tiers 4 and 5 on a spot instance instead of this
+# machine. Both have always been supported by the image - CHECK=nether
+# and CHECK=route - and only this script kept them local, which meant
+# a pool rebuild pinned somebody's laptop for hours while every other
+# stage ran on AWS.
+#
+# Two things have to be bridged, and neither is optional:
+#
+#   INPUT  the local harnesses build their own per-seed input files.
+#          The cloud runner passes a whole line through, so the lines
+#          have to arrive in the shape the mod's hook expects.
+#   OUTPUT the cloud writes the seed's own CSV row. The local harness
+#          prefixes it with the pair id and type, and everything
+#          downstream keys off the pair id, so it has to be re-joined.
+CLOUD="${CLOUD:-0}"
+WORKERS="${WORKERS:-16}"
 REGION="${REGION:-us-west-2}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export ROOT
 
 echo "=== collecting held rows ==="
 aws dynamodb scan --region "$REGION" --table-name "$TABLE" --output json \
@@ -61,11 +79,67 @@ fi
 
 echo
 echo "=== tier 4: nether as a match world ($COUNT pairs) ==="
-"$ROOT/seed-filter/verify-pairs.sh" /tmp/held-pairs.txt 1
+if [ "$CLOUD" = 1 ]; then
+  # held-pairs:  ow ns bx bz pairId type
+  # netherlocate.txt wants: OW BX BZ NS
+  awk '{print $1, $3, $4, $2}' /tmp/held-pairs.txt > /tmp/cloud-nether.txt
+  "$ROOT/cloud/run-on-spot.sh" nether /tmp/cloud-nether.txt "$WORKERS" || true
+  CLOUD_CSV=$(ls -t "$ROOT/seed-filter/results"/nether-*.csv 2>/dev/null | head -1)
+  python3 - "$CLOUD_CSV" <<'JOIN'
+import csv, pathlib, sys
+# Re-attach pairId and type, which the cloud row does not carry.
+byseed = {}
+for line in pathlib.Path('/tmp/held-pairs.txt').read_text().split('\n'):
+    f = line.split()
+    if len(f) >= 6:
+        byseed[f[0]] = (f[4], f[5])
+out = ['pairId,type,seed,bx,bz,fx,fz,bastionDist,fortressDist,verdict,'
+       'shippedX,shippedZ,shipError,containers,secondBastionDist,bastionCount']
+src = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else None
+if src:
+    for r in csv.reader(open(src)):
+        if not r or not r[0].lstrip('-').isdigit():
+            continue
+        pid, t = byseed.get(r[0], ('', ''))
+        out.append(','.join([pid, t] + r))
+pathlib.Path(__import__('os').environ.get('ROOT', '.') + '/mod/run/pairs-all.csv'
+             ).write_text('\n'.join(out) + '\n')
+print(f'  {len(out)-1} rows -> mod/run/pairs-all.csv')
+JOIN
+else
+  "$ROOT/seed-filter/verify-pairs.sh" /tmp/held-pairs.txt 1
+fi
 
 echo
 echo "=== tier 5: overworld opening ($COUNT pairs) ==="
-"$ROOT/seed-filter/verify-routes.sh" /tmp/held-routes.txt 1
+if [ "$CLOUD" = 1 ]; then
+  # held-routes is already the shape routecheck.txt wants, minus the
+  # trailing pair id the hook ignores.
+  awk '{print $1, $2, $3, $4, $5, $6, $7}' /tmp/held-routes.txt > /tmp/cloud-route.txt
+  "$ROOT/cloud/run-on-spot.sh" route /tmp/cloud-route.txt "$WORKERS" || true
+  CLOUD_CSV=$(ls -t "$ROOT/seed-filter/results"/route-*.csv 2>/dev/null | head -1)
+  python3 - "$CLOUD_CSV" <<'JOIN'
+import csv, pathlib, sys, os
+byseed = {}
+for line in pathlib.Path('/tmp/held-routes.txt').read_text().split('\n'):
+    f = line.split()
+    if len(f) >= 8:
+        byseed[f[1]] = (f[7], f[0])
+out = ['pairId,type,seed,lava,chests,verdict,detail,extra']
+src = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else None
+if src:
+    for r in csv.reader(open(src)):
+        if not r or not r[0].lstrip('-').isdigit():
+            continue
+        pid, t = byseed.get(r[0], ('', ''))
+        out.append(','.join([pid, t] + r))
+pathlib.Path(os.environ.get('ROOT', '.') + '/mod/run/routes-all.csv'
+             ).write_text('\n'.join(out) + '\n')
+print(f'  {len(out)-1} rows -> mod/run/routes-all.csv')
+JOIN
+else
+  "$ROOT/seed-filter/verify-routes.sh" /tmp/held-routes.txt 1
+fi
 
 echo
 echo "=== releasing what passed ==="

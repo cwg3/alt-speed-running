@@ -55,7 +55,13 @@ case "$CHECK" in
 	spawn)         INFILE=spawncheck.txt;   CSV=spawncheck.csv   ;;
 	ravine)        INFILE=ravine.txt;       CSV=ravine.csv       ;;
 	nether)        INFILE=netherlocate.txt; CSV=netherlocate.csv ;;
-	route)         INFILE=routecheck.txt;   CSV=routecheck.csv   ;;
+	# SEEDFIELD=2: a routecheck line starts with the seed TYPE, not
+	# the seed. Taking field 1 sets level-seed=village, which Minecraft
+	# hashes into some unrelated world - every route check would have
+	# verified the wrong place. Nothing caught it because route had
+	# only ever run on a laptop, where a different script builds the
+	# input.
+	route)         INFILE=routecheck.txt;   CSV=routecheck.csv;   SEEDFIELD=2 ;;
 	portalfilter)  INFILE=portalfilter.txt; CSV=portalfilter.csv ;;
 	# The blacksmith check. The hook that reads this has always been in
 	# the image - the jar ships with it - but the case was missing, so
@@ -72,7 +78,9 @@ echo "[container] $CHECK: $total seeds" >&2
 
 while read -r line; do
 	case "$line" in ''|\#*) continue ;; esac
-	seed=${line%% *}
+	# Which field carries the world seed depends on the check - see
+	# the case block above.
+	seed=$(printf '%s\n' "$line" | awk -v f="${SEEDFIELD:-1}" '{print $f}')
 	done=$((done + 1))
 
 	# A stale world directory is the difference between generating the
