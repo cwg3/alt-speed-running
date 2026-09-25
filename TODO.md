@@ -42,7 +42,23 @@ Four deviations are documented but have never actually fired in a
 match, which is a bad combination for a project whose pitch is that
 every deviation is published:
 
-- [ ] hoglin drops (needs a player-credited melee kill)
-- [ ] suspicious stew
-- [ ] drowned tridents
-- [ ] wither skeleton crowding
+Each needs an observation vanilla cannot also explain. Casual
+sightings do not count, and two have already been mistaken for
+confirmation:
+
+- [ ] **hoglin drops** — the schedule is 24 porkchops across 8 kills
+  IN A MATCH. Vanilla drops 2-4 per kill and averages the same over
+  eight, so single kills prove nothing: 3 is vanilla's commonest roll.
+  Eight kills totalling exactly 24 is the tell. The mixin also logs
+  `Hoglin schedule: N porkchops and M hides per K kills` when it runs,
+  which is the cheaper check.
+- [ ] **suspicious stew** — only HARMFUL effects are stripped, and
+  most flowers give benign ones. Eating stew without being hurt is not
+  evidence. Proof needs a stew brewed from a wither rose or a lily of
+  the valley, eaten in a match, with no wither or poison applied.
+- [ ] **drowned tridents**
+- [ ] **wither skeleton crowding**
+
+Note that every one of these is inert in a practice world by design -
+the mixins return early when `MatchState.inMatch()` is false - so any
+test has to happen inside a real match.
