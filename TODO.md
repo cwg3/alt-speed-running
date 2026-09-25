@@ -43,29 +43,41 @@ Known outstanding work, roughly in the order it would matter.
   to know — what killed me, and where did it come from — the death
   event and the entity track already answer.
 
-## Unverified in play
+## We need your help! 🎣
 
-Four deviations are documented but have never actually fired in a
-match, which is a bad combination for a project whose pitch is that
-every deviation is published:
+Four deviations are documented but have never been caught happening in
+a real match. Everything else on this ladder has been confirmed in
+play; these four have not, and we would rather say so than quietly
+leave them on the list.
 
-Each needs an observation vanilla cannot also explain. Casual
-sightings do not count, and two have already been mistaken for
-confirmation:
+**If you catch one, tell us.** A screenshot, a clip, or the match ID
+is plenty. This is the most useful thing a tester can do right now,
+and it is the sort of thing that only turns up when a lot of people
+are playing rather than one person hunting for it.
 
-- [ ] **hoglin drops** — the schedule is 24 porkchops across 8 kills
-  IN A MATCH. Vanilla drops 2-4 per kill and averages the same over
-  eight, so single kills prove nothing: 3 is vanilla's commonest roll.
-  Eight kills totalling exactly 24 is the tell. The mixin also logs
-  `Hoglin schedule: N porkchops and M hides per K kills` when it runs,
-  which is the cheaper check.
-- [ ] **suspicious stew** — only HARMFUL effects are stripped, and
-  most flowers give benign ones. Eating stew without being hurt is not
-  evidence. Proof needs a stew brewed from a wither rose or a lily of
-  the valley, eaten in a match, with no wither or poison applied.
-- [ ] **drowned tridents**
-- [ ] **wither skeleton crowding**
+One catch: **none of these do anything in a practice world.** Every
+one is inert unless you are in a real match — the code checks, and
+leaves practice worlds completely vanilla. So it has to happen in a
+match to count.
 
-Note that every one of these is inert in a practice world by design -
-the mixins return early when `MatchState.inMatch()` is false - so any
-test has to happen inside a real match.
+The other catch is that Minecraft is random, so "I saw the thing" is
+not quite enough on its own. What we need is an observation vanilla
+cannot also explain:
+
+- [ ] **Hoglin drops** — a match gives you 24 porkchops across 8
+  kills, always, and your opponent gets the same. Vanilla drops 2–4
+  per kill and averages the same over eight, so a single kill proves
+  nothing: 3 is vanilla's commonest roll. **Eight kills totalling
+  exactly 24** is the tell.
+- [ ] **Suspicious stew** — only *harmful* effects are stripped, and
+  most flowers give harmless ones anyway. So eating stew and being
+  fine is not evidence. What we need is a stew that *should* have
+  hurt — brewed from a wither rose or a lily of the valley — eaten in
+  a match, with no wither or poison applied.
+- [ ] **Drowned tridents**
+- [ ] **Wither skeleton crowding**
+
+Two of these have already been reported as seen, and both turned out
+to be equally explained by vanilla. No harm done — that is exactly how
+this is supposed to work, and we would rather chase a few false
+positives than mark something confirmed that is not.
