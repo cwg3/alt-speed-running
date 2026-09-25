@@ -24,6 +24,9 @@ set -uo pipefail
 PER="${1:-3}"
 CAND="${2:-60}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# CLOUD=1 sends every stage to a spot instance instead of this machine.
+WORKERS="${WORKERS:-16}"
+source "$ROOT/seed-filter/run-check.sh"
 LOG=/tmp/overnight.log
 exec > >(tee -a "$LOG") 2>&1
 echo "=== overnight rebuild started $(date) : $PER per type, $CAND candidates each ==="
@@ -46,8 +49,7 @@ out.write_text('\n'.join(rows) + '\n')
 print(f'stage 2: {len(rows)} candidates to check for wood at spawn')
 PY
 
-"$ROOT/seed-filter/verify-spawn.sh" /tmp/onr/spawn-in.txt 1
-cp "$ROOT/mod/run/spawn-filter.csv" /tmp/onr/spawn.csv
+run_check spawn /tmp/onr/spawn-in.txt "$WORKERS" /tmp/onr/spawn.csv
 
 python3 - "$ROOT" <<'PY'
 import json, csv, pathlib, sys
@@ -70,8 +72,7 @@ pathlib.Path('/tmp/onr/rp-in.txt').write_text('\n'.join(rows) + '\n')
 print(f'stage 3a: {len(rows)} ruined portal candidates to frame-check')
 PY
 if [ -s /tmp/onr/rp-in.txt ]; then
-  "$ROOT/seed-filter/verify-rp.sh" /tmp/onr/rp-in.txt 1
-  cp "$ROOT/mod/run/rp-filter.csv" /tmp/onr/rp.csv
+  run_check portalfilter /tmp/onr/rp-in.txt "$WORKERS" /tmp/onr/rp.csv
   python3 - <<'PY'
 import json, csv
 ok = {r[0] for r in list(csv.reader(open('/tmp/onr/rp.csv')))[1:] if r and r[1]=='PASS'}
@@ -103,8 +104,7 @@ pathlib.Path('/tmp/onr/village-in.txt').write_text(('\n'.join(rows) + '\n') if r
 print(f'stage 3b: {len(rows)} village candidates to blacksmith-check')
 PY
 if [ -s /tmp/onr/village-in.txt ]; then
-  "$ROOT/seed-filter/verify-villages.sh" /tmp/onr/village-in.txt 1
-  cp "$ROOT/mod/run/village-all.csv" /tmp/onr/village.csv
+  run_check village /tmp/onr/village-in.txt "$WORKERS" /tmp/onr/village.csv
   python3 - <<'PY'
 import json, csv, sys
 # seed,ironIngots,hasIronPickaxe,hasIronArmor,chests,smithChests,diamonds
@@ -148,8 +148,7 @@ pathlib.Path('/tmp/onr/ravine-in.txt').write_text(('\n'.join(rows) + '\n') if ro
 print(f'stage 3c: {len(rows)} ocean candidates to ravine-check')
 PY
 if [ -s /tmp/onr/ravine-in.txt ]; then
-  "$ROOT/seed-filter/verify-ravines.sh" /tmp/onr/ravine-in.txt 1
-  cp "$ROOT/mod/run/ravine-all.csv" /tmp/onr/ravine.csv
+  run_check ravine /tmp/onr/ravine-in.txt "$WORKERS" /tmp/onr/ravine.csv
   python3 - <<'PY'
 import json, csv, sys
 rows = [r for r in csv.reader(open('/tmp/onr/ravine.csv')) if len(r) > 3]

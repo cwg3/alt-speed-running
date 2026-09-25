@@ -37,6 +37,8 @@ PER="${1:-6}"
 CAND="${2:-400}"
 WORKERS="${3:-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# CLOUD=1 sends every stage to a spot instance instead of this machine.
+source "$ROOT/seed-filter/run-check.sh"
 WORK=/tmp/ocean
 LOG=/tmp/ocean-rebuild.log
 exec > >(tee -a "$LOG") 2>&1
@@ -78,8 +80,7 @@ fi
 
 echo
 echo "=== stage 3: wood at spawn, and the wreck's own chests ==="
-"$ROOT/seed-filter/verify-spawn.sh" "$WORK/spawn-in.txt" "$WORKERS"
-cp "$ROOT/mod/run/spawn-filter.csv" "$WORK/spawn.csv"
+run_check spawn "$WORK/spawn-in.txt" "$WORKERS" "$WORK/spawn.csv"
 python3 - <<'PY'
 import json, csv
 rows = [r for r in csv.reader(open('/tmp/ocean/spawn.csv')) if r]
@@ -106,8 +107,7 @@ fi
 
 echo
 echo "=== stage 4: two magma ravines (the stage overnight-rebuild never ran) ==="
-"$ROOT/seed-filter/verify-ravines.sh" "$WORK/ravine-in.txt" "$WORKERS"
-cp "$ROOT/mod/run/ravine-all.csv" "$WORK/ravine.csv"
+run_check ravine "$WORK/ravine-in.txt" "$WORKERS" "$WORK/ravine.csv"
 python3 - "$PER" <<'PY'
 import json, csv, sys
 per = int(sys.argv[1])

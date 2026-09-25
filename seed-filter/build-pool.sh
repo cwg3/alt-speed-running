@@ -40,6 +40,9 @@ set -euo pipefail
 PER_TYPE="${1:-40}"
 TABLE="${2:-BackendStack-SeedPoolTableB4C21150-12O8ZBQS8FM8L}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# CLOUD=1 sends every stage to a spot instance instead of this machine.
+WORKERS="${WORKERS:-16}"
+source "$ROOT/seed-filter/run-check.sh"
 
 # Candidates per type.
 #
@@ -105,7 +108,7 @@ for s in passed:
     x, z = coords[s]
     print(s, x, z)
 " > run/village-candidates.txt
-bash "$ROOT/seed-filter/verify-villages.sh" run/village-candidates.txt 1
+run_check village run/village-candidates.txt "$WORKERS" "$ROOT/mod/run/village-all.csv"
 
 echo
 echo "=== stage 3: magma ravine check (generated worlds, ~12s each) ==="
