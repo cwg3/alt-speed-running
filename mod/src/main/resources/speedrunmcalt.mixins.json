@@ -1,37 +1,38 @@
 {
-	"required": true,
-	"package": "com.speedrunmcalt.mixin",
-	"compatibilityLevel": "JAVA_8",
-	"mixins": [
-		"StartupProofMixin",
-		"SplitTrackerMixin",
-		"PiglinBarterMixin",
-		"EyeOfEnderFairnessMixin",
-		"WorldRandomAccessor",
-		"SpawnerDeterminismMixin",
-		"SheepShearFairnessMixin",
-		"EndermiteFairnessMixin",
-		"LootableContainerAccessor",
-		"WorldChunkAccessor",
-		"BlazeRodMixin",
-		"HoglinDropMixin",
-		"DrownedTridentMixin",
-		"SuspiciousStewMixin",
-		"WitherSkeletonCrowdMixin",
-		"GravelFlintMixin",
-		"NetherStructureSeedMixin",
-		"TempleSpawnMixin",
-		"ReplayEventsMixin",
-		"ReplayPickupMixin"
-	],
-	"client": [
-		"TitleScreenMixin",
-		"GammaUnlockMixin",
-		"PauseMenuMixin",
-		"LoadingScreenLogoMixin",
-		"SpectatorSlotMixin"
-	],
-	"injectors": {
-		"defaultRequire": 1
-	}
+  "required": true,
+  "package": "com.speedrunmcalt.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [
+    "StartupProofMixin",
+    "SplitTrackerMixin",
+    "PiglinBarterMixin",
+    "EyeOfEnderFairnessMixin",
+    "WorldRandomAccessor",
+    "SpawnerDeterminismMixin",
+    "SheepShearFairnessMixin",
+    "EndermiteFairnessMixin",
+    "LootableContainerAccessor",
+    "WorldChunkAccessor",
+    "BlazeRodMixin",
+    "HoglinDropMixin",
+    "DrownedTridentMixin",
+    "SuspiciousStewMixin",
+    "WitherSkeletonCrowdMixin",
+    "GravelFlintMixin",
+    "NetherStructureSeedMixin",
+    "TempleSpawnMixin",
+    "ReplayEventsMixin",
+    "ReplayPickupMixin",
+    "ReplayPickupNameMixin"
+  ],
+  "client": [
+    "TitleScreenMixin",
+    "GammaUnlockMixin",
+    "PauseMenuMixin",
+    "LoadingScreenLogoMixin",
+    "SpectatorSlotMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
 }
