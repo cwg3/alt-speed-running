@@ -106,6 +106,12 @@ export const handler = async (
 			// version zero. The client decides whether it can rebuild.
 			worldSetupVersion: stamped,
 			players: players.map((p) => p.uuid),
+			// Splits alongside the traces, so playback can mark WHERE
+			// in a run each one happened. A position trace says where
+			// somebody was; it does not say that this was the moment
+			// they got the rod. The events are already recorded - they
+			// just never reached the replay.
+			splits: match.Item.splits ?? {},
 			traces,
 		}),
 	};

@@ -1,6 +1,6 @@
 // Builds a plausible replay trace for the pace bot.
 //
-//   npx tsx scripts/synthTrace.ts <finishSeconds> [hz] [startX] [startZ]
+//   npx tsx scripts/synthTrace.ts <finishSeconds> [hz] [startX] [startZ] [bastionX] [bastionZ]
 //
 // Prints the packed sample rows on stdout for pace-bot.sh to upload.
 //
@@ -57,6 +57,13 @@ function main() {
 	// opponent that runs somewhere else is not much of a test.
 	const startX = parseFloat(process.argv[4] ?? '0');
 	const startZ = parseFloat(process.argv[5] ?? '0');
+	// Where the bastion actually is, so the nether leg TRAVELS there
+	// rather than wandering. A synthetic opponent that never visits the
+	// structure it claims to have looted is not testing much - and
+	// "trace them to the bastion" is the first thing anybody tries.
+	const bastionX = parseFloat(process.argv[6] ?? 'NaN');
+	const bastionZ = parseFloat(process.argv[7] ?? 'NaN');
+	const hasBastion = Number.isFinite(bastionX) && Number.isFinite(bastionZ);
 	const step = 1 / hz;
 
 	const rows: string[] = [];
@@ -81,6 +88,25 @@ function main() {
 				x = 100; z = 0; y = 50;
 			}
 			prevDim = dim;
+		} else if (dim === NETHER && hasBastion) {
+			// Head for the bastion, then mill around it. Still not a
+			// real route - it does not path around lava or ravines -
+			// but it arrives where the match says the bastion is, at
+			// roughly when the bot claims to have got there.
+			const dx = bastionX - x;
+			const dz = bastionZ - z;
+			const dist = Math.hypot(dx, dz);
+			const speed = WALK * step;
+			if (dist > 6) {
+				x += (dx / dist) * speed;
+				z += (dz / dist) * speed;
+				heading = Math.atan2(dz, dx);
+			} else {
+				heading += 0.08;
+				x += Math.cos(heading) * speed * 0.4;
+				z += Math.sin(heading) * speed * 0.4;
+			}
+			y += Math.sin(t / 3) * 0.05;
 		} else {
 			// Wander with a slowly turning heading rather than a
 			// straight line: a real run does not travel on a bearing

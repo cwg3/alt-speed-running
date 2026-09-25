@@ -59,8 +59,19 @@ public final class ReplayData {
 	/** Keyed by player uuid; a track's samples may be null if none was uploaded. */
 	public final Map<String, Track> tracks;
 
+	/**
+	 * uuid -> split name -> time in ms.
+	 *
+	 * A trace says where somebody was. Splits say which moments
+	 * mattered, and without them a replay is ten minutes of walking
+	 * with no landmarks.
+	 */
+	public final Map<String, Map<String, Long>> splits;
+
 	public ReplayData(String matchId, long overworldSeed, long netherSeed, String seedType,
-			int worldSetupVersion, Map<String, Track> tracks) {
+			int worldSetupVersion, Map<String, Track> tracks,
+			Map<String, Map<String, Long>> splits) {
+		this.splits = splits;
 		this.matchId = matchId;
 		this.overworldSeed = overworldSeed;
 		this.netherSeed = netherSeed;

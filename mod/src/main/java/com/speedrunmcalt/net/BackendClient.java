@@ -296,13 +296,27 @@ public final class BackendClient {
 					t.has("username") ? t.get("username").getAsString() : "player", samples));
 		}
 
+		java.util.Map<String, java.util.Map<String, Long>> splits =
+				new java.util.LinkedHashMap<>();
+		if (resp.has("splits") && resp.get("splits").isJsonObject()) {
+			for (java.util.Map.Entry<String, com.google.gson.JsonElement> e
+					: resp.getAsJsonObject("splits").entrySet()) {
+				java.util.Map<String, Long> byName = new java.util.LinkedHashMap<>();
+				for (java.util.Map.Entry<String, com.google.gson.JsonElement> se
+						: e.getValue().getAsJsonObject().entrySet()) {
+					byName.put(se.getKey(), se.getValue().getAsLong());
+				}
+				splits.put(e.getKey(), byName);
+			}
+		}
+
 		return new ReplayData(
 				resp.get("matchId").getAsString(),
 				resp.get("overworldSeed").getAsLong(),
 				resp.get("netherSeed").getAsLong(),
 				str(resp, "seedType", "unknown"),
 				num(resp, "worldSetupVersion"),
-				tracks);
+				tracks, splits);
 	}
 
 	/** One match's splits, both players, in route order. */

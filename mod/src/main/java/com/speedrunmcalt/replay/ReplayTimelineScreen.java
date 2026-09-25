@@ -170,6 +170,21 @@ public class ReplayTimelineScreen extends Screen {
 				fill(matrices, barLeft + px, barY, barLeft + px + 1, barY + BAR_HEIGHT,
 						0xFF000000 | colour);
 			}
+			// Split markers. The bar says which dimension; these say
+			// which MOMENTS - without them a ten minute run is a strip
+			// of colour with no landmarks.
+			java.util.Map<String, Long> mine =
+					data.splits.get(ReplayPlayback.watching());
+			if (mine != null) {
+				for (Long at : mine.values()) {
+					if (at == null || at < 0 || at > duration) {
+						continue;
+					}
+					int mx = barLeft + (int) ((at / (double) duration) * width);
+					fill(matrices, mx, barY - 4, mx + 1, barY + BAR_HEIGHT + 4, 0xFFFFD400);
+				}
+			}
+
 			// Playhead.
 			int head = barLeft + (int) ((pos / (double) duration) * width);
 			fill(matrices, head - 1, barY - 3, head + 1, barY + BAR_HEIGHT + 3, 0xFFFFFFFF);

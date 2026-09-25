@@ -108,7 +108,42 @@ public final class MatchHud {
 				right - client.textRenderer.getWidth(hint), y,
 				com.speedrunmcalt.menu.Palette.DIM);
 
+		renderLastSplit(matrices, client, data, at, watched);
 		renderReplayControls(matrices, client);
+	}
+
+	/**
+	 * The most recent split the watched player has reached.
+	 *
+	 * A trace shows movement and nothing else - no trades, no kills,
+	 * no rod. Those moments ARE recorded, as splits, and without
+	 * surfacing them a replay is ten minutes of walking with nothing
+	 * to anchor it.
+	 */
+	private static void renderLastSplit(MatrixStack matrices, MinecraftClient client,
+			com.speedrunmcalt.net.ReplayData data, long at, String watched) {
+		java.util.Map<String, Long> mine = data.splits.get(watched);
+		if (mine == null || mine.isEmpty()) {
+			return;
+		}
+		String best = null;
+		long bestAt = -1;
+		for (java.util.Map.Entry<String, Long> e : mine.entrySet()) {
+			Long t = e.getValue();
+			if (t != null && t <= at && t > bestAt) {
+				bestAt = t;
+				best = e.getKey();
+			}
+		}
+		if (best == null) {
+			return;
+		}
+		String label = best.replace('_', ' ') + "  " + MatchState.formatTime(bestAt);
+		int w = client.textRenderer.getWidth(label);
+		drawShadowed(matrices, client, label,
+				(client.getWindow().getScaledWidth() - w) / 2,
+				client.getWindow().getScaledHeight() - 34,
+				com.speedrunmcalt.menu.Palette.YELLOW);
 	}
 
 	/**
