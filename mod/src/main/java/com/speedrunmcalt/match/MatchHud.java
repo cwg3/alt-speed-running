@@ -273,51 +273,94 @@ public final class MatchHud {
 
 		for (int i = 0; i < slots; i++) {
 			int slotX = x + 1 + i * SLOT;
-			String text = labels[i];
-			int colour = com.speedrunmcalt.menu.Palette.DIM;
+			int iconX = slotX + 2;
+			int iconY = y + 3;
 
-			// The three with a state worth showing say what it IS, not
-			// only what the key does - a speed control that always
-			// reads "speed" cannot tell you that you are at 4x.
-			if (i == 0) {
-				boolean paused = com.speedrunmcalt.replay.ReplayPlayback.paused();
-				// U+2016, not U+23F8. The pause glyph was added in
-				// Unicode 7.0 and Minecraft's unicode font predates
-				// it, so it would draw as an empty box - which looks
-				// exactly like a bug in the control, not a missing
-				// character.
-				text = paused ? "\u25B6" : "\u2016";
-				colour = paused ? com.speedrunmcalt.menu.Palette.PHOSPHOR
-						: com.speedrunmcalt.menu.Palette.CYAN;
-			} else if (i == 1) {
-				text = "\u25C0\u25C0";
-			} else if (i == 2) {
-				text = "\u25B6\u25B6";
-			} else if (i == 3) {
-				float sp = com.speedrunmcalt.replay.ReplayPlayback.speed();
-				text = (sp == (long) sp ? String.valueOf((long) sp) : String.valueOf(sp))
-						+ "\u00D7";
-				colour = sp != 1f ? com.speedrunmcalt.menu.Palette.CYAN
-						: com.speedrunmcalt.menu.Palette.DIM;
-			} else if (i == 4) {
-				boolean free = com.speedrunmcalt.replay.ReplayPlayback.camera()
-						== com.speedrunmcalt.replay.ReplayPlayback.Camera.FREE;
-				text = free ? "\u25C7" : "\u25C6";
-				colour = free ? com.speedrunmcalt.menu.Palette.CYAN
-						: com.speedrunmcalt.menu.Palette.DIM;
-			} else if (i == 5) {
-				text = "\u21C4";
+			// Items, not glyphs. A hotbar full of items is what a
+			// Minecraft player already knows how to read, and the
+			// sprites carry meaning no 20px word can: sugar IS speed,
+			// an ender eye IS looking somewhere you are not, a head IS
+			// the other player.
+			switch (i) {
+				case 0: {
+					// Green for running, red for held. Concrete rather
+					// than dye because a flat block of colour reads at
+					// 16px and a dye blob does not.
+					boolean paused = com.speedrunmcalt.replay.ReplayPlayback.paused();
+					icon(client, paused
+							? new net.minecraft.item.ItemStack(net.minecraft.item.Items.RED_CONCRETE)
+							: new net.minecraft.item.ItemStack(net.minecraft.item.Items.LIME_CONCRETE),
+							iconX, iconY);
+					break;
+				}
+				case 1:
+					// The same arrow as slot 3, mirrored. Minecraft has
+					// no backwards arrow, and two different items would
+					// have made a symmetric pair look like two
+					// unrelated controls.
+					mirroredIcon(client,
+							new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW),
+							iconX, iconY);
+					break;
+				case 2:
+					icon(client,
+							new net.minecraft.item.ItemStack(net.minecraft.item.Items.ARROW),
+							iconX, iconY);
+					break;
+				case 3: {
+					// Sugar, with the multiplier drawn where a stack
+					// count goes - the one place on a hotbar slot that
+					// already means "how many".
+					float sp = com.speedrunmcalt.replay.ReplayPlayback.speed();
+					String label = (sp == (long) sp ? String.valueOf((long) sp)
+							: String.valueOf(sp)) + "x";
+					net.minecraft.item.ItemStack sugar =
+							new net.minecraft.item.ItemStack(net.minecraft.item.Items.SUGAR);
+					icon(client, sugar, iconX, iconY);
+					client.getItemRenderer().renderGuiItemOverlay(
+							client.textRenderer, sugar, iconX, iconY, label);
+					break;
+				}
+				case 4: {
+					// An ender eye goes where you are not; a compass
+					// always points home. Free camera and locked.
+					boolean free = com.speedrunmcalt.replay.ReplayPlayback.camera()
+							== com.speedrunmcalt.replay.ReplayPlayback.Camera.FREE;
+					icon(client, new net.minecraft.item.ItemStack(free
+							? net.minecraft.item.Items.ENDER_EYE
+							: net.minecraft.item.Items.COMPASS), iconX, iconY);
+					break;
+				}
+				default:
+					icon(client,
+							new net.minecraft.item.ItemStack(net.minecraft.item.Items.PLAYER_HEAD),
+							iconX, iconY);
+					break;
 			}
-
-			// No key numbers. The hotbar already says which key each
-			// slot is - that is what a hotbar means - and printing
-			// "1 2 3 4 5 6" above it labels something nobody needed
-			// labelled.
-			int tw = client.textRenderer.getWidth(text);
-			drawShadowed(matrices, client, text,
-					slotX + (SLOT - tw) / 2, y + 7, colour);
 		}
 		com.mojang.blaze3d.systems.RenderSystem.disableBlend();
+	}
+
+	private static void icon(MinecraftClient client, net.minecraft.item.ItemStack stack,
+			int x, int y) {
+		client.getItemRenderer().renderGuiItemIcon(stack, x, y);
+	}
+
+	/**
+	 * The same sprite, flipped left to right.
+	 *
+	 * Minecraft has no backwards arrow. Translating to the icon's far
+	 * edge and scaling x by -1 draws it back across its own box, so
+	 * the pair reads as one control in two directions rather than as
+	 * two unrelated items.
+	 */
+	private static void mirroredIcon(MinecraftClient client, net.minecraft.item.ItemStack stack,
+			int x, int y) {
+		com.mojang.blaze3d.systems.RenderSystem.pushMatrix();
+		com.mojang.blaze3d.systems.RenderSystem.translatef(x + 16f, y, 0f);
+		com.mojang.blaze3d.systems.RenderSystem.scalef(-1f, 1f, 1f);
+		client.getItemRenderer().renderGuiItemIcon(stack, 0, 0);
+		com.mojang.blaze3d.systems.RenderSystem.popMatrix();
 	}
 
 	private static void render(MatrixStack matrices, float tickDelta) {
