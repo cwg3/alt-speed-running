@@ -174,8 +174,25 @@ public class MatchHistoryScreen extends Screen {
 		rowsTop = 40;
 		int y = 40;
 		for (MatchHistoryEntry e : entries) {
-			this.textRenderer.drawWithShadow(matrices, e.won ? "WON" : "LOST",
-					left, y, e.won ? Palette.CYAN : Palette.MAGENTA);
+			// A forfeit is not a loss and should not read as one.
+			//
+			// The row is per player, and forfeitedBy is the quitter's
+			// uuid - so the same match says FORFEIT on the quitter's
+			// row and WON on the other, with a marker saying how. A
+			// player scrolling their own history can tell a run they
+			// gave up from one they were beaten in, which is the
+			// distinction the record existed to keep.
+			boolean iQuit = e.forfeitedBy != null
+					&& e.forfeitedBy.equals(com.speedrunmcalt.menu.AltSession.uuid());
+			String verdict = e.won ? "WON" : (iQuit ? "FORFEIT" : "LOST");
+			this.textRenderer.drawWithShadow(matrices, verdict,
+					left, y, e.won ? Palette.CYAN
+							: (iQuit ? Palette.ALERT : Palette.MAGENTA));
+			if (e.won && e.forfeitedBy != null) {
+				// Won because they quit, not because you were faster.
+				this.textRenderer.drawWithShadow(matrices, "ff",
+						left + 26, y, Palette.DIM);
+			}
 
 			this.textRenderer.drawWithShadow(matrices, "vs", left + 34, y, Palette.DIM);
 			this.textRenderer.drawWithShadow(matrices, e.opponentName,

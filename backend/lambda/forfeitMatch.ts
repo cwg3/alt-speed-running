@@ -57,7 +57,9 @@ export const handler = async (
 
 	const result = await applyMatchCompletion(
 		MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, body.matchId,
-		opponent, quitter, match.Item.splits ?? {}, MATCH_HISTORY_TABLE_NAME);
+		opponent, quitter, match.Item.splits ?? {}, MATCH_HISTORY_TABLE_NAME,
+		// The quitter, so history can say forfeit rather than loss.
+		quitter.uuid);
 
 	if (result.alreadyCompleted) {
 		return {

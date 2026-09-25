@@ -25,9 +25,18 @@ public final class MatchHistoryEntry {
 	 */
 	public final int worldSetupVersion;
 
+	/**
+	 * Who quit, or null if nobody did.
+	 *
+	 * A forfeit and a loss are not the same result. Nothing recorded
+	 * this before, so a player who conceded at 3:29 appeared in
+	 * history exactly as one who was beaten to the dragon.
+	 */
+	public final String forfeitedBy;
+
 	public MatchHistoryEntry(String matchId, long completedAt, String opponentName,
 			boolean won, int ratingDelta, int seasonPointsAwarded,
-			String seedType, int worldSetupVersion) {
+			String seedType, int worldSetupVersion, String forfeitedBy) {
 		this.matchId = matchId;
 		this.completedAt = completedAt;
 		this.opponentName = opponentName;
@@ -36,5 +45,6 @@ public final class MatchHistoryEntry {
 		this.seasonPointsAwarded = seasonPointsAwarded;
 		this.seedType = seedType;
 		this.worldSetupVersion = worldSetupVersion;
+		this.forfeitedBy = forfeitedBy;
 	}
 }

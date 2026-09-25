@@ -58,6 +58,9 @@ export const handler = async (
 		opponentName: r.opponentName,
 		opponentUuid: r.opponentUuid,
 		won: r.won,
+		// Who quit, or null. A forfeit and a loss are different
+		// results; the screen decides how to say so.
+		forfeitedBy: r.forfeitedBy ?? null,
 		ratingDelta: r.ratingDelta,
 		seasonPointsAwarded: r.seasonPointsAwarded,
 		seedType: r.seedType,

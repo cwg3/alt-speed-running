@@ -97,6 +97,8 @@ async function writeHistory(
 	loserDelta: number,
 	seasonPoints: number,
 	completedAt: number,
+	/** Set when the match ended because someone quit. */
+	forfeitedBy?: string,
 ): Promise<void> {
 	const rows = [
 		{ me: winner, them: loser, won: true, delta: winnerDelta, points: seasonPoints },
@@ -110,9 +112,14 @@ async function writeHistory(
 				UpdateExpression: 'SET matchId = :m, opponentUuid = :ou, opponentName = :on, '
 					+ 'won = :w, ratingDelta = :d, seasonPointsAwarded = :p, '
 					+ 'seedType = :st, overworldSeed = :os, netherSeed = :ns, '
-					+ 'worldSetupVersion = :wsv',
+					+ 'worldSetupVersion = :wsv, forfeitedBy = :ff',
 				ExpressionAttributeValues: {
 					':m': matchId,
+					// null, not absent: 'this match was not forfeited'
+					// and 'this row predates the field' are different
+					// facts, and a reader that cannot tell them apart
+					// will show old losses as forfeits or the reverse.
+					':ff': forfeitedBy ?? null,
 					':ou': r.them.uuid,
 					':on': r.them.username ?? 'opponent',
 					':w': r.won,
@@ -144,6 +151,15 @@ export async function applyMatchCompletion(
 	// history row and the screen showed only backfilled ones. An
 	// optional parameter is a compile-time check declined.
 	historyTableName: string,
+	/**
+	 * Who quit, when that is how the match ended.
+	 *
+	 * A forfeit and a loss are not the same result and should not
+	 * read as one. Nothing recorded it before, so history showed a
+	 * player who conceded at 3:29 exactly as it showed one who was
+	 * beaten to the dragon.
+	 */
+	forfeitedBy?: string,
 ): Promise<CompletionResult> {
 	// One timestamp for both the match record and the history sort key,
 	// so a row can be found from a match and vice versa.
@@ -152,7 +168,8 @@ export async function applyMatchCompletion(
 		await ddb.send(new UpdateCommand({
 			TableName: matchesTableName,
 			Key: { matchId },
-			UpdateExpression: 'SET #status = :completed, winnerUuid = :winner, completedAt = :now',
+			UpdateExpression: 'SET #status = :completed, winnerUuid = :winner, completedAt = :now, '
+				+ 'forfeitedBy = :forfeit',
 			ConditionExpression: '#status = :pending',
 			ExpressionAttributeNames: { '#status': 'status' },
 			ExpressionAttributeValues: {
@@ -160,6 +177,7 @@ export async function applyMatchCompletion(
 				':pending': 'pending',
 				':winner': winner.uuid,
 				':now': completedAt,
+				':forfeit': forfeitedBy ?? null,
 			},
 		}));
 	} catch (err) {
@@ -216,7 +234,7 @@ export async function applyMatchCompletion(
 			ProjectionExpression: 'seedType, overworldSeed, netherSeed, worldSetupVersion',
 		}));
 		await writeHistory(historyTableName, matchId, m.Item ?? {},
-			winner, loser, winnerDelta, loserDelta, seasonPoints, completedAt);
+			winner, loser, winnerDelta, loserDelta, seasonPoints, completedAt, forfeitedBy);
 	}
 
 	// Clear the pointer so neither player is handed this finished match

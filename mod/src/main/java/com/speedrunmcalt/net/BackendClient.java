@@ -254,7 +254,9 @@ public final class BackendClient {
 					num(m, "ratingDelta"),
 					num(m, "seasonPointsAwarded"),
 					str(m, "seedType", "unknown"),
-					num(m, "worldSetupVersion")));
+					num(m, "worldSetupVersion"),
+					m.has("forfeitedBy") && !m.get("forfeitedBy").isJsonNull()
+							? m.get("forfeitedBy").getAsString() : null));
 		}
 		return out;
 	}
