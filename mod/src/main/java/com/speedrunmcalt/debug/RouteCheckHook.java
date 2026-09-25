@@ -19,7 +19,8 @@ import java.nio.file.Paths;
 /**
  * TEMPORARY - verifies a pool pair's OVERWORLD OPENING against the game.
  *
- * Tier 4 verified the nether: the bastion is where we ship it and the
+ * The nether check verified the nether: the bastion is where we ship
+ * it and the
  * distances hold. The overworld route was never verified by instrument
  * at all. The filter checks that a structure is PREDICTED near spawn,
  * and then trusts MatchWorldSetup to supply everything a route actually
@@ -177,10 +178,10 @@ public class RouteCheckHook implements DedicatedServerModInitializer {
 				// magma ravine rather than a surface pool.
 				// 160 blocks = 10 chunks, which is the PUBLISHED rule
 				// (SPEC.md: "2 magma ravines within 10 chunks") and what
-				// RavineCheckHook uses in tier 3.
+				// RavineCheckHook uses in the ravine check.
 				//
 				// This was 128 on its first run and quarantined a seed
-				// tier 3 had just passed. The seed was fine; the checker
+				// the ravine check had just passed. The seed was fine; the checker
 				// was stricter than the rule it was checking. A verifier
 				// that disagrees with the spec is not a stricter
 				// verifier, it is a wrong one - and it fails seeds in a

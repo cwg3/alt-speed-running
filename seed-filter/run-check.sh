@@ -1,9 +1,9 @@
 #!/bin/bash
-# One dispatcher for a verification stage: cloud or local, same output.
+# One dispatcher for a verification check: cloud or local, same output.
 #
 #   run_check <check> <input-file> <workers> <dest-csv>
 #
-# CLOUD=1 sends the stage to a spot instance; anything else runs the
+# CLOUD=1 sends the check to a spot instance; anything else runs the
 # local harness. Either way the caller gets <dest-csv> in the shape it
 # already parses, which is the whole point - an orchestrator should not
 # have to know where the work happened.
@@ -16,7 +16,8 @@
 #           so feeding its output straight in drops the first real
 #           seed of every batch - a silent off-by-one in the data, not
 #           a crash.
-#   rp      same as spawn - verify-rp.sh writes the same header and
+#   portalfilter
+#           same as spawn - verify-rp.sh writes the same header and
 #           the parser skips row 0.
 #   ravine  the mod's own CSV already carries the type, so both paths
 #           agree and nothing is added.

@@ -209,7 +209,7 @@ buries them in seabed and beach quite happily.
 
 The fix mirrors `PortalVerify`: confirm at least one chest has a clear
 vertical path to open water or air. It needs the world generated, so
-it belongs in tier 3 alongside the magma ravine check that ocean seeds
+it belongs with the type checks, alongside the `ravine` check ocean seeds
 already pay for — which means it is close to free to add.
 
 **First bad seed found by the vote rather than by us.** That is the
@@ -410,7 +410,7 @@ into it. Every guarantee was satisfied, in a chest nobody could open.
 path uses it. On the same seed the surface chest now holds the iron and
 a flint and steel, and the buried one is left alone.
 
-Tier 5 now also asserts that a ruined portal can be LIT - an igniter in
+The `route` check now also asserts that a ruined portal can be LIT - an igniter in
 a container within 24 blocks of it. "A portal is here" was true and
 useless.
 
@@ -480,7 +480,7 @@ one, not the distance back to a point nobody returns to. It was also
 strictly stricter, so it discarded seeds the standard accepts.
 
 **The open-path check is not built.** It needs the world generated, so
-it belongs in tier 3 - and it is the same class as every other gap
+it belongs with the type checks - and it is the same class as every gap
 found today: the filter proves a structure EXISTS and says nothing
 about whether a player can get to it.
 
@@ -584,7 +584,7 @@ measured rather than assumed.
 
 The earlier note claiming two pool seeds overshot the fortress limit at
 279 and 324 blocks described the origin-measured version and was stale.
-No seed in the current pool exceeds it: tier-4 verification measured
+No seed in the current pool exceeds it: the `nether` check measured
 every passing pair's fortress at 137 to 249 blocks from its bastion.
 
 ## Mechanics
@@ -625,9 +625,9 @@ that seed was later quarantined for the link-point rule. Shipwreck
 remains untested against the current code.
 
 **Buried treasure confirmed in play 2026-09-23**, on seed
-seed#3a5b - the first pair tier 4 ever verified, and until now
+seed#3a5b - the first pair `nether` ever verified, and until now
 never played. Treasure found at 4:49, wood at spawn fine, magma ravine
-where tier 5 said it was. That was the last type with no completed
+where `route` said it was. That was the last type with no completed
 overworld route.
 
 The wood result matters on its own: this seed predates the wood filter
@@ -791,6 +791,34 @@ filter stage. A pool that silently shrinks teaches nothing.
 
 ## Pool
 
+### The checks
+
+Each check has ONE name, used by the dispatcher (`CHECK=`), the cloud
+runner, the logs and this document. There are deliberately no numbers:
+they were the source of a real confusion, because three scripts each
+invented their own "stage 3" and none of them meant the same check.
+
+| check | proves | needs | cost |
+|---|---|---|---|
+| `cubiomes` | structures, distances, biomes, bastion type | nothing | microseconds |
+| `jigsaw` | a blacksmith piece name — PRE-filter only | generator, no chunks | ~66 ms |
+| `spawn` | real logs above sea level near spawn; for a wreck, its chests and their food | generated world | ~40 s |
+| `village` | a real blacksmith chest, and what is in it | generated world | ~15 s |
+| `ravine` | two magma ravines in reach of the ship, plus kelp | generated world | ~12 s |
+| `portalfilter` | a ruined portal frame that can actually be completed | generated world | ~15 s |
+| `nether` | the nether as a MATCH builds it: a bastion at the shipped coordinate, a fortress in range | match world, two seeds | ~40 s |
+| `route` | the overworld opening `MatchWorldSetup` actually makes | match world, two seeds | ~40 s |
+
+The split that matters is the last two. Everything above them verifies a
+SEED. `nether` and `route` verify a PAIR - a world built from one seed
+whose nether is redirected to another - which does not exist until the
+loader has made one. That is why they run after the held load and not
+before it, and why they are the only two that can catch a two-seed bug.
+
+Two steps in the pipeline are not checks and are not named like them:
+**load held** puts candidates in the table with `used=true` so nothing
+is drawable, and **release** clears the flag on whatever passed.
+
 **31 live seeds**, rebuilt 2026-09-22, with 11 quarantined:
 
 | type | live | quarantined |
@@ -804,7 +832,7 @@ filter stage. A pool that silently shrinks teaches nothing.
 Buried treasure is short because far fewer candidates pass the
 two-magma-ravine check than shipwreck does.
 
-**Tiers 4 and 5 rejected 7 of 23 freshly filtered pairs - 30%.** Six
+**`nether` and `route` rejected 7 of 23 freshly filtered pairs - 30%.** Six
 failed in the nether, three of those shipping a bastion coordinate 487
 to 577 blocks from any real bastion. Every one had passed the cubiomes
 filter. That rate is the argument for the held-load flow below: the
@@ -819,40 +847,41 @@ times in a row before the draw was made random.
 `seedtypes` picks a random start seed on each run, so a rebuild
 produces a different, equally valid set - not the same seeds. The
 candidate JSON in `seed-filter/output/` is gitignored, so the exact
-seeds currently live exist only in DynamoDB. The tier-4 verification
+seeds currently live exist only in DynamoDB. The `nether` check's
 results ARE committed, in `seed-filter/results/`. Commit that directory
 deliberately if a specific pool ever needs to be reproducible.
 
-**Load held, verify, then release.** Tiers 1 to 3 verify a SEED; tiers
-4 and 5 verify a PAIR, and a pair does not exist until the loader has
-made one. So `loadSeedPool.ts --held` writes every row `used=true`, and
-`seed-filter/verify-and-release.sh` runs both tiers and releases only
-what passes. Nothing unverified is ever drawable, not even briefly -
+**Load held, verify, then release.** Every check up to the type checks
+verifies a SEED; `nether` and `route` verify a PAIR, and a pair does not
+exist until the loader has made one. So `loadSeedPool.ts --held` writes
+every row `used=true`, and `seed-filter/verify-and-release.sh` runs both
+pair checks and releases only what passes. Nothing unverified is ever drawable, not even briefly -
 and briefly is all it takes, because a seed is dealt the moment someone
 queues.
 
-Built by `seed-filter/build-pool.sh` in tiers of increasing cost:
+Built by `seed-filter/build-pool.sh`, cheapest check first:
 
-1. **cubiomes** — structures, distances, biomes, bastion type, wood
+- **`cubiomes`** — structures, distances, biomes, bastion type, wood
    near spawn. Microseconds per seed.
-2. **jigsaw** — a cheap blacksmith PRE-filter. Needs Minecraft's
+- **`jigsaw`** — a cheap blacksmith PRE-filter. Needs Minecraft's
    generator but no chunks, ~66 ms per seed. It tests a piece *name*,
    which over-reports by roughly 3x: in the last build 40 raw
    candidates gave 16 jigsaw passes and 5 real smith chests. It is a
-   pre-filter and never the thing that decides the pool — stage 4
+   pre-filter and never the thing that decides the pool — the loader
    refuses to load if the verification output is missing.
-3. **generated world** — magma ravines for the ocean types, and real
+- **`spawn`, `village`, `ravine`, `portalfilter`** — the type checks,
+  each needing a generated world: magma ravines for the ocean types, real
    blacksmith chests plus the iron/diamond threshold for villages.
    Carvers and loot tables are both invisible to cubiomes, so the
    world must be built and inspected. Roughly 12 s per seed, and the
    reason a pool build takes half an hour.
 
-4. **match world** — the nether, generated the way a MATCH generates
+- **`nether`** — the nether, generated the way a MATCH generates
    it: world seed = overworld seed, `MatchState.netherSeed` set, the
    structure-seed mixins live. `seed-filter/verify-pairs.sh`. Roughly
    40 s per pair.
 
-Tier 4 exists because tiers 1 to 3 all verify a SEED, and a match does
+`nether` exists because every check before it verifies a SEED, and a match does
 not ship a seed - it ships a pair, a world built from one seed whose
 nether is redirected to another, plus a coordinate telling the player
 where to go. Every earlier harness generated single-seed worlds, which
@@ -861,22 +890,22 @@ live pool found 4 of 19 pairs out of spec, and three of those were
 shipping a bastion coordinate with nothing at it - 452, 522 and 828
 blocks from the nearest real bastion, zero containers at two of them.
 That is precisely the failure players had been reporting as "the
-bastion wasn't at the coords you gave me", and no tier below 4 could
-see it.
+bastion wasn't at the coords you gave me", and no seed-level check
+could see it.
 
 The FORTRESS leg was confirmed in play on 2026-09-22, on pair
 7be07d50: fortress at 176,64, 229 blocks from the bastion, reached in
 under two minutes from the portal (nether 5:14, fortress 7:09). This
 mattered because no fortress coordinate is shipped to the player -
-tier 4 measures the distance and the runner finds it the real way - so
+`nether` measures the distance and the runner finds it the real way - so
 "findable at that range" had been assumption, not evidence.
 
-Tier 4 was confirmed by hand on 2026-09-22: a player walked to the
+`nether` was confirmed by hand on 2026-09-22: a player walked to the
 shipped bastion coordinate of pair 39c3b474 in a real match and found
 it, then bartered there. The harness and the product finally agree
 about the same world.
 
-**Measure generation, not the locator.** Tier 4's first version used
+**Measure generation, not the locator.** `nether`'s first version used
 `locateStructure` for ground truth and failed two good seeds. The
 locator walks outward through the structure region grid and returns the
 first viable placement it meets - *a* bastion in an early ring, not the
@@ -888,12 +917,12 @@ Filter on `hasChildren()`: the map carries placeholder entries for
 features considered and not placed, and counting those would turn "no
 bastion here" into a confident wrong coordinate.
 
-5. **overworld opening** — runs the REAL `MatchWorldSetup` in a
+- **`route`** — runs the REAL `MatchWorldSetup` in a
    generated match world and then asks whether the opening it was
    supposed to create is actually there.
    `seed-filter/verify-routes.sh`. Roughly 40 s per pair.
 
-Tier 5 exists because tier 4 verified the nether and nothing verified
+`route` exists because `nether` verified the nether and nothing verified
 the overworld. The filter checks that a structure is PREDICTED near
 spawn and then trusts the runtime to supply everything a route needs -
 lava to cast a portal from, a portal that can be lit, chests with a
@@ -903,7 +932,7 @@ both report failure through a return value that was discarded at the
 call site. The first shipped a player into open ocean with no portal
 and no lava.
 
-What tier 5 asserts, per type: `setupFailure` is null; a ruined portal
+What `route` asserts, per type: `setupFailure` is null; a ruined portal
 seed has a usable portal, vanilla's or placed; village and desert
 temple have BUCKETABLE lava near the objective and containers at it;
 shipwreck and buried treasure have a usable magma ravine.
@@ -915,7 +944,7 @@ passes everything is not a check. It now counts source blocks with air
 directly above, within 24 blocks of the surface: lava a player can
 actually put in a bucket. The same seeds then scored 17 to 64.
 
-Every tier past the first exists because a requirement was silently
+Every check past the first exists because a requirement was silently
 unchecked and shipped. Villages went out without blacksmiths until one
 turned up in a live match — twice, because the first fix verified a
 piece name rather than a chest.
@@ -948,7 +977,7 @@ jungle biome clipping the sample radius - and the only logs within 80
 blocks were the SHIPWRECK'S OWN HULL, 61 blocks out and 12 blocks under
 water. The player had no wood, so no crafting table, so no run.
 
-This is the same mistake as every other tier in this file: a piece name
+This is the same mistake as every other check in this file: a piece name
 instead of a chest, an obsidian count instead of a frame, "a portal
 exists" instead of "it can be lit". The cheap check is a pre-filter and
 must never be the thing that decides the pool.

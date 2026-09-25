@@ -62,7 +62,7 @@ const SEED_TYPES = [
  *
  * The type filter exists so one type can be rebuilt without discarding
  * the others. Rebuilding everything means re-running every
- * verification stage, and the ocean types' magma-ravine check is hours
+ * verification check, and the ocean types' magma-ravine check is hours
  * of world generation - far too much to pay for a fix that only
  * concerns villages.
  */
@@ -111,9 +111,9 @@ async function main() {
 	// Load the pool HELD: every row written used=true, so nothing can
 	// be dealt until it has been verified and released.
 	//
-	// The pipeline's own stages verify a SEED. Tiers 4 and 5 verify a
-	// PAIR - the nether as a match world generates it, and the
-	// overworld opening MatchWorldSetup actually produces - and those
+	// Every check up to the type checks verifies a SEED. The nether and
+	// route checks verify a PAIR - the nether as a match world generates
+	// it, and the overworld opening MatchWorldSetup produces - and those
 	// need the paired rows to exist before they can run. Loading held
 	// is what keeps that from meaning "briefly drawable and unchecked".
 	const held = process.argv.includes('--held');
@@ -143,7 +143,7 @@ async function main() {
 		fs.readFileSync(path.join(outputDir, 'nether_seeds.json'), 'utf-8'));
 
 	// Blacksmith positions, keyed by overworld seed, from the pool
-	// build's smith stage (mod/run/smith.csv:
+	// build's village check (mod/run/smith.csv:
 	// seed,hasSmith,spanX,spanZ,smithX,smithZ).
 	//
 	// Village seeds ship this because structureX/Z is the jigsaw

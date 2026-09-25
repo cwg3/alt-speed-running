@@ -4,18 +4,22 @@
 #   ./overnight-rebuild.sh [per-type] [candidates-per-type]
 #
 # Order matters: cheap checks first, and no seed reaches the pool until
-# a generated world has been looked at. Stages, per type:
+# a generated world has been looked at. Per type:
 #
-#   1  cubiomes        structures, distances, biomes        (instant)
-#   2  spawn resources real logs near spawn, not a biome;   (~40s each)
-#                      plus 3 chests + food for shipwreck
-#   3  type-specific   blacksmith chest (village),          (~15-40s)
-#                      magma ravine (ocean),
-#                      finishable portal frame (RP)
-#   4  load HELD       nothing drawable until verified
-#   5  tiers 4 and 5   the nether as a match world, and the
-#                      overworld opening MatchWorldSetup makes
-#   6  release         only what passed both
+#   cubiomes      structures, distances, biomes         (instant)
+#   spawn         real logs near spawn, not a biome;    (~40s each)
+#                 plus 3 chests + food for shipwreck
+#   village       a blacksmith chest, and its contents  (~15s each)
+#   ravine        two magma ravines        (ocean types only)
+#   portalfilter  a frame that can be completed  (RP only)
+#   load HELD     not a check: nothing drawable until verified
+#   nether        the nether as a MATCH world builds it  (~40s)
+#   route         the overworld opening MatchWorldSetup makes
+#   release       not a check: clears the flag on what passed both
+#
+# Check names are the ones run-check.sh dispatches and SPEC.md's check
+# table defines. There are no stage numbers on purpose: three scripts
+# each had their own "stage 3" and none of them meant the same check.
 #
 # Everything is serial and writes explicit ERROR markers: a crashed
 # worker counted as a zero is how "35 of 40 villages have no
@@ -24,7 +28,7 @@ set -uo pipefail
 PER="${1:-3}"
 CAND="${2:-60}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-# CLOUD=1 sends every stage to a spot instance instead of this machine.
+# CLOUD=1 sends every check to a spot instance instead of this machine.
 WORKERS="${WORKERS:-16}"
 source "$ROOT/seed-filter/run-check.sh"
 LOG=/tmp/overnight.log
@@ -46,7 +50,7 @@ for t, vs in d.items():
     for v in vs:
         rows.append(f"{v['seed']} {v['structure']['x']} {v['structure']['z']} {t}")
 out.write_text('\n'.join(rows) + '\n')
-print(f'stage 2: {len(rows)} candidates to check for wood at spawn')
+print(f'spawn: {len(rows)} candidates to check for wood at spawn')
 PY
 
 run_check spawn /tmp/onr/spawn-in.txt "$WORKERS" /tmp/onr/spawn.csv
@@ -69,7 +73,7 @@ import json, pathlib
 d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
 rows = [f"{v['seed']} {v['structure']['x']} {v['structure']['z']}" for v in d.get('ruined_portal', [])]
 pathlib.Path('/tmp/onr/rp-in.txt').write_text('\n'.join(rows) + '\n')
-print(f'stage 3a: {len(rows)} ruined portal candidates to frame-check')
+print(f'portalfilter: {len(rows)} ruined portal candidates to frame-check')
 PY
 if [ -s /tmp/onr/rp-in.txt ]; then
   run_check portalfilter /tmp/onr/rp-in.txt "$WORKERS" /tmp/onr/rp.csv
@@ -86,7 +90,7 @@ fi
 
 # Village: the blacksmith must exist AND hold iron.
 #
-# This stage and the ravine one below were named in the header for a
+# This check and the ravine one below were named in the header for a
 # long time and never actually called. Ruined portals got their frame
 # check; villages shipped on the jigsaw's word alone and ocean seeds
 # shipped with no ravine check at all.
@@ -101,7 +105,7 @@ import json, pathlib
 d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
 rows = [f"{v['seed']} {v['structure']['x']} {v['structure']['z']}" for v in d.get('village', [])]
 pathlib.Path('/tmp/onr/village-in.txt').write_text(('\n'.join(rows) + '\n') if rows else '')
-print(f'stage 3b: {len(rows)} village candidates to blacksmith-check')
+print(f'village: {len(rows)} candidates to blacksmith-check')
 PY
 if [ -s /tmp/onr/village-in.txt ]; then
   run_check village /tmp/onr/village-in.txt "$WORKERS" /tmp/onr/village.csv
@@ -110,7 +114,7 @@ import json, csv, sys
 # seed,ironIngots,hasIronPickaxe,hasIronArmor,chests,smithChests,diamonds
 rows = [r for r in csv.reader(open('/tmp/onr/village.csv')) if len(r) > 5]
 # A crashed worker is not a village without a smith. This is the guard
-# the ravine stage went without, which turned 388 servers that never
+# the ravine check went without, which turned 388 servers that never
 # bound a port into 388 seeds "with no ravine".
 bad = [r for r in rows if not r[1].lstrip('-').isdigit()]
 if bad:
@@ -145,7 +149,7 @@ for t in ('shipwreck', 'buried_treasure'):
     for v in d.get(t, []):
         rows.append(f"{v['seed']} {v['structure']['x']} {v['structure']['z']} {t}")
 pathlib.Path('/tmp/onr/ravine-in.txt').write_text(('\n'.join(rows) + '\n') if rows else '')
-print(f'stage 3c: {len(rows)} ocean candidates to ravine-check')
+print(f'ravine: {len(rows)} ocean candidates to ravine-check')
 PY
 if [ -s /tmp/onr/ravine-in.txt ]; then
   run_check ravine /tmp/onr/ravine-in.txt "$WORKERS" /tmp/onr/ravine.csv
@@ -193,7 +197,7 @@ cd "$ROOT/backend"
 npx tsx scripts/loadSeedPool.ts BackendStack-SeedPoolTableB4C21150-12O8ZBQS8FM8L --held 2>&1 | tail -3
 
 echo
-echo "=== tiers 4 and 5, then release ==="
+echo "=== nether + route, then release ==="
 "$ROOT/seed-filter/verify-and-release.sh"
 echo
 echo "=== finished $(date) ==="

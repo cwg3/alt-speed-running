@@ -4,6 +4,15 @@ Known outstanding work, roughly in the order it would matter.
 
 ## Operational
 
+- [ ] **`seed-filter/verify-and-release.sh` still says "tier 4" and
+  "tier 5".** Everything else now uses one vocabulary - the check names
+  `run-check.sh` dispatches - but this file was mid-run when the rename
+  happened and bash reads a script incrementally by byte offset, so
+  editing it would have corrupted the running job. Rename `tier 4` to
+  `nether` and `tier 5` to `route` in its header, its two `echo` banners
+  and the two `MISSING` detail strings once it is idle. Nothing parses
+  those strings; it is comments and progress output only.
+
 - [ ] **Four cloud paths have never actually run.** Written tonight,
   logic-tested locally, but no instance has executed them:
   `run-check.sh` CLOUD=1, `verify-and-release.sh` CLOUD=1,
@@ -74,6 +83,19 @@ Known outstanding work, roughly in the order it would matter.
   more than one person will be drawing from the same pool.
 
 ## Housekeeping
+
+- [x] **One name per check, no stage numbers.** There were four
+  numbering schemes and they disagreed: `stage 3` meant the type checks
+  in `overnight-rebuild.sh`, the magma ravine in `build-pool.sh`, and
+  the spawn check in `ocean-rebuild.sh`, while SPEC.md counted five
+  "tiers" that lined up with none of them. Renumbering would not have
+  fixed it, because the numbers were the problem - a position in one
+  script's sequence is not an identity. Every check is now referred to
+  by the name `run-check.sh` already dispatched it under (`cubiomes`,
+  `jigsaw`, `spawn`, `village`, `ravine`, `portalfilter`, `nether`,
+  `route`), defined once in SPEC.md's check table. The two steps that
+  are not checks - load HELD and release - say so instead of taking a
+  number. Do not reintroduce numbered stages.
 
 - [x] **Match worlds are cleaned up.** `MatchWorlds` keeps the three
   most recent plus the live one, trimming a few per match off the game

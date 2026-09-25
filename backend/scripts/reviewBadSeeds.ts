@@ -75,7 +75,7 @@ async function main() {
 	for (const [t, n] of Object.entries(byType).sort((a, b) => b[1] - a[1])) {
 		console.log(`  ${t.padEnd(16)} ${n}`);
 	}
-	console.log('\nA cluster in one type points at that type\'s filter stage.');
+	console.log('\nA cluster in one type points at that type\'s own check.');
 }
 
 main().catch((err) => {

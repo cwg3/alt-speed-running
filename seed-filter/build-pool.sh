@@ -17,19 +17,20 @@
 #      to be built and looked at. ~12s per seed, and the reason a pool
 #      build takes half an hour rather than a minute.
 #
-# Both stage 2 and 3 exist because a spec requirement was quietly not
+# Both the jigsaw pre-filter and the generated-world checks exist
+# because a spec requirement was quietly not
 # being checked and a player hit it. Villages shipped without smiths
 # until one turned up in a live match; ocean seeds would have shipped
 # without a nether route the same way.
 #
-# Stages 2 and 3 stop as soon as enough seeds pass, so the cost scales
+# They stop as soon as enough seeds pass, so the cost scales
 # with what is needed rather than with how many candidates were
 # generated. At measured ocean pass rates this is still hours for a
 # full pool - run it when nobody is playing, because it will use a core
 # continuously and a previous run put someone's game 28 seconds
 # behind.
 #
-# Ruined portal needs no verification stage. cubiomes cannot predict
+# Ruined portal needs no generated-world check. cubiomes cannot predict
 # whether a portal generates, and about two thirds of RP seeds are
 # unusable as generated - missing or underground. Rather than checking
 # and discarding those, the mod checks at world creation and builds a
@@ -40,7 +41,7 @@ set -euo pipefail
 PER_TYPE="${1:-40}"
 TABLE="${2:-BackendStack-SeedPoolTableB4C21150-12O8ZBQS8FM8L}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-# CLOUD=1 sends every stage to a spot instance instead of this machine.
+# CLOUD=1 sends every check to a spot instance instead of this machine.
 WORKERS="${WORKERS:-16}"
 source "$ROOT/seed-filter/run-check.sh"
 
@@ -52,12 +53,12 @@ source "$ROOT/seed-filter/run-check.sh"
 # filled. Twelve times over covers the worst measured rate with room
 # for variance.
 #
-# Stage 1 is cheap even at this size (40/type scanned 26k seeds in 32
+# cubiomes is cheap even at this size (40/type scanned 26k seeds in 32
 # seconds), so over-generating costs seconds. Running out costs a whole
 # rebuild.
 CANDIDATES=$((PER_TYPE * 12))
 
-echo "=== stage 1: cubiomes ($CANDIDATES candidates per type) ==="
+echo "=== cubiomes: $CANDIDATES candidates per type ==="
 cd "$ROOT/seed-filter"
 ./seedtypes "$CANDIDATES" 2>&1 | grep -E "Start seed|Scanned|village|desert|ruined|shipwreck|buried|nether"
 
@@ -66,16 +67,16 @@ mkdir -p run
 printf 'eula=true\n' > run/eula.txt
 # Clear EVERY harness input, not just the outputs. Each debug hook
 # claims a boot by its own input file and yields if another is present,
-# so one stale file silently skips a whole stage - which is exactly what
-# happened here: a leftover ravine.txt made the blacksmith stage produce
-# nothing and the run only failed two stages later.
+# so one stale file silently skips a whole check - which is exactly what
+# happened here: a leftover ravine.txt made the blacksmith check produce
+# nothing and the run only failed two checks later.
 rm -f run/smith.csv run/ravine.csv \
       run/smithbatch.txt run/ravine.txt run/loot.txt run/lava.txt \
       run/portal.txt run/rpverify.txt run/rpverify.csv run/rppredict.txt \
       run/rppredict.csv run/village.txt run/diag.txt run/results.csv
 
 echo
-echo "=== stage 2: blacksmith check (jigsaw, no chunks) ==="
+echo "=== jigsaw: blacksmith pre-filter (no chunks) ==="
 printf 'level-seed=1\nlevel-type=default\nonline-mode=false\nmax-tick-time=-1\nsync-chunk-writes=false\n' > run/server.properties
 python3 -c "
 import json
@@ -89,7 +90,7 @@ rm -f run/smithbatch.txt
 
 echo
 echo
-echo "=== stage 2b: blacksmith VERIFICATION (generated worlds, ~15s each) ==="
+echo "=== village: blacksmith VERIFICATION (generated worlds, ~15s each) ==="
 # The jigsaw check above is a PRE-FILTER, not an answer. It matches a
 # piece NAME containing armorer/weaponsmith/toolsmith, and a taiga
 # village satisfied that while generating no smith chest at all - every
@@ -111,7 +112,7 @@ for s in passed:
 run_check village run/village-candidates.txt "$WORKERS" "$ROOT/mod/run/village-all.csv"
 
 echo
-echo "=== stage 3: magma ravine check (generated worlds, ~12s each) ==="
+echo "=== ravine: magma ravines (generated worlds, ~12s each) ==="
 # One world per seed. Stops as soon as PER_TYPE have passed, so a type
 # with a high pass rate costs proportionally less.
 for TYPE in shipwreck buried_treasure; do
@@ -144,7 +145,7 @@ rm -f run/ravine.txt
 ./gradlew --stop > /dev/null 2>&1 || true
 
 echo
-echo "=== stage 4: keep only seeds that passed ==="
+echo "=== keeping only the seeds that passed ==="
 python3 - "$ROOT" "$PER_TYPE" <<'PY'
 import csv, json, sys
 root, per_type = sys.argv[1], int(sys.argv[2])
@@ -154,7 +155,7 @@ data = json.load(open(path))
 # Fail loudly on a missing result file rather than quietly shipping an
 # unfiltered pool - an unchecked village pool is what put a smithless
 # village into a live match.
-# village-qualified.txt comes from stage 2b, which GENERATES each
+# village-qualified.txt comes from the village check, which GENERATES each
 # village and reads its real loot tables. smith.csv is only the cheap
 # pre-filter and must never be the thing that decides the pool - it
 # over-reports by about 3x.
@@ -162,7 +163,7 @@ try:
     verified = {l.strip() for l in open(f'{root}/mod/run/village-qualified.txt') if l.strip()}
 except FileNotFoundError:
     sys.exit('ERROR: no village-qualified.txt - the blacksmith VERIFICATION '
-             '(stage 2b) did not run. Refusing to load a village pool checked '
+             '(the village check) did not run. Refusing to load a village pool checked '
              'only by jigsaw piece name; that shipped smithless villages twice.')
 
 before = len(data['village'])
@@ -181,7 +182,7 @@ if len(data['village']) < per_type:
 try:
     ravine = {r[0]: r[2] == 'true' for r in csv.reader(open(f'{root}/mod/run/ravine.csv'))}
 except FileNotFoundError:
-    sys.exit('ERROR: no ravine.csv - the magma ravine stage did not run. '
+    sys.exit('ERROR: no ravine.csv - the ravine check did not run. '
              'Refusing to load ocean seeds with no nether route.')
 
 for t in ('shipwreck', 'buried_treasure'):
@@ -199,16 +200,16 @@ json.dump(data, open(path, 'w'), indent=2)
 PY
 
 echo
-echo "=== stage 5: load ==="
+echo "=== load ==="
 cd "$ROOT/backend"
 # LOAD_FLAGS defaults to a full replace, which is what a from-scratch
 # rebuild wants. Override it to add to an existing pool instead:
 #
 #   LOAD_FLAGS="--held" ./build-pool.sh 5
 #
-# --held writes every row used=true so nothing is drawable until tiers
-# 4 and 5 (verify-pairs.sh, verify-routes.sh) have passed it and it has
-# been released. Those verify a PAIR rather than a seed, so they can
+# --held writes every row used=true so nothing is drawable until the
+# nether and route checks (verify-pairs.sh, verify-routes.sh) have
+# passed it and it has been released. Those verify a PAIR rather than a seed, so they can
 # only run after the rows exist - and a pool that is briefly drawable
 # and unchecked is how a player ends up in open ocean with no portal.
 npx tsx scripts/loadSeedPool.ts "$TABLE" ${LOAD_FLAGS:---replace} 2>&1 | tail -3
