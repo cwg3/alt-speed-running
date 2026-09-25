@@ -208,9 +208,9 @@ thirds of those seeds fail it; shipwrecks never got one, and vanilla
 buries them in seabed and beach quite happily.
 
 The fix mirrors `PortalVerify`: confirm at least one chest has a clear
-vertical path to open water or air. It needs the world generated, so
-it belongs with the type checks, alongside the `ravine` check ocean seeds
-already pay for — which means it is close to free to add.
+vertical path to open water or air. It needs the world generated, so it
+belongs with the type checks, alongside the `ravine` check that ocean
+seeds already pay for — which means it is close to free to add.
 
 **First bad seed found by the vote rather than by us.** That is the
 mechanism working as designed: a player hit something no test covered,
@@ -410,9 +410,9 @@ into it. Every guarantee was satisfied, in a chest nobody could open.
 path uses it. On the same seed the surface chest now holds the iron and
 a flint and steel, and the buried one is left alone.
 
-The `route` check now also asserts that a ruined portal can be LIT - an igniter in
-a container within 24 blocks of it. "A portal is here" was true and
-useless.
+The `route` check now also asserts that a ruined portal can be LIT - an
+igniter in a container within 24 blocks of it. "A portal is here" was
+true and useless.
 
 **This is the most visible thing the mod builds.** A placed portal is
 not at a vanilla-determined location, so "seed X has a portal at Y"
@@ -480,9 +480,9 @@ one, not the distance back to a point nobody returns to. It was also
 strictly stricter, so it discarded seeds the standard accepts.
 
 **The open-path check is not built.** It needs the world generated, so
-it belongs with the type checks - and it is the same class as every gap
-found today: the filter proves a structure EXISTS and says nothing
-about whether a player can get to it.
+it belongs with the type checks - and it is the same class as every
+other gap found today: the filter proves a structure EXISTS and says
+nothing about whether a player can get to it.
 
 **Nether structures were placed from the WRONG SEED.** This was the
 foundational defect, and it sat under everything else for days.
@@ -832,7 +832,8 @@ is drawable, and **release** clears the flag on whatever passed.
 Buried treasure is short because far fewer candidates pass the
 two-magma-ravine check than shipwreck does.
 
-**`nether` and `route` rejected 7 of 23 freshly filtered pairs - 30%.** Six
+**`nether` and `route` rejected 7 of 23 freshly filtered pairs -
+30%.** Six
 failed in the nether, three of those shipping a bastion coordinate 487
 to 577 blocks from any real bastion. Every one had passed the cubiomes
 filter. That rate is the argument for the held-load flow below: the
@@ -855,57 +856,57 @@ deliberately if a specific pool ever needs to be reproducible.
 verifies a SEED; `nether` and `route` verify a PAIR, and a pair does not
 exist until the loader has made one. So `loadSeedPool.ts --held` writes
 every row `used=true`, and `seed-filter/verify-and-release.sh` runs both
-pair checks and releases only what passes. Nothing unverified is ever drawable, not even briefly -
-and briefly is all it takes, because a seed is dealt the moment someone
-queues.
+pair checks and releases only what passes. Nothing unverified is ever
+drawable, not even briefly - and briefly is all it takes, because a seed
+is dealt the moment someone queues.
 
 Built by `seed-filter/build-pool.sh`, cheapest check first:
 
 - **`cubiomes`** — structures, distances, biomes, bastion type, wood
-   near spawn. Microseconds per seed.
+  near spawn. Microseconds per seed.
 - **`jigsaw`** — a cheap blacksmith PRE-filter. Needs Minecraft's
-   generator but no chunks, ~66 ms per seed. It tests a piece *name*,
-   which over-reports by roughly 3x: in the last build 40 raw
-   candidates gave 16 jigsaw passes and 5 real smith chests. It is a
-   pre-filter and never the thing that decides the pool — the loader
-   refuses to load if the verification output is missing.
+  generator but no chunks, ~66 ms per seed. It tests a piece *name*,
+  which over-reports by roughly 3x: in the last build 40 raw candidates
+  gave 16 jigsaw passes and 5 real smith chests. It is a pre-filter and
+  never the thing that decides the pool — the loader refuses to load
+  if the verification output is missing.
 - **`spawn`, `village`, `ravine`, `portalfilter`** — the type checks,
-  each needing a generated world: magma ravines for the ocean types, real
-   blacksmith chests plus the iron/diamond threshold for villages.
-   Carvers and loot tables are both invisible to cubiomes, so the
-   world must be built and inspected. Roughly 12 s per seed, and the
-   reason a pool build takes half an hour.
+  each needing a generated world: magma ravines for the ocean types,
+  real blacksmith chests plus the iron/diamond threshold for villages.
+  Carvers and loot tables are both invisible to cubiomes, so the world
+  must be built and inspected. Roughly 12 s per seed, and the reason a
+  pool build takes half an hour.
+- **`nether`** — the nether, generated the way a MATCH generates it:
+  world seed = overworld seed, `MatchState.netherSeed` set, the
+  structure-seed mixins live. `seed-filter/verify-pairs.sh`.
+  Roughly 40 s per pair.
 
-- **`nether`** — the nether, generated the way a MATCH generates
-   it: world seed = overworld seed, `MatchState.netherSeed` set, the
-   structure-seed mixins live. `seed-filter/verify-pairs.sh`. Roughly
-   40 s per pair.
+The `nether` check exists because every check before it verifies a SEED,
+and a match does not ship a seed - it ships a pair, a world built from
+one seed whose nether is redirected to another, plus a coordinate
+telling the player where to go. Every earlier harness generated
+single-seed worlds, which cannot reproduce a two-seed bug by
+construction. The first run over the live pool found 4 of 19 pairs out
+of spec, and three of those were shipping a bastion coordinate with
+nothing at it - 452, 522 and 828 blocks from the nearest real bastion,
+zero containers at two of them. That is precisely the failure players
+had been reporting as "the bastion wasn't at the coords you gave me",
+and no seed-level check could see it.
 
-`nether` exists because every check before it verifies a SEED, and a match does
-not ship a seed - it ships a pair, a world built from one seed whose
-nether is redirected to another, plus a coordinate telling the player
-where to go. Every earlier harness generated single-seed worlds, which
-cannot reproduce a two-seed bug by construction. The first run over the
-live pool found 4 of 19 pairs out of spec, and three of those were
-shipping a bastion coordinate with nothing at it - 452, 522 and 828
-blocks from the nearest real bastion, zero containers at two of them.
-That is precisely the failure players had been reporting as "the
-bastion wasn't at the coords you gave me", and no seed-level check
-could see it.
-
-The FORTRESS leg was confirmed in play on 2026-09-22, on pair
-7be07d50: fortress at 176,64, 229 blocks from the bastion, reached in
-under two minutes from the portal (nether 5:14, fortress 7:09). This
-mattered because no fortress coordinate is shipped to the player -
-`nether` measures the distance and the runner finds it the real way - so
+The FORTRESS leg was confirmed in play on 2026-09-22, on pair 7be07d50:
+fortress at 176,64, 229 blocks from the bastion, reached in under two
+minutes from the portal (nether 5:14, fortress 7:09). This mattered
+because no fortress coordinate is shipped to the player - the `nether`
+check measures the distance and the runner finds it the real way - so
 "findable at that range" had been assumption, not evidence.
 
-`nether` was confirmed by hand on 2026-09-22: a player walked to the
-shipped bastion coordinate of pair 39c3b474 in a real match and found
-it, then bartered there. The harness and the product finally agree
+The `nether` check was confirmed by hand on 2026-09-22: a player walked
+to the shipped bastion coordinate of pair 39c3b474 in a real match and
+found it, then bartered there. The harness and the product finally agree
 about the same world.
 
-**Measure generation, not the locator.** `nether`'s first version used
+**Measure generation, not the locator.** The `nether` check's first
+version used
 `locateStructure` for ground truth and failed two good seeds. The
 locator walks outward through the structure region grid and returns the
 first viable placement it meets - *a* bastion in an early ring, not the
@@ -917,20 +918,19 @@ Filter on `hasChildren()`: the map carries placeholder entries for
 features considered and not placed, and counting those would turn "no
 bastion here" into a confident wrong coordinate.
 
-- **`route`** — runs the REAL `MatchWorldSetup` in a
-   generated match world and then asks whether the opening it was
-   supposed to create is actually there.
-   `seed-filter/verify-routes.sh`. Roughly 40 s per pair.
+- **`route`** — runs the REAL `MatchWorldSetup` in a generated match
+  world and then asks whether the opening it was supposed to create is
+  actually there. `seed-filter/verify-routes.sh`. Roughly 40 s per pair.
 
-`route` exists because `nether` verified the nether and nothing verified
-the overworld. The filter checks that a structure is PREDICTED near
-spawn and then trusts the runtime to supply everything a route needs -
-lava to cast a portal from, a portal that can be lit, chests with a
-floor under them. Nobody ever checked that the supplying WORKED, and
-twice it did not: `RuinedPortalPlacer.place` and `LavaPoolPlacer.place`
-both report failure through a return value that was discarded at the
-call site. The first shipped a player into open ocean with no portal
-and no lava.
+The `route` check exists because `nether` verified the nether and
+nothing verified the overworld. The filter checks that a structure is
+PREDICTED near spawn and then trusts the runtime to supply everything a
+route needs - lava to cast a portal from, a portal that can be lit,
+chests with a floor under them. Nobody ever checked that the supplying
+WORKED, and twice it did not: `RuinedPortalPlacer.place` and
+`LavaPoolPlacer.place` both report failure through a return value that
+was discarded at the call site. The first shipped a player into open
+ocean with no portal and no lava.
 
 What `route` asserts, per type: `setupFailure` is null; a ruined portal
 seed has a usable portal, vanilla's or placed; village and desert
