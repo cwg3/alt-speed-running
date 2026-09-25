@@ -27,6 +27,14 @@
 set -uo pipefail
 PER="${1:-3}"
 CAND="${2:-60}"
+# TARGETS is a JSON map of seedType -> how many to produce, and overrides
+# the uniform PER. topup.sh sets it from each type's shortfall, because a
+# uniform count rebuilds types that are not short: desert temple sat at
+# twice the floor while shipwreck was the one starving, and checking
+# desert temple candidates to then discard them is the most expensive way
+# to do nothing. A type whose target is 0 is dropped before the spawn
+# check, not after.
+TARGETS="${TARGETS:-}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # CLOUD=1 sends every check to a spot instance instead of this machine.
 WORKERS="${WORKERS:-16}"
@@ -43,7 +51,19 @@ echo
 python3 - "$ROOT" <<'PY'
 import json, pathlib, sys
 root = sys.argv[1]
+import os
 d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
+
+# Drop types we do not need before paying for any check on them.
+targets = json.loads(os.environ['TARGETS']) if os.environ.get('TARGETS') else None
+if targets is not None:
+    skipped = [t for t in list(d) if targets.get(t, 0) <= 0]
+    for t in skipped:
+        del d[t]
+    if skipped:
+        print('not short, skipping entirely:', ', '.join(sorted(skipped)))
+    json.dump(d, open('/tmp/onr/output/overworld_by_type.json','w'), indent=2)
+
 out = pathlib.Path('/tmp/onr/spawn-in.txt')
 rows = []
 for t, vs in d.items():
@@ -52,6 +72,11 @@ for t, vs in d.items():
 out.write_text('\n'.join(rows) + '\n')
 print(f'spawn: {len(rows)} candidates to check for wood at spawn')
 PY
+
+if [ ! -s /tmp/onr/spawn-in.txt ]; then
+  echo "no candidates for any short type - nothing to do"
+  exit 0
+fi
 
 run_check spawn /tmp/onr/spawn-in.txt "$WORKERS" /tmp/onr/spawn.csv
 
@@ -178,15 +203,17 @@ PY
 fi
 
 python3 - "$PER" <<'PY'
-import json, sys
+import json, os, sys
 per = int(sys.argv[1])
+targets = json.loads(os.environ['TARGETS']) if os.environ.get('TARGETS') else None
 d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
 print()
 print('after the cheap-to-mid filters:')
 for t in sorted(d):
-    d[t] = d[t][:per]
-    mark = 'OK ' if len(d[t]) >= per else 'SHORT'
-    print(f'  {mark} {t}: {len(d[t])}/{per}')
+    want = targets.get(t, 0) if targets is not None else per
+    d[t] = d[t][:want]
+    mark = 'OK ' if len(d[t]) >= want else 'SHORT'
+    print(f'  {mark} {t}: {len(d[t])}/{want}')
 json.dump(d, open('/tmp/onr/output/overworld_by_type.json','w'), indent=2)
 PY
 
