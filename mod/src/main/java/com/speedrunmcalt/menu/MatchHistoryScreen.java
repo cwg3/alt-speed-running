@@ -24,6 +24,14 @@ import java.util.List;
  */
 public class MatchHistoryScreen extends Screen {
 	private static final int ROWS_PER_PAGE = 12;
+	/**
+	 * Width reserved for WON / LOST / FORFEIT.
+	 *
+	 * FORFEIT is the longest at seven characters; the column is sized
+	 * for it so every row lines up and none of them collide.
+	 */
+	private static final int VERDICT_W = 50;
+
 	private static final int ROW_HEIGHT = 14;
 
 	private final Screen parent;
@@ -197,12 +205,19 @@ public class MatchHistoryScreen extends Screen {
 			if (e.won && e.forfeitedBy != null) {
 				// Won because they quit, not because you were faster.
 				this.textRenderer.drawWithShadow(matrices, "ff",
-						left + 26, y, Palette.DIM);
+						left + 28, y, Palette.DIM);
 			}
 
-			this.textRenderer.drawWithShadow(matrices, "vs", left + 34, y, Palette.DIM);
+			// The verdict column is sized for the LONGEST verdict, not
+			// for the common one. At the old offset "FORFEIT" ran into
+			// the "vs" and the row read "FORFEITs PaceBot".
+			//
+			// A fixed column rather than one measured per row: measured
+			// would fit every row and align none of them, and a list is
+			// read down the columns.
+			this.textRenderer.drawWithShadow(matrices, "vs", left + VERDICT_W, y, Palette.DIM);
 			this.textRenderer.drawWithShadow(matrices, e.opponentName,
-					left + 50, y, Palette.YELLOW);
+					left + VERDICT_W + 16, y, Palette.YELLOW);
 
 			this.textRenderer.drawWithShadow(matrices, typeName(e.seedType),
 					left + 140, y, Palette.PURPLE);
