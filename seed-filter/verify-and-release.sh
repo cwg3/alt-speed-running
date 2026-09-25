@@ -47,7 +47,13 @@ pathlib.Path('/tmp/held-routes.txt').write_text('\n'.join(routes)+'\n' if routes
 print(len(pairs),'held rows')
 "
 
-COUNT=$(grep -cve '^[[:space:]]*$' /tmp/held-pairs.txt 2>/dev/null || echo 0)
+# grep -c exits 1 when the count is zero, so a `|| echo 0` fallback
+# fires IN ADDITION to grep's own "0" and COUNT becomes two lines -
+# which made the empty case die on "[: 0\n0: integer expression
+# expected" instead of saying "nothing held". `|| true` keeps the count
+# grep already printed.
+COUNT=$(grep -cve '^[[:space:]]*$' /tmp/held-pairs.txt 2>/dev/null || true)
+COUNT=${COUNT:-0}
 if [ "$COUNT" -eq 0 ]; then
   echo "nothing held - nothing to do"
   exit 0
@@ -88,9 +94,27 @@ routes = verdicts(f'{root}/mod/run/routes-all.csv', 0, 5, [6, 7])
 
 released = rejected = 0
 failed = []
+inconclusive = []
+# ERROR and MISSING are the harness failing to answer, not the seed
+# failing. check-one-pair.sh goes out of its way to emit an explicit
+# ERROR rather than a plausible-looking zero, precisely so a crashed
+# worker is never mistaken for a result - and then this stage read
+# "not PASS" as "bad seed" and quarantined on it anyway.
+#
+# That cost 23 verified shipwrecks. Every worker had died the same way,
+# on a mixin that could not load, and all 23 were written off with
+# "nether ERROR: -1 -1 -1". They were fine. The jar was not.
+#
+# Inconclusive rows stay HELD. Re-running the tier after fixing
+# whatever broke is free; re-deriving a seed that was thrown away is
+# the expensive half of this pipeline.
+UNANSWERED = ('ERROR', 'MISSING')
 for pid in set(nether) | set(routes):
     nv, nd = nether.get(pid, ('MISSING', 'tier 4 produced no row'))
     rv, rd = routes.get(pid, ('MISSING', 'tier 5 produced no row'))
+    if nv in UNANSWERED or rv in UNANSWERED:
+        inconclusive.append(pid)
+        continue
     ok = nv == 'PASS' and rv == 'PASS'
     if ok:
         expr = 'SET #u = :f REMOVE heldUnverified'
@@ -125,7 +149,10 @@ for pid in set(nether) | set(routes):
         print(f'  FAILED {pid}: {r.stderr.strip()[:200]}')
         failed.append(pid)
 
-print(f'released {released}, quarantined {rejected}')
+print(f'released {released}, quarantined {rejected}, inconclusive {len(inconclusive)}')
+if inconclusive:
+    print(f'  {len(inconclusive)} rows stayed HELD - the harness did not answer for them.')
+    print('  Fix the harness and re-run; nothing was thrown away.')
 if failed:
     print(f'WARNING: {len(failed)} writes FAILED - those rows are still held: {failed}')
 PY
