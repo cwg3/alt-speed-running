@@ -83,6 +83,91 @@ json.dump(d, open('/tmp/onr/output/overworld_by_type.json','w'), indent=2)
 PY
 fi
 
+# Village: the blacksmith must exist AND hold iron.
+#
+# This stage and the ravine one below were named in the header for a
+# long time and never actually called. Ruined portals got their frame
+# check; villages shipped on the jigsaw's word alone and ocean seeds
+# shipped with no ravine check at all.
+#
+# A piece name is not a chest: a taiga village satisfies "has a
+# weaponsmith piece" and can generate no smith chest whatever. SPEC.md
+# is the rule - blacksmith present, 3 iron in its chest (the golem
+# adds 4, for the 7 that enters the nether). Only 41% of jigsaw
+# passers survive it.
+python3 - <<'PY'
+import json, pathlib
+d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
+rows = [f"{v['seed']} {v['structure']['x']} {v['structure']['z']}" for v in d.get('village', [])]
+pathlib.Path('/tmp/onr/village-in.txt').write_text(('\n'.join(rows) + '\n') if rows else '')
+print(f'stage 3b: {len(rows)} village candidates to blacksmith-check')
+PY
+if [ -s /tmp/onr/village-in.txt ]; then
+  "$ROOT/seed-filter/verify-villages.sh" /tmp/onr/village-in.txt 1
+  cp "$ROOT/mod/run/village-all.csv" /tmp/onr/village.csv
+  python3 - <<'PY'
+import json, csv, sys
+# seed,ironIngots,hasIronPickaxe,hasIronArmor,chests,smithChests,diamonds
+rows = [r for r in csv.reader(open('/tmp/onr/village.csv')) if len(r) > 5]
+# A crashed worker is not a village without a smith. This is the guard
+# the ravine stage went without, which turned 388 servers that never
+# bound a port into 388 seeds "with no ravine".
+bad = [r for r in rows if not r[1].lstrip('-').isdigit()]
+if bad:
+    print(f'  ABORT: {len(bad)} of {len(rows)} village checks returned no verdict')
+    print('  These are crashes, not failures. Fix the cause and re-run.')
+    sys.exit(1)
+ok = {r[0] for r in rows if int(r[5]) >= 1 and int(r[1]) >= 3}
+d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
+before = len(d.get('village', []))
+d['village'] = [v for v in d.get('village', []) if str(v['seed']) in ok]
+print(f'  village: {before} -> {len(d["village"])} with a smith holding 3+ iron')
+json.dump(d, open('/tmp/onr/output/overworld_by_type.json','w'), indent=2)
+PY
+fi
+
+# Ocean: two findable magma ravines.
+#
+# A ravine is the first thing a runner looks for on an ocean seed -
+# before bubbles, before kelp - because it is the nether portal. Both
+# ocean types need one and neither was ever checked here.
+python3 - <<'PY'
+import json, pathlib
+d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
+rows = []
+for t in ('shipwreck', 'buried_treasure'):
+    for v in d.get(t, []):
+        rows.append(f"{v['seed']} {v['structure']['x']} {v['structure']['z']} {t}")
+pathlib.Path('/tmp/onr/ravine-in.txt').write_text(('\n'.join(rows) + '\n') if rows else '')
+print(f'stage 3c: {len(rows)} ocean candidates to ravine-check')
+PY
+if [ -s /tmp/onr/ravine-in.txt ]; then
+  "$ROOT/seed-filter/verify-ravines.sh" /tmp/onr/ravine-in.txt 1
+  cp "$ROOT/mod/run/ravine-all.csv" /tmp/onr/ravine.csv
+  python3 - <<'PY'
+import json, csv, sys
+rows = [r for r in csv.reader(open('/tmp/onr/ravine.csv')) if len(r) > 3]
+bad = [r for r in rows if r[2] not in ('true', 'false')]
+if bad:
+    kinds = {}
+    for r in bad:
+        kinds[r[2]] = kinds.get(r[2], 0) + 1
+    print(f'  ABORT: {len(bad)} of {len(rows)} ravine checks did not return a verdict')
+    for k, n in sorted(kinds.items()):
+        print(f'    {k}: {n}')
+    print('  These are crashes, not failures. Do not let them count as')
+    print('  seeds without ravines - that mistake cost a whole batch once.')
+    sys.exit(1)
+ok = {r[0] for r in rows if r[2] == 'true'}
+d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
+for t in ('shipwreck', 'buried_treasure'):
+    before = len(d.get(t, []))
+    d[t] = [v for v in d.get(t, []) if str(v['seed']) in ok]
+    print(f'  {t}: {before} -> {len(d[t])} with two magma ravines')
+json.dump(d, open('/tmp/onr/output/overworld_by_type.json','w'), indent=2)
+PY
+fi
+
 python3 - "$PER" <<'PY'
 import json, sys
 per = int(sys.argv[1])
