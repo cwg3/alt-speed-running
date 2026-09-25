@@ -54,8 +54,11 @@ You need **both**. Put them in the same folder (step 3).
 
 | File | Where |
 |---|---|
-| `speedrunmcalt-0.1.0.jar` | from whoever sent you this |
-| `fabric-api-0.18.0+build.387-1.16.1.jar` | [Modrinth](https://modrinth.com/mod/fabric-api/version/0.18.0+build.387-1.16.1) |
+| `speedrunmcalt-<version>.jar` | [latest release](../../releases/latest) |
+| `fabric-api-0.18.0+build.387-1.16.1.jar` | [latest release](../../releases/latest), or [Modrinth](https://modrinth.com/mod/fabric-api/version/0.18.0+build.387-1.16.1) |
+
+Both are attached to every release, so you do not need to hunt for the
+Fabric API separately.
 
 > **The Fabric API version matters.** Use exactly
 > `0.18.0+build.387-1.16.1`. Newer builds that look like they support
