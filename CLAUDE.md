@@ -71,6 +71,15 @@ fifth.
   `--only` loads re-pair the same nether seeds; some are paired 2-3x.
   Reorder `nether_seeds.json` unused-first before a load, or fix the
   loader to track what is taken.
+- **A cloud check that "produced no results" did not run.** It is never
+  "found nothing". Treat it as fatal - `run_check_or_die`. Loading a pool
+  built from missing data and reporting success is the worst outcome
+  available, and it has happened.
+- **An instance type must be PASSED to run-on-spot.sh.** Its default was
+  c7g.4xlarge, 32GiB, which cannot hold 16 workers at 2G - the memory
+  guard refuses and the check produces an empty CSV, not an error. Fixed
+  in verify-and-release.sh once and left broken in run-check.sh, which is
+  why the first unattended build did nothing. Default is now m7g.4xlarge.
 - **Docs written during a problem outlive the fix.** The gravel stat,
   the F6 forfeit note and the "results are committed" line all survived
   the change that made them false.

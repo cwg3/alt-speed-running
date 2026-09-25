@@ -101,7 +101,7 @@ if [ ! -s /tmp/onr/spawn-in.txt ]; then
   exit 1
 fi
 
-run_check spawn /tmp/onr/spawn-in.txt "$WORKERS" /tmp/onr/spawn.csv
+run_check_or_die spawn /tmp/onr/spawn-in.txt "$WORKERS" /tmp/onr/spawn.csv
 
 python3 - "$ROOT" <<'PY'
 import json, csv, pathlib, sys
@@ -124,7 +124,7 @@ pathlib.Path('/tmp/onr/rp-in.txt').write_text('\n'.join(rows) + '\n')
 print(f'portalfilter: {len(rows)} ruined portal candidates to frame-check')
 PY
 if [ -s /tmp/onr/rp-in.txt ]; then
-  run_check portalfilter /tmp/onr/rp-in.txt "$WORKERS" /tmp/onr/rp.csv
+  run_check_or_die portalfilter /tmp/onr/rp-in.txt "$WORKERS" /tmp/onr/rp.csv
   python3 - <<'PY'
 import json, csv
 ok = {r[0] for r in list(csv.reader(open('/tmp/onr/rp.csv')))[1:] if r and r[1]=='PASS'}
@@ -156,7 +156,7 @@ pathlib.Path('/tmp/onr/village-in.txt').write_text(('\n'.join(rows) + '\n') if r
 print(f'village: {len(rows)} candidates to blacksmith-check')
 PY
 if [ -s /tmp/onr/village-in.txt ]; then
-  run_check village /tmp/onr/village-in.txt "$WORKERS" /tmp/onr/village.csv
+  run_check_or_die village /tmp/onr/village-in.txt "$WORKERS" /tmp/onr/village.csv
   python3 - <<'PY'
 import json, csv, sys
 # seed,ironIngots,hasIronPickaxe,hasIronArmor,chests,smithChests,diamonds
@@ -200,7 +200,7 @@ pathlib.Path('/tmp/onr/ravine-in.txt').write_text(('\n'.join(rows) + '\n') if ro
 print(f'ravine: {len(rows)} ocean candidates to ravine-check')
 PY
 if [ -s /tmp/onr/ravine-in.txt ]; then
-  run_check ravine /tmp/onr/ravine-in.txt "$WORKERS" /tmp/onr/ravine.csv
+  run_check_or_die ravine /tmp/onr/ravine-in.txt "$WORKERS" /tmp/onr/ravine.csv
   python3 - <<'PY'
 import json, csv, sys
 rows = [r for r in csv.reader(open('/tmp/onr/ravine.csv')) if len(r) > 3]

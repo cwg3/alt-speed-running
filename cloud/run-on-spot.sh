@@ -25,7 +25,14 @@ set -euo pipefail
 CHECK="${1:?usage: run-on-spot.sh <check> <seeds-file> [workers] [type]}"
 SEEDS="${2:?}"
 WORKERS="${3:-16}"
-ITYPE="${4:-c7g.4xlarge}"
+# m7g, not c7g. Both are 16 vCPUs, but c7g.4xlarge has 32GiB and the
+# standard 16 workers at 2G each do not fit - the memory guard below
+# refuses the launch, the check produces no rows, and the caller sees an
+# empty CSV rather than an error. verify-and-release.sh carried a comment
+# explaining this and passed the type explicitly; run-check.sh did not,
+# so every pool-build check silently refused to launch. Fixing the
+# DEFAULT fixes both callers and any future one.
+ITYPE="${4:-m7g.4xlarge}"
 REGION="${REGION:-us-west-2}"
 MAX_MINUTES="${MAX_MINUTES:-180}"
 # Heap PER CONTAINER. Must fit the instance: a t4g.small has 2GB total,
