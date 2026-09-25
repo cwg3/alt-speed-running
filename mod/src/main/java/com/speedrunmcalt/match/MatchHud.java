@@ -290,15 +290,31 @@ public final class MatchHud {
 			return;
 		}
 		if (!MatchState.inMatch() || MatchState.replayMode) {
-			if (com.speedrunmcalt.menu.Matchmaker.state()
-					== com.speedrunmcalt.menu.Matchmaker.State.SEARCHING) {
+			com.speedrunmcalt.menu.Matchmaker.State qs =
+					com.speedrunmcalt.menu.Matchmaker.state();
+			String line = null;
+			int colour = com.speedrunmcalt.menu.Palette.DIM;
+			if (qs == com.speedrunmcalt.menu.Matchmaker.State.SEARCHING) {
+				line = "searching for an opponent  " + MatchHud.clock(
+						com.speedrunmcalt.menu.Matchmaker.searchSeconds());
+			} else if (qs == com.speedrunmcalt.menu.Matchmaker.State.LAUNCHING) {
+				// The overlay exists because a queued player is off in
+				// a practice world, and that is exactly who most needs
+				// to be told the wait is over. Without this the search
+				// line simply disappears and nothing replaces it until
+				// the match world finishes loading.
+				//
+				// Yellow, like the MATCH FOUND title and the menu line:
+				// anything about a match being found is yellow.
+				line = "match found vs " + com.speedrunmcalt.menu.Matchmaker.opponent()
+						+ "  - loading world";
+				colour = com.speedrunmcalt.menu.Palette.YELLOW;
+			}
+			if (line != null) {
 				drawShadowed(matrices, client, "alt", X, Y,
 						com.speedrunmcalt.menu.Palette.PHOSPHOR);
-				drawShadowed(matrices, client,
-						"searching for an opponent  " + MatchHud.clock(
-								com.speedrunmcalt.menu.Matchmaker.searchSeconds()),
-						X + client.textRenderer.getWidth("alt  "), Y,
-						com.speedrunmcalt.menu.Palette.DIM);
+				drawShadowed(matrices, client, line,
+						X + client.textRenderer.getWidth("alt  "), Y, colour);
 			}
 			return;
 		}

@@ -81,15 +81,21 @@ public class AltMenuScreen extends Screen {
 		// Centring it on the string is what the geometry says and it
 		// reads as off by several pixels: "speed" is five characters
 		// against "running"'s seven, so the hyphen is well left of
-		// centre, and since the hyphen and "alt" are both phosphor
-		// green the eye lines those two up and sees the error.
+		// centre, and the eye lines "alt" up with the hyphen and sees
+		// the error. That was true when only those two were green and
+		// it is more true now that the whole wordmark is.
 		String[] wordmark = { "speed", "-", "running" };
 		drawCenteredText(matrices, this.textRenderer, new LiteralText("alt"),
 				Palette.segmentCenterX(this.textRenderer, cx, wordmark, 1),
 				top, Palette.PHOSPHOR);
 		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, top + 12,
 				wordmark,
-				new int[] { Palette.PURPLE, Palette.PHOSPHOR, Palette.PURPLE });
+				// All one colour now. The three-part split existed to
+				// pick the hyphen out in green against purple; with the
+				// wordmark entirely phosphor there is nothing to pick
+				// out, and the segment layout is kept only because
+				// "alt" is positioned from it.
+				new int[] { Palette.PHOSPHOR, Palette.PHOSPHOR, Palette.PHOSPHOR });
 
 		String status;
 		String detail = null;
@@ -147,7 +153,10 @@ public class AltMenuScreen extends Screen {
 					break;
 				case LAUNCHING:
 					queue = "match found vs " + Matchmaker.opponent() + " - loading world";
-					queueColor = ACCENT;
+					// Yellow, like the MATCH FOUND title and its vs line
+					// a moment earlier. Anything about a match being
+					// found is yellow; cyan is for ordinary status.
+					queueColor = Palette.YELLOW;
 					break;
 				case ERROR:
 					queue = "error: " + Matchmaker.error();
