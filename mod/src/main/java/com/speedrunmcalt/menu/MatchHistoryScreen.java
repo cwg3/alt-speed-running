@@ -23,7 +23,25 @@ import java.util.List;
  * the backend, with the screen reading volatile state each frame.
  */
 public class MatchHistoryScreen extends Screen {
-	private static final int ROWS_PER_PAGE = 12;
+	/**
+	 * Most rows a page will ever hold. The real number is whatever
+	 * fits the window - see rowsPerPage().
+	 */
+	private static final int MAX_ROWS_PER_PAGE = 12;
+
+	/** First row's baseline. */
+	private static final int ROWS_TOP = 40;
+
+	/**
+	 * Space kept below the last row for the footer.
+	 *
+	 * The hint and the replay note are positioned from the BOTTOM of
+	 * the screen while the rows grow from the top, so on a short
+	 * window the twelfth row landed on top of "click a match for
+	 * splits and replay". Reserving the footer's own height is what
+	 * stops the two from meeting.
+	 */
+	private static final int FOOTER_RESERVE = 66;
 	/**
 	 * Width reserved for WON / LOST / FORFEIT.
 	 *
@@ -33,6 +51,22 @@ public class MatchHistoryScreen extends Screen {
 	private static final int VERDICT_W = 50;
 
 	private static final int ROW_HEIGHT = 14;
+
+	/** Row count the current page was fetched for, so a resize refetches. */
+	private int loadedForRows = -1;
+
+	/**
+	 * How many rows actually fit, which depends on the window and the
+	 * GUI scale rather than on a constant.
+	 *
+	 * Used for the FETCH as well as the drawing: asking for twelve and
+	 * drawing eight would silently hide four matches and make "Older"
+	 * skip them.
+	 */
+	private int rowsPerPage() {
+		int room = (this.height - FOOTER_RESERVE - ROWS_TOP) / ROW_HEIGHT;
+		return Math.max(3, Math.min(MAX_ROWS_PER_PAGE, room));
+	}
 
 	private final Screen parent;
 
@@ -74,7 +108,11 @@ public class MatchHistoryScreen extends Screen {
 		this.addButton(new ButtonWidget(cx + 55, bottom, 100, 20,
 				new LiteralText("Back"), b -> this.client.openScreen(parent)));
 
-		if (entries.isEmpty()) {
+		// init() runs again on every resize, so this is also where a
+		// window that got shorter gets a page that fits it. Reloading
+		// rather than just drawing fewer rows: drawing fewer would
+		// hide matches and make "Older" step over them.
+		if (entries.isEmpty() || loadedForRows != rowsPerPage()) {
 			load();
 		}
 	}
@@ -88,13 +126,17 @@ public class MatchHistoryScreen extends Screen {
 			loading = false;
 			return;
 		}
+		// Read on the client thread: rowsPerPage() touches this.height,
+		// which the worker below has no business reading.
+		final int want = rowsPerPage();
+		loadedForRows = want;
 		Thread t = new Thread(() -> {
 			try {
 				List<MatchHistoryEntry> page =
-						BackendClient.matchHistory(token, ROWS_PER_PAGE, before);
+						BackendClient.matchHistory(token, want, before);
 				// A short page means there is nothing older, so "Older"
 				// stops rather than fetching an empty one.
-				atEnd = page.size() < ROWS_PER_PAGE;
+				atEnd = page.size() < want;
 				entries = page;
 			} catch (Exception e) {
 				error = e.getMessage();
@@ -180,8 +222,11 @@ public class MatchHistoryScreen extends Screen {
 		int left = cx - 150;
 		rowsLeft = left;
 		rowsTop = 40;
-		int y = 40;
-		for (MatchHistoryEntry e : entries) {
+		int y = ROWS_TOP;
+		// Belt and braces: never draw past the footer even if entries
+		// outlives the resize that shrank the window.
+		int drawable = Math.min(entries.size(), rowsPerPage());
+		for (MatchHistoryEntry e : entries.subList(0, drawable)) {
 			// A forfeit is not a loss and should not read as one.
 			//
 			// The row is per player, and forfeitedBy is the quitter's
