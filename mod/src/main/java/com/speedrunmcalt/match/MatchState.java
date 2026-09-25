@@ -244,6 +244,10 @@ public final class MatchState {
 		BarterSchedule.reset();
 		DropSchedule.reset();
 		MatchClock.reset();
+		// Here rather than at the four places that call reset(): a
+		// per-run guard that one caller forgets is a run that cannot
+		// finish, and nothing would say why.
+		FountainFinish.reset();
 		mySplits.clear();
 		opponentSplits.clear();
 		opponentUsername = null;

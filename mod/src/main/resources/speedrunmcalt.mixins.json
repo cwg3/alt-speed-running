@@ -23,7 +23,8 @@
     "TempleSpawnMixin",
     "ReplayEventsMixin",
     "ReplayPickupMixin",
-    "ReplayPickupNameMixin"
+    "ReplayPickupNameMixin",
+    "EndFountainMixin"
   ],
   "client": [
     "TitleScreenMixin",

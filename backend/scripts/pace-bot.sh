@@ -156,6 +156,41 @@ for entry in "${SPLITS[@]}"; do
   echo "[$(date +%H:%M:%S)] $name claimed ${at}s (sent at ${due}s) -> $OUT"
 done
 
+# Enter the fountain.
+#
+# Killing the dragon no longer ends the race - the runner has to get
+# back to the exit portal and jump in, and the real client posts to
+# /matches/complete at that moment. Without this the bot reports
+# kill_dragon and then simply stops, and the match never completes:
+# the human waits forever for a DEFEAT that is not coming.
+#
+# This is the script's own rule applied again - a stand-in that does
+# not make the calls the real thing makes will eventually prove
+# something false. It proved it about abandonment; this is the same
+# lesson in the win path.
+#
+# A close finish is held provisionally so the LOWEST RUN TIME wins
+# rather than the fastest connection, so the call may have to be
+# repeated until the window closes.
+if [ -n "${MATCH_ID:-}" ]; then
+  FIN_MS=$(( FINISH * 1000 ))
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    BODY=$(printf '{"matchId":"%s","winnerUuid":"%s","elapsedMs":%d}' \
+      "$MATCH_ID" "$UUID" "$FIN_MS")
+    OUT=$(curl -s --globoff -X POST "$API/matches/complete" \
+      -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
+      -d "$BODY")
+    echo "[$(date +%H:%M:%S)] fountain -> $OUT"
+    case "$OUT" in
+      *'"provisional":true'*)
+        RETRY=$(printf '%s' "$OUT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('retryInMs',1000))" 2>/dev/null || echo 1000)
+        sleep $(python3 -c "print(max(0.3, ($RETRY + 200)/1000))")
+        ;;
+      *) break ;;
+    esac
+  done
+fi
+
 # Upload a synthetic replay trace.
 #
 # The bot posts splits but never recorded a position trace, so every

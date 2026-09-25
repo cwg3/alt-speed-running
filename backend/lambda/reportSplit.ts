@@ -2,7 +2,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { resolveSessionToken } from './lib/auth';
-import { applyMatchCompletion, MatchPlayer } from './lib/matchCompletion';
+import { MatchPlayer } from './lib/matchCompletion';
 import { isSplitName, validateSplit } from './lib/splitRules';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
@@ -12,9 +12,20 @@ const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
 const MATCH_HISTORY_TABLE_NAME = process.env.MATCH_HISTORY_TABLE_NAME!;
 
-// Reaching this split ends the race, so it completes the match with
-// the reporting player as the winner.
-const FINAL_SPLIT = 'kill_dragon';
+// NOTHING in this handler ends the race any more.
+//
+// Killing the dragon used to complete the match. That is the wrong
+// moment: the dragon dying is a split, and the race is not over until
+// the runner has got back to the exit portal and jumped in. Two
+// players can kill within seconds of each other and the one standing
+// on the fountain wins.
+//
+// Completion moved to /matches/complete, which the client calls when
+// the player actually enters the fountain. That endpoint requires a
+// recorded kill_dragon split from the claimed winner, so the
+// plausibility rules here still gate the win - they just no longer
+// award it.
+
 
 interface SplitRequest {
 	matchId: string;
@@ -134,36 +145,13 @@ export const handler = async (
 		// Matches predating lastSeenAt have no map to write into.
 	});
 
-	if (body.splitName !== FINAL_SPLIT) {
-		return {
-			statusCode: 200,
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ recorded: true, completed: false }),
-		};
-	}
-
-	// Dragon kill ends the race - first report wins, enforced by the
-	// conditional update inside applyMatchCompletion.
-	const loser = players.find((p) => p.uuid !== reporterUuid)!;
-	// Include the split just written - the copy read at the top of the
-	// handler predates it.
-	const finalSplits = {
-		...allSplits,
-		[reporterUuid]: { ...mine, [body.splitName]: body.elapsedMs },
-	};
-	const result = await applyMatchCompletion(
-		MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, body.matchId, reporter, loser, finalSplits,
-		MATCH_HISTORY_TABLE_NAME);
-
+	// Recording only. Completion is the fountain's job now, through
+	// /matches/complete - see the note at the top of this file. The
+	// ordering, floor and gap rules that ran earlier in this handler
+	// still gate the win; they just no longer award it.
 	return {
 		statusCode: 200,
 		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({
-			recorded: true,
-			completed: !result.alreadyCompleted,
-			alreadyCompleted: result.alreadyCompleted,
-			winner: result.winner,
-			loser: result.loser,
-		}),
+		body: JSON.stringify({ recorded: true, completed: false }),
 	};
 };

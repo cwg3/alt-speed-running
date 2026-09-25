@@ -410,6 +410,44 @@ public final class BackendClient {
 	 * long run is thousands of entries, and repeating four field names
 	 * on each of them roughly triples the payload for no benefit.
 	 */
+	/**
+	 * Claims the win, which is what entering the exit fountain means.
+	 *
+	 * Not a split. The dragon dying is the last split; the race ends
+	 * when the runner gets back to the fountain and jumps in, and the
+	 * server only accepts this from a player who already has a
+	 * kill_dragon split recorded - so the plausibility rules on the
+	 * split path still gate the win.
+	 *
+	 * Returns true if this call is what completed the match, false if
+	 * it was already over (the opponent got there first).
+	 */
+	public static FountainResult claimFountainWin(String sessionToken, String matchId,
+			String selfUuid, long elapsedMs) throws IOException {
+		JsonObject body = new JsonObject();
+		body.addProperty("matchId", matchId);
+		body.addProperty("winnerUuid", selfUuid);
+		// The run time is what decides a close finish, not the order
+		// the two requests happen to arrive in.
+		body.addProperty("elapsedMs", elapsedMs);
+		JsonObject resp = post(API_BASE + "/matches/complete", body, sessionToken);
+
+		if (resp.has("provisional") && resp.get("provisional").getAsBoolean()) {
+			long retry = resp.has("retryInMs") ? resp.get("retryInMs").getAsLong() : 1000L;
+			return new FountainResult(true, retry, false);
+		}
+		// A settled match this call did not win reports alreadyCompleted,
+		// or names the other player as winner.
+		boolean already = resp.has("alreadyCompleted")
+				&& resp.get("alreadyCompleted").getAsBoolean();
+		boolean won = !already;
+		if (resp.has("winner") && resp.get("winner").isJsonObject()) {
+			JsonObject w = resp.getAsJsonObject("winner");
+			won = w.has("uuid") && selfUuid.equals(w.get("uuid").getAsString());
+		}
+		return new FountainResult(false, 0L, won);
+	}
+
 	public static void uploadReplay(String sessionToken, String matchId,
 			java.util.List<com.speedrunmcalt.match.ReplayRecorder.Sample> samples,
 			java.util.List<com.speedrunmcalt.match.ReplayRecorder.Event> events,
