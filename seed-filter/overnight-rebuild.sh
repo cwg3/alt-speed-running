@@ -240,11 +240,35 @@ for t in sorted(d):
 json.dump(d, open('/tmp/onr/output/overworld_by_type.json','w'), indent=2)
 PY
 
-cp /tmp/onr/output/*.json "$ROOT/seed-filter/output/"
+# seed-filter/output/ is gitignored, so a fresh clone does not have it -
+# and `cp a.json b.json <missing-dir>/` fails outright while `cp one.json
+# <missing-dir>/` quietly creates a FILE called output. Either way the
+# loader then cannot find overworld_by_type.json. A nightly runner spent
+# forty minutes on the checks and loaded nothing because of this.
+mkdir -p "$ROOT/seed-filter/output"
+cp /tmp/onr/output/*.json "$ROOT/seed-filter/output/" || {
+  echo "ERROR: could not copy the candidate JSON to seed-filter/output" >&2
+  exit 1
+}
+if [ ! -s "$ROOT/seed-filter/output/overworld_by_type.json" ]; then
+  echo "ERROR: overworld_by_type.json is missing after the copy." >&2
+  exit 1
+fi
+
 echo
 echo "=== loading HELD (nothing drawable until verified) ==="
 cd "$ROOT/backend"
+# The loader's exit code was piped into tail, which returns tail's - so
+# a loader that could not read its input reported success and the run
+# carried on to release nothing and call that fine.
+set -o pipefail
 npx tsx scripts/loadSeedPool.ts BackendStack-SeedPoolTableB4C21150-12O8ZBQS8FM8L --held 2>&1 | tail -3
+rc=${PIPESTATUS[0]}
+set +o pipefail
+if [ "$rc" -ne 0 ]; then
+  echo "ERROR: the loader failed (rc=$rc) - nothing was written to the pool." >&2
+  exit 1
+fi
 
 echo
 echo "=== nether + route, then release ==="

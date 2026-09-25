@@ -93,6 +93,13 @@ onto the MATCH FOUND title and onto the leaderboard.
   launcher's mods folder; a build only writes `mod/build/libs`. Use
   `mod/install-local.sh`, and restart the game - a running client keeps
   the jar it started with. "It built" is not "it is installed".
+- **Gitignored directories do not exist in a fresh clone.**
+  `seed-filter/output/` and the `seedtypes` binary both broke the
+  nightly runner this way. Anything the pipeline writes into an ignored
+  path needs `mkdir -p` first.
+- **`cmd | tail` returns tail's exit code, not cmd's.** That is how a
+  loader which could not read its input reported success. Use
+  `PIPESTATUS[0]` or `set -o pipefail`.
 - **Docs written during a problem outlive the fix.** The gravel stat,
   the F6 forfeit note and the "results are committed" line all survived
   the change that made them false.
