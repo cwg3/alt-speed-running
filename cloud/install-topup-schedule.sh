@@ -27,6 +27,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ACCT=$(aws sts get-caller-identity --query Account --output text)
 MODE="${1:-}"
 
+# --roles-only creates the IAM pieces and stops, so the runner can be
+# launched by hand once before anything recurring exists. The first
+# execution of this user-data should be watched, not scheduled.
+
 if [ "$MODE" = "--remove" ]; then
 	aws scheduler delete-schedule --region "$REGION" --name "$SCHEDULE" 2>/dev/null \
 		&& echo "schedule $SCHEDULE deleted" || echo "no schedule to delete"
@@ -73,6 +77,8 @@ echo "=== runner role ==="
 aws iam get-role --role-name "$ROLE" >/dev/null 2>&1 || {
 	aws iam create-role --role-name "$ROLE" --assume-role-policy-document \
 		'{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
+	aws iam attach-role-policy --role-name "$ROLE" \
+		--policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
 	aws iam create-instance-profile --instance-profile-name "$ROLE" >/dev/null
 	aws iam add-role-to-instance-profile --instance-profile-name "$ROLE" --role-name "$ROLE"
 	echo "  created $ROLE"
@@ -92,6 +98,13 @@ aws iam put-role-policy --role-name "$SCHED_ROLE" --policy-name run-topup \
 	 {\"Effect\":\"Allow\",\"Action\":\"ec2:RunInstances\",\"Resource\":\"*\"},
 	 {\"Effect\":\"Allow\",\"Action\":\"ec2:CreateTags\",\"Resource\":\"*\"},
 	 {\"Effect\":\"Allow\",\"Action\":\"iam:PassRole\",\"Resource\":\"arn:aws:iam::${ACCT}:role/${ROLE}\"}]}"
+
+if [ "$MODE" = "--roles-only" ]; then
+	echo
+	echo "roles ready. Launch one runner by hand with:"
+	echo "  ./cloud/run-topup-once.sh"
+	exit 0
+fi
 
 AMI=$(aws ssm get-parameter --region "$REGION" \
 	--name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \

@@ -103,3 +103,10 @@ echo
 # PER is ignored when TARGETS is set; passed so the usage stays honest.
 TARGETS="$TARGETS" WORKERS="$WORKERS" \
 	"$ROOT/seed-filter/overnight-rebuild.sh" "$FLOOR" "$CAND"
+rc=$?
+echo
+if [ "$rc" -ne 0 ]; then
+	echo "!! top-up FAILED (rc=$rc) - the pool was not changed" >&2
+	exit "$rc"
+fi
+echo "top-up complete"

@@ -15,24 +15,52 @@
 # container image. So this stays small and cheap while the heavy work
 # happens on machines that exist only as long as a check takes.
 set -uo pipefail
-exec > >(tee /var/log/topup.log) 2>&1
+LOG=/var/log/topup.log
+exec > >(tee "$LOG") 2>&1
+STAMP=$(date -u '+%Y%m%d-%H%M%S')
 echo "=== top-up runner booted $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
+
+# The log has to leave the instance, because the instance does not
+# outlive the run. Without this a failed night is indistinguishable from
+# a quiet one: nothing built, nothing to read, nobody told. Pushed every
+# 30s and once more on the way out, so even a hang leaves evidence of how
+# far it got.
+ACCT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
+BUCKET="alt-seedwork-${ACCT}"
+S3LOG="s3://${BUCKET}/topup-logs/${STAMP}.log"
+echo "log -> $S3LOG"
+( while :; do sleep 30; aws s3 cp "$LOG" "$S3LOG" --quiet 2>/dev/null || true; done ) &
+PUSHER=$!
+push_log() { kill "$PUSHER" 2>/dev/null || true; aws s3 cp "$LOG" "$S3LOG" --quiet 2>/dev/null || true; }
 
 # instance-initiated-shutdown-behavior=terminate is set on the launch, so
 # a shutdown here ends the instance. This trap means it terminates on ANY
 # exit path, including a failure - an orchestrator that dies and leaves
 # itself running bills until someone notices.
-trap 'echo "=== shutting down $(date -u +%H:%M:%SZ) ==="; shutdown -h now' EXIT
+trap 'echo "=== shutting down $(date -u +%H:%M:%SZ) ==="; push_log; shutdown -h now' EXIT
 
 export DEBIAN_FRONTEND=noninteractive
-dnf install -y git python3 nodejs awscli 2>/dev/null \
-  || { apt-get update -qq && apt-get install -y -qq git python3 nodejs npm awscli; }
+# gcc and make are for seedtypes, which is compiled and NOT in git.
+dnf install -y git python3 nodejs gcc make 2>/dev/null \
+  || { apt-get update -qq && apt-get install -y -qq git python3 nodejs npm gcc make; }
 
 cd /opt
-# Public repo, so no credentials. --depth 1 because history is not needed
-# and the pool purge left it large.
-git clone --depth 1 https://github.com/cwg3/alt-speed-running.git
+# Public repo, so no credentials. Shallow, but WITH submodules: cubiomes
+# is one, and seedtypes will not build without its headers and archive.
+git clone --depth 1 --recurse-submodules --shallow-submodules \
+  https://github.com/cwg3/alt-speed-running.git
 cd alt-speed-running
+
+# Build the candidate generator, exactly as cloud/Dockerfile does.
+echo "=== building seedtypes ==="
+make -C tools/cubiomes release >/dev/null 2>&1
+( cd seed-filter && cc -O3 -o seedtypes seedtypes.c \
+    ../tools/cubiomes/libcubiomes.a -lm -lpthread )
+if [ ! -x seed-filter/seedtypes ]; then
+  echo "!! seedtypes did not build - cannot generate candidates" >&2
+  exit 1
+fi
+echo "  built $(stat -c%s seed-filter/seedtypes) bytes"
 
 # The pool scripts need the submodule only to BUILD cubiomes, and the
 # container image already carries a built seedtypes. Nothing here compiles.
@@ -44,4 +72,14 @@ export ITYPE="${ITYPE:-m7g.4xlarge}"
 cd backend && npm ci --omit=dev --silent 2>&1 | tail -2; cd ..
 
 ./seed-filter/topup.sh
-echo "=== top-up finished rc=$? $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
+RC=$?
+if [ "$RC" -eq 0 ]; then
+  echo "=== top-up OK $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
+else
+  # `rc=$?` straight after the call reported 0 on a failed build once,
+  # because nothing in the chain propagated the error and the empty-input
+  # guard then said "nothing to do" - which is what a QUIET night says.
+  # A failure that reads as a quiet night is the worst of both.
+  echo "=== top-up FAILED rc=$RC $(date -u '+%Y-%m-%dT%H:%M:%SZ') ===" >&2
+fi
+exit "$RC"

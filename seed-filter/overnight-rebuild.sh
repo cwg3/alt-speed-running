@@ -44,8 +44,25 @@ exec > >(tee -a "$LOG") 2>&1
 echo "=== overnight rebuild started $(date) : $PER per type, $CAND candidates each ==="
 
 cd "$ROOT/seed-filter"
+# seedtypes is COMPILED and gitignored, so a fresh clone does not have it.
+# Without this check the generator silently does nothing, the candidate
+# JSON is never written, and the first thing to complain is a traceback
+# three steps later that says nothing about the cause. A nightly runner
+# hit exactly that on its first execution.
+if [ ! -x "$ROOT/seed-filter/seedtypes" ]; then
+  echo "ERROR: $ROOT/seed-filter/seedtypes is missing or not executable." >&2
+  echo "  It is built from seedtypes.c and is not in git. Build it with:" >&2
+  echo "    make -C tools/cubiomes release" >&2
+  echo "    cc -O3 -o seed-filter/seedtypes seed-filter/seedtypes.c \\" >&2
+  echo "       tools/cubiomes/libcubiomes.a -lm -lpthread" >&2
+  exit 1
+fi
 rm -rf /tmp/onr && mkdir -p /tmp/onr && cd /tmp/onr
 "$ROOT/seed-filter/seedtypes" "$CAND" 2>&1 | grep -E "Start seed|Scanned|nether" || true
+if [ ! -s /tmp/onr/output/overworld_by_type.json ]; then
+  echo "ERROR: seedtypes produced no candidate JSON - refusing to continue." >&2
+  exit 1
+fi
 echo
 
 python3 - "$ROOT" <<'PY'
@@ -74,8 +91,14 @@ print(f'spawn: {len(rows)} candidates to check for wood at spawn')
 PY
 
 if [ ! -s /tmp/onr/spawn-in.txt ]; then
-  echo "no candidates for any short type - nothing to do"
-  exit 0
+  # NOT "nothing to do". topup.sh only calls this when a type is short,
+  # and the generator has already been checked, so no candidates here
+  # means generation came up empty for the types that needed them. The
+  # first version said "nothing to do" and exited 0 - which is what a
+  # genuinely quiet night says, so a broken run read as a calm one.
+  echo "ERROR: no candidates for the short types, though generation ran." >&2
+  echo "  Raise the candidate count, or check seedtypes output." >&2
+  exit 1
 fi
 
 run_check spawn /tmp/onr/spawn-in.txt "$WORKERS" /tmp/onr/spawn.csv
