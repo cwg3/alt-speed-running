@@ -32,13 +32,29 @@ public final class ReplayData {
 		}
 	}
 
+	/** A named moment: a death, a kill, something picked up. */
+	public static final class Event {
+		public final long t;
+		public final String type;
+		public final String detail;
+
+		public Event(long t, String type, String detail) {
+			this.t = t;
+			this.type = type;
+			this.detail = detail;
+		}
+	}
+
 	public static final class Track {
 		public final String username;
 		public final List<Sample> samples;
+		/** Empty for traces recorded before events existed. */
+		public final List<Event> events;
 
-		public Track(String username, List<Sample> samples) {
+		public Track(String username, List<Sample> samples, List<Event> events) {
 			this.username = username;
 			this.samples = samples;
+			this.events = events;
 		}
 	}
 

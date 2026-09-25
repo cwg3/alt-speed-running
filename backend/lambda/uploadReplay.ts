@@ -14,8 +14,6 @@ const SESSIONS_TABLE_NAME = process.env.SESSIONS_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
 const REPLAY_BUCKET = process.env.REPLAY_BUCKET!;
 
-// One sample per second, so this is about two hours of play. Beyond it
-// the client is misbehaving rather than playing.
 // Two hours at the recorder's 10Hz. This moved with the sample rate;
 // left at 7200 the backend would have rejected every run past twelve
 // minutes, which is to say every run worth reviewing.
@@ -24,6 +22,8 @@ const MAX_SAMPLES = 72000;
 interface ReplayRequest {
 	matchId: string;
 	samples: Sample[];
+	/** [t, type, detail]. Absent from clients built before events existed. */
+	events?: [number, string, string][];
 }
 
 export const handler = async (
@@ -56,6 +56,21 @@ export const handler = async (
 	// still sends five-wide rows. Rejecting those would turn an
 	// optional upload into a hard failure at the end of somebody's
 	// match.
+	// Events are [t, type, detail]. Absent on clients built before
+	// they existed, which the version gate does not exclude because it
+	// enforces a minimum rather than an exact build.
+	const events = body.events ?? [];
+	if (!Array.isArray(events) || events.length > 2000
+			|| !events.every((e) => Array.isArray(e) && e.length === 3
+				&& Number.isFinite(e[0]) && typeof e[1] === 'string'
+				&& typeof e[2] === 'string' && e[2].length <= 200)) {
+		return {
+			statusCode: 400,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ error: 'events must be [t, type, detail] triples' }),
+		};
+	}
+
 	if (!body.samples.every((s) => Array.isArray(s)
 			&& (s.length === 5 || s.length === 7) && s.every(Number.isFinite))) {
 		return {
@@ -83,7 +98,13 @@ export const handler = async (
 	await s3.send(new PutObjectCommand({
 		Bucket: REPLAY_BUCKET,
 		Key: key,
-		Body: gzipSync(JSON.stringify(body.samples)),
+		// Samples and events in one object. Storing them separately
+		// would allow a trace whose events are missing to look
+		// complete, which is the failure mode worth designing out.
+		Body: gzipSync(JSON.stringify({
+			samples: body.samples,
+			events: body.events ?? [],
+		})),
 		ContentType: 'application/json',
 		ContentEncoding: 'gzip',
 	}));

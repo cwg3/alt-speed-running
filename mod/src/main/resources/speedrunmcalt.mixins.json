@@ -20,7 +20,9 @@
 		"WitherSkeletonCrowdMixin",
 		"GravelFlintMixin",
 		"NetherStructureSeedMixin",
-		"TempleSpawnMixin"
+		"TempleSpawnMixin",
+		"ReplayEventsMixin",
+		"ReplayPickupMixin"
 	],
 	"client": [
 		"TitleScreenMixin",

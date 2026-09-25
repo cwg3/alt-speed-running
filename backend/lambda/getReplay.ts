@@ -25,14 +25,21 @@ const SESSIONS_TABLE_NAME = process.env.SESSIONS_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
 const REPLAY_BUCKET = process.env.REPLAY_BUCKET!;
 
-async function readTrace(matchId: string, uuid: string): Promise<unknown[] | null> {
+async function readTrace(matchId: string, uuid: string):
+		Promise<{ samples: unknown[]; events: unknown[] } | null> {
 	try {
 		const obj = await s3.send(new GetObjectCommand({
 			Bucket: REPLAY_BUCKET,
 			Key: `${matchId}/${uuid}.json.gz`,
 		}));
 		const body = await obj.Body!.transformToByteArray();
-		return JSON.parse(gunzipSync(Buffer.from(body)).toString('utf8'));
+		const parsed = JSON.parse(gunzipSync(Buffer.from(body)).toString('utf8'));
+		// Older objects are a bare array of samples; newer ones are
+		// { samples, events }. Both are real and both must load - the
+		// old ones are somebody's actual matches.
+		return Array.isArray(parsed)
+			? { samples: parsed, events: [] }
+			: { samples: parsed.samples ?? [], events: parsed.events ?? [] };
 	} catch (err: any) {
 		// A missing trace is ordinary: a player who quit before the
 		// upload, or a match that predates recording. Absent, not an
@@ -86,9 +93,11 @@ export const handler = async (
 
 	const traces: Record<string, unknown> = {};
 	for (const p of players) {
+		const t = await readTrace(matchId, p.uuid);
 		traces[p.uuid] = {
 			username: p.username,
-			samples: await readTrace(matchId, p.uuid),
+			samples: t?.samples ?? null,
+			events: t?.events ?? [],
 		};
 	}
 

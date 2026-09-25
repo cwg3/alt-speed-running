@@ -109,6 +109,7 @@ public final class MatchHud {
 				com.speedrunmcalt.menu.Palette.DIM);
 
 		renderLastSplit(matrices, client, data, at, watched);
+		renderEventFeed(matrices, client, data, at, watched);
 		renderReplayControls(matrices, client);
 	}
 
@@ -153,6 +154,64 @@ public final class MatchHud {
 	 * nothing. Putting the controls there keeps them off the middle of
 	 * the screen, which is the part being watched.
 	 */
+	/**
+	 * The last few things that happened, in order.
+	 *
+	 * A position trace shows movement and nothing else. These are the
+	 * beats a run is actually made of - what was picked up, what was
+	 * killed, what killed them - and they are the reason somebody
+	 * scrubs to a particular second rather than watching ten minutes.
+	 *
+	 * Only what is already behind the playhead, and only the last few:
+	 * a full log would be a wall of text over the thing being watched,
+	 * and everything is on the timeline anyway.
+	 */
+	private static void renderEventFeed(MatrixStack matrices, MinecraftClient client,
+			com.speedrunmcalt.net.ReplayData data, long at, String watched) {
+		com.speedrunmcalt.net.ReplayData.Track t = data.tracks.get(watched);
+		if (t == null || t.events == null || t.events.isEmpty()) {
+			return;
+		}
+		java.util.List<com.speedrunmcalt.net.ReplayData.Event> recent = new java.util.ArrayList<>();
+		for (com.speedrunmcalt.net.ReplayData.Event e : t.events) {
+			if (e.t <= at) {
+				recent.add(e);
+			}
+		}
+		if (recent.isEmpty()) {
+			return;
+		}
+		int from = Math.max(0, recent.size() - 5);
+		int y = Y + LINE * 4;
+		for (int i = from; i < recent.size(); i++) {
+			com.speedrunmcalt.net.ReplayData.Event e = recent.get(i);
+			// A death is the only one that changes what happens next,
+			// so it is the only one that gets a colour.
+			int colour = "death".equals(e.type)
+					? com.speedrunmcalt.menu.Palette.MAGENTA
+					: com.speedrunmcalt.menu.Palette.DIM;
+			String label = MatchState.formatTime(e.t) + "  " + readable(e);
+			drawShadowed(matrices, client, label, X, y, colour);
+			y += LINE;
+		}
+	}
+
+	/**
+	 * Translation keys are how the game names things internally; they
+	 * are not what anybody wants to read on screen.
+	 */
+	private static String readable(com.speedrunmcalt.net.ReplayData.Event e) {
+		if ("death".equals(e.type)) {
+			return e.detail;   // already a death message
+		}
+		String d = e.detail;
+		int dot = d.lastIndexOf('.');
+		if (dot >= 0 && dot < d.length() - 1) {
+			d = d.substring(dot + 1).replace('_', ' ');
+		}
+		return ("kill".equals(e.type) ? "killed " : "") + d;
+	}
+
 	private static void renderReplayControls(MatrixStack matrices, MinecraftClient client) {
 		String[] labels = com.speedrunmcalt.replay.ReplayKeys.LABELS;
 		int screenW = client.getWindow().getScaledWidth();

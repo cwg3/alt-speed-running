@@ -292,8 +292,17 @@ public final class BackendClient {
 							row.get(4).getAsDouble(), yaw, pitch));
 				}
 			}
+			java.util.List<ReplayData.Event> evs = new java.util.ArrayList<>();
+			if (t.has("events") && t.get("events").isJsonArray()) {
+				for (com.google.gson.JsonElement evEl : t.getAsJsonArray("events")) {
+					JsonArray row = evEl.getAsJsonArray();
+					evs.add(new ReplayData.Event(row.get(0).getAsLong(),
+							row.get(1).getAsString(), row.get(2).getAsString()));
+				}
+			}
 			tracks.put(e.getKey(), new ReplayData.Track(
-					t.has("username") ? t.get("username").getAsString() : "player", samples));
+					t.has("username") ? t.get("username").getAsString() : "player",
+					samples, evs));
 		}
 
 		java.util.Map<String, java.util.Map<String, Long>> splits =
@@ -372,7 +381,9 @@ public final class BackendClient {
 	 * on each of them roughly triples the payload for no benefit.
 	 */
 	public static void uploadReplay(String sessionToken, String matchId,
-			java.util.List<com.speedrunmcalt.match.ReplayRecorder.Sample> samples) throws IOException {
+			java.util.List<com.speedrunmcalt.match.ReplayRecorder.Sample> samples,
+			java.util.List<com.speedrunmcalt.match.ReplayRecorder.Event> events)
+			throws IOException {
 		JsonArray packed = new JsonArray();
 		for (com.speedrunmcalt.match.ReplayRecorder.Sample s : samples) {
 			JsonArray row = new JsonArray();
@@ -389,9 +400,22 @@ public final class BackendClient {
 			packed.add(row);
 		}
 
+		// Events ride with the samples rather than in a second request:
+		// half an upload is worse than none, and a trace whose events
+		// went missing looks complete.
+		JsonArray packedEvents = new JsonArray();
+		for (com.speedrunmcalt.match.ReplayRecorder.Event e : events) {
+			JsonArray row = new JsonArray();
+			row.add(e.t);
+			row.add(e.type);
+			row.add(e.detail);
+			packedEvents.add(row);
+		}
+
 		JsonObject body = new JsonObject();
 		body.addProperty("matchId", matchId);
 		body.add("samples", packed);
+		body.add("events", packedEvents);
 		post(API_BASE + "/matches/replay", body, sessionToken);
 	}
 

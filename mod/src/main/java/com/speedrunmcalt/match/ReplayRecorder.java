@@ -85,6 +85,35 @@ public final class ReplayRecorder {
 		}
 	}
 
+	/**
+	 * A moment worth naming, as opposed to a position.
+	 *
+	 * A trace says where somebody was; it cannot say that this was when
+	 * they died, or took the rod, or lost the bed. Those are the beats
+	 * a replay is watched FOR, and none of them are reproducible from
+	 * the seed - terrain and loot are deterministic, a zombie arriving
+	 * at 4:12 is not.
+	 *
+	 * Deliberately sparse. Recording every damage tick would bury the
+	 * moments that matter in noise and cost more than the positions do.
+	 */
+	public static final class Event {
+		public final long t;
+		public final String type;
+		public final String detail;
+
+		Event(long t, String type, String detail) {
+			this.t = t;
+			this.type = type;
+			this.detail = detail;
+		}
+	}
+
+	private static final List<Event> EVENTS = Collections.synchronizedList(new ArrayList<>());
+
+	/** Far fewer than samples, but a stuck client should not grow either. */
+	private static final int MAX_EVENTS = 2000;
+
 	private static final List<Sample> SAMPLES = Collections.synchronizedList(new ArrayList<>());
 	private static int tickCounter = 0;
 	private static volatile boolean uploaded = false;
@@ -96,7 +125,33 @@ public final class ReplayRecorder {
 		ClientTickEvents.END_CLIENT_TICK.register(ReplayRecorder::tick);
 	}
 
+	/**
+	 * Records a named moment, if there is room and a match is running.
+	 *
+	 * Public because the things worth recording happen all over the
+	 * mod - a death in one mixin, a pickup in another - and routing
+	 * them through here keeps the ordering and the guards in one
+	 * place.
+	 */
+	public static void event(String type, String detail) {
+		if (!MatchState.inMatch() || MatchState.replayMode) {
+			return;
+		}
+		if (EVENTS.size() >= MAX_EVENTS) {
+			return;
+		}
+		EVENTS.add(new Event(
+				System.currentTimeMillis() - MatchState.matchStartMillis, type, detail));
+	}
+
+	public static List<Event> events() {
+		synchronized (EVENTS) {
+			return new ArrayList<>(EVENTS);
+		}
+	}
+
 	public static void reset() {
+		EVENTS.clear();
 		SAMPLES.clear();
 		tickCounter = 0;
 		uploaded = false;
@@ -163,7 +218,7 @@ public final class ReplayRecorder {
 
 		Thread thread = new Thread(() -> {
 			try {
-				BackendClient.uploadReplay(token, matchId, snapshot);
+				BackendClient.uploadReplay(token, matchId, snapshot, events());
 				SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Uploaded replay: {} samples", snapshot.size());
 			} catch (Exception e) {
 				// A failed upload must not affect the match result.
