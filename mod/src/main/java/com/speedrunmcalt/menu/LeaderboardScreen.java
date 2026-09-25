@@ -28,6 +28,9 @@ import java.util.List;
  * title screen before anyone has logged in.
  */
 public class LeaderboardScreen extends Screen {
+	/** Screen headings are cyan everywhere in this mod. */
+	private static final int ACCENT = Palette.CYAN;
+
 	private static final int ROW_HEIGHT = 12;
 	private static final int ROWS_TOP = 46;
 	private static final int FOOTER_RESERVE = 52;
@@ -88,8 +91,12 @@ public class LeaderboardScreen extends Screen {
 
 		matrices.push();
 		matrices.scale(1.5f, 1.5f, 1.0f);
+		// NOT phosphor. That green is the wordmark's and nothing else -
+		// spending it on a screen title makes a heading look like
+		// branding, which is the exact drift the palette warns about
+		// having already happened once on MATCH FOUND.
 		drawCenteredText(matrices, this.textRenderer, new LiteralText("LEADERBOARD"),
-				(int) (cx / 1.5f), (int) (14 / 1.5f), Palette.PHOSPHOR);
+				(int) (cx / 1.5f), (int) (14 / 1.5f), ACCENT);
 		matrices.pop();
 
 		if (loading) {
@@ -141,19 +148,22 @@ public class LeaderboardScreen extends Screen {
 			LeaderboardEntry e = list.get(i);
 			boolean isMe = me != null && me.equals(e.uuid);
 
-			// Your own row in phosphor, everyone else's name in yellow -
-			// the colour a player name is everywhere else in this mod.
-			// Finding yourself on a long board should not need reading.
-			int nameColour = isMe ? Palette.PHOSPHOR : Palette.YELLOW;
-
+			// Every name yellow, including yours. A player name is yellow
+			// everywhere else in this mod, and recolouring one of them to
+			// mean "you" both breaks that and spends a palette colour on
+			// something a label says better. Your row is marked after the
+			// record instead.
 			this.textRenderer.drawWithShadow(matrices, String.valueOf(e.rank),
 					xRank, y, e.rank <= 3 ? Palette.EMERALD : Palette.DIM);
-			this.textRenderer.drawWithShadow(matrices, e.username, xName, y, nameColour);
+			this.textRenderer.drawWithShadow(matrices, e.username, xName, y, Palette.YELLOW);
 			this.textRenderer.drawWithShadow(matrices, String.valueOf(e.skillRating),
 					xRating, y, Palette.CYAN);
 			this.textRenderer.drawWithShadow(matrices, String.valueOf(e.seasonPoints),
 					xPoints, y, Palette.PURPLE);
 			this.textRenderer.drawWithShadow(matrices, record(e), xRecord, y, Palette.DIM);
+			if (isMe) {
+				this.textRenderer.drawWithShadow(matrices, "you", xRecord + 46, y, ACCENT);
+			}
 			y += ROW_HEIGHT;
 		}
 

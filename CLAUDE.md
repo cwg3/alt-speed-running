@@ -50,6 +50,15 @@ SPEC.md's check table and dispatched by `seed-filter/run-check.sh`.
 There were four disagreeing "stage N" schemes before; do not add a
 fifth.
 
+## Brand
+
+PHOSPHOR green (`0x56FF42`) is the wordmark's colour and **nothing
+else** - the "alt" text on the title screen, the menu and the HUD. It is
+not a heading colour, not a highlight, not "good news". Screen headings
+are `ACCENT` (cyan); a won split or a winner is `EMERALD`, a deliberately
+different green. Palette.java says all this; it has drifted twice anyway,
+onto the MATCH FOUND title and onto the leaderboard.
+
 ## Things that have bitten repeatedly
 
 - **Mixin signatures validate at class load, not compile.** A clean
