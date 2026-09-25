@@ -356,6 +356,22 @@ export class BackendStack extends cdk.Stack {
 		const replayBucket = new Bucket(this, 'ReplayBucket', {
 			blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
 			removalPolicy: cdk.RemovalPolicy.RETAIN,
+			// Versioned, so a delete or an overwrite leaves the previous
+			// object recoverable.
+			//
+			// Not protection from an attacker: the bucket blocks all
+			// public access, has no bucket policy, and nothing here is
+			// granted s3:DeleteObject - the upload function gets Put and
+			// the fetch function gets Read. Anyone able to delete a
+			// replay already holds account credentials, and could delete
+			// the versions too.
+			//
+			// It protects against US. A bad script, a wrong prefix, a
+			// redeploy that overwrites. The DynamoDB tables got
+			// point-in-time recovery for the same reason, and replays
+			// are the other half of a match record: the tables say what
+			// happened, these say what it looked like.
+			versioned: true,
 		});
 
 		const uploadReplayFn = new NodejsFunction(this, 'UploadReplayFunction', {

@@ -2,22 +2,10 @@
 
 Known outstanding work, roughly in the order it would matter.
 
-## Durability
-
-- [ ] **Versioning on the replay bucket.** S3 replay objects have no
-  versioning, so a script that deleted them would be unrecoverable
-  beyond the last manual snapshot. Low risk — nothing deletes replays
-  today — but it is the one asset without a second line of defence.
-  The DynamoDB tables got point-in-time recovery; this is the same
-  argument applied to the bucket. Add `versioned: true` to the
-  `ReplayBucket` in `backend/lib/backend-stack.ts`.
-
 ## Before testers
 
 - [ ] **Repo visibility.** Private, so the draft GitHub release is not
-  downloadable by anyone invited. Going public exposes source, SPEC,
-  DEVIATIONS and full history — history was already rewritten for the
-  naming scrub, so it is clean.
+  downloadable by anyone invited.
 - [ ] **Pool depth.** Thin types run out fast: a player never draws
   the same seed twice, so a type with four seeds lasts four matches
   and then silently drops out of their draw. Land types are cheap
