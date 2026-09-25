@@ -27,10 +27,27 @@
 # exactly the shortfall would leave every type short after the first
 # pass, and a top-up that never reaches its floor would run every night
 # forever.
+#
+# IT IS PER TYPE, because the types are not close. One multiplier either
+# starves the expensive openings or wastes hours checking candidates the
+# cheap ones never needed - the first run of this script gave shipwreck
+# the same allowance as desert temple and shipwreck finished with
+# nothing.
+#
+# A CAP keeps one night bounded. Reaching the floor for the most
+# expensive type in a single run would mean generating and checking
+# thousands of candidates; the floor does not need to be reached tonight,
+# it needs to be approached every night until it is.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FLOOR="${FLOOR:-50}"
-HEADROOM="${HEADROOM:-1.6}"
+# Fallback only. The real per-type numbers live in headroom.local.json,
+# which is NOT in git: together they say which openings are expensive to
+# produce, and that is a map of where the ladder is thin. A missing file
+# degrades to this single loose value rather than failing - the same way
+# split-rules.local.json does - because a top-up that refuses to run is
+# worse than one that over-generates.
+HEADROOM="${HEADROOM:-6}"
 TABLE="${TABLE:-BackendStack-SeedPoolTableB4C21150-12O8ZBQS8FM8L}"
 REGION="${REGION:-us-west-2}"
 WORKERS="${WORKERS:-16}"
@@ -39,13 +56,32 @@ DRY=0
 
 echo "=== pool top-up $(date -u '+%Y-%m-%dT%H:%M:%SZ') : floor $FLOOR per type ==="
 
+# Local file first, then the S3 mirror - the cloud runner clones from
+# git and so has neither until it fetches one.
+HEADROOM_FILE="$ROOT/seed-filter/headroom.local.json"
+if [ ! -f "$HEADROOM_FILE" ]; then
+	ACCT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
+	aws s3 cp "s3://alt-seedwork-${ACCT}/secrets/headroom.local.json" \
+		"$HEADROOM_FILE" --quiet 2>/dev/null \
+		&& echo "  per-type headroom fetched from S3" \
+		|| echo "  no headroom file - falling back to a flat ${HEADROOM}x for every type"
+fi
+
 PLAN=$(aws dynamodb scan --region "$REGION" --table-name "$TABLE" \
          --projection-expression "seedType,#u,heldUnverified,poolReject" \
          --expression-attribute-names '{"#u":"used"}' \
          --output json 2>/dev/null \
-  | FLOOR="$FLOOR" HEADROOM="$HEADROOM" python3 -c "
+  | FLOOR="$FLOOR" HEADROOM="$HEADROOM" HEADROOM_FILE="$HEADROOM_FILE" python3 -c "
 import json, os, sys, collections
-floor = int(os.environ['FLOOR']); headroom = float(os.environ['HEADROOM'])
+floor = int(os.environ['FLOOR']); flat = float(os.environ['HEADROOM'])
+try:
+    cfg = json.load(open(os.environ['HEADROOM_FILE']))
+except Exception:
+    cfg = {}
+cap = int(cfg.get('_maxCandidatesPerType', 400))
+def headroom_for(t):
+    v = cfg.get(t)
+    return float(v) if isinstance(v, (int, float)) else flat
 TYPES = ['village','desert_temple','ruined_portal','shipwreck','buried_treasure']
 items = json.load(sys.stdin)['Items']
 draw = collections.Counter()
@@ -70,9 +106,16 @@ held = sum(1 for i in items if i.get('heldUnverified',{}).get('BOOL'))
 if held:
     print(f'  NOTE {held} rows are held mid-verification', file=sys.stderr)
 
-want = max(targets.values())
-print(json.dumps({'targets': targets, 'short': short,
-                  'cand': int(want * headroom) + 10 if want else 0}))
+# One candidate count per type, each capped so a single night stays
+# bounded. The generator makes the largest of them and each type is
+# trimmed to its own before anything is checked.
+cands = {t: (min(cap, int(targets[t] * headroom_for(t)) + 10) if targets[t] else 0)
+         for t in TYPES}
+for t in TYPES:
+    if targets[t]:
+        print(f'  {t:<18}want {targets[t]:>3}  ->  generate {cands[t]}', file=sys.stderr)
+print(json.dumps({'targets': targets, 'short': short, 'cands': cands,
+                  'cand': max(cands.values()) if short else 0}))
 ")
 rc=$?
 if [ $rc -ne 0 ] || [ -z "$PLAN" ]; then
@@ -83,6 +126,7 @@ fi
 SHORT=$(printf '%s' "$PLAN" | python3 -c "import json,sys; print(' '.join(json.load(sys.stdin)['short']))")
 CAND=$(printf '%s' "$PLAN"  | python3 -c "import json,sys; print(json.load(sys.stdin)['cand'])")
 TARGETS=$(printf '%s' "$PLAN" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['targets']))")
+CANDS=$(printf '%s' "$PLAN" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['cands']))")
 
 echo
 if [ -z "$SHORT" ]; then
@@ -101,7 +145,7 @@ fi
 
 echo
 # PER is ignored when TARGETS is set; passed so the usage stays honest.
-TARGETS="$TARGETS" WORKERS="$WORKERS" \
+TARGETS="$TARGETS" CANDS="$CANDS" WORKERS="$WORKERS" \
 	"$ROOT/seed-filter/overnight-rebuild.sh" "$FLOOR" "$CAND"
 rc=$?
 echo

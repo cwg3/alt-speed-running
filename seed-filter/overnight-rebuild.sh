@@ -71,14 +71,26 @@ root = sys.argv[1]
 import os
 d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
 
-# Drop types we do not need before paying for any check on them.
+# Drop types we do not need before paying for any check on them, and
+# trim the rest to their OWN candidate count. seedtypes generates the
+# largest type's allowance for every type, so without this the cheap
+# openings get spawn-checked at the expensive one's volume - which is
+# most of the cost of the run spent on types that were already at their
+# floor.
 targets = json.loads(os.environ['TARGETS']) if os.environ.get('TARGETS') else None
+cands = json.loads(os.environ['CANDS']) if os.environ.get('CANDS') else None
 if targets is not None:
     skipped = [t for t in list(d) if targets.get(t, 0) <= 0]
     for t in skipped:
         del d[t]
     if skipped:
         print('not short, skipping entirely:', ', '.join(sorted(skipped)))
+    if cands:
+        for t in list(d):
+            n = cands.get(t)
+            if isinstance(n, int) and n > 0 and len(d[t]) > n:
+                print(f'  {t}: {len(d[t])} generated -> {n} to check')
+                d[t] = d[t][:n]
     json.dump(d, open('/tmp/onr/output/overworld_by_type.json','w'), indent=2)
 
 out = pathlib.Path('/tmp/onr/spawn-in.txt')
