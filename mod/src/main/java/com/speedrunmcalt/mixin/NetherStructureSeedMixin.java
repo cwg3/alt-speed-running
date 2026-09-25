@@ -51,7 +51,7 @@ public abstract class NetherStructureSeedMixin {
 
 	@ModifyVariable(method = "setStructureStarts", at = @At("HEAD"), argsOnly = true, ordinal = 0)
 	private long speedrunmcalt$useNetherSeed(long worldSeed) {
-		if (!MatchState.inMatch() || MatchState.netherSeed == 0) {
+		if (!MatchState.ourWorld() || MatchState.netherSeed == 0) {
 			return worldSeed;
 		}
 		BiomeSource source = ((ChunkGenerator) (Object) this).getBiomeSource();
@@ -98,7 +98,7 @@ public abstract class NetherStructureSeedMixin {
 					target = "Lnet/minecraft/server/world/ServerWorld;getSeed()J"))
 	private long speedrunmcalt$locateWithNetherSeed(ServerWorld world) {
 		long worldSeed = world.getSeed();
-		if (!MatchState.inMatch() || MatchState.netherSeed == 0) {
+		if (!MatchState.ourWorld() || MatchState.netherSeed == 0) {
 			return worldSeed;
 		}
 		BiomeSource source = ((ChunkGenerator) (Object) this).getBiomeSource();

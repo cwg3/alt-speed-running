@@ -81,14 +81,24 @@ public final class MatchWorldSetup {
 	 * that.
 	 */
 	private static void onTick(MinecraftServer server) {
-		if (!MatchState.inMatch()) {
+		// ourWorld(), not inMatch(). A replay never starts a run clock,
+		// so gating this on inMatch() meant the bastion chests were
+		// never topped up in a replay - the same silent divergence that
+		// left replay worlds with the wrong overworld loot.
+		if (!MatchState.ourWorld()) {
 			return;
 		}
 
 		// Arrival check first, and independent of the bastion work: a
 		// player stranded over lava never reaches the bastion at all,
 		// so gating this behind that would be backwards.
-		if (!MatchState.netherArrivalChecked) {
+		//
+		// Matches only. This one REACTS to where a player happens to
+		// be standing and edits terrain to rescue them, so running it
+		// in a replay would let the viewer's camera - which goes
+		// wherever they fly it - cut platforms into a world that is
+		// supposed to be a record of what happened.
+		if (!MatchState.replayMode && !MatchState.netherArrivalChecked) {
 			ServerWorld netherWorld = server.getWorld(World.NETHER);
 			if (netherWorld != null && !netherWorld.getPlayers().isEmpty()) {
 				MatchState.netherArrivalChecked = true;

@@ -262,6 +262,28 @@ public final class MatchState {
 		return matchStartMillis > 0 && matchId != null;
 	}
 
+	/**
+	 * True while the world being generated is one WE specified - a
+	 * match world or a replay of one.
+	 *
+	 * Distinct from inMatch(), and the difference is not academic.
+	 * inMatch() asks whether a run CLOCK is running, which is the
+	 * right question for scoring and the wrong one for world
+	 * generation: a replay never starts a clock, so anything gated on
+	 * inMatch() silently stopped applying to replay worlds. The nether
+	 * seed redirect was, and a replay generated its nether from the
+	 * overworld seed - no bastion at the coordinate the match had, on
+	 * a world that otherwise looked right.
+	 *
+	 * It cannot simply be "matchId != null": a player who queues while
+	 * practising has a matchId before their match world exists, and
+	 * redirecting structures in their practice world would rewrite a
+	 * world they are standing in.
+	 */
+	public static boolean ourWorld() {
+		return replayMode || inMatch();
+	}
+
 	public static String formatTime(long millis) {
 		long totalSeconds = Math.max(0, millis) / 1000;
 		return String.format("%d:%02d", totalSeconds / 60, totalSeconds % 60);
