@@ -35,8 +35,12 @@ there is no version to choose and no way to choose the wrong one.
 Slightly more manual, and you must match the versions yourself.
 
 1. Get the [Fabric installer](https://fabricmc.net/use/installer).
-   Run it, choose **Minecraft 1.16.1** and **loader 0.19.5**, tick
-   *Create profile*, install.
+   Run it, choose **Minecraft 1.16.1** and **loader 0.19.5** (or newer),
+   tick *Create profile*, install. If 1.16.1 is not in the version list,
+   untick **Stable Only** — the installer hides old releases by default.
+
+   This adds a `fabric-loader-1.16.1` profile. It does not touch your
+   existing installations.
 2. From the [releases page](https://github.com/cwg3/alt-speed-running/releases),
    download both jars: `speedrunmcalt-<version>.jar` and
    `fabric-api-0.18.0+build.387-1.16.1.jar`.
@@ -51,9 +55,12 @@ Two things to get right, because both fail confusingly:
 - **1.16.1 exactly** — not 1.16, not 1.16.5. World generation differs
   between them, which would put you on a different world from your
   opponent.
-- **That exact Fabric API build.** Newer ones for "1.16" require
-  1.16.2+ internally and the game will refuse to load. If you download
-  Fabric API from elsewhere, take the one tagged for 1.16.1.
+- **That exact Fabric API build.** Newer ones that look like they
+  support 1.16 — `0.42.0+1.16`, for example — actually require 1.16.2
+  internally, and the game refuses to start with an **"Incompatible
+  mods found"** screen. If you hit that error, this is why. Taking the
+  jar from the releases page avoids it; if you get Fabric API
+  elsewhere, take the one tagged for 1.16.1.
 
 This installs the mod into your main Minecraft, so it loads every time
 you use that profile. If you would rather keep it separate, use a
@@ -61,7 +68,8 @@ launcher from 2a.
 
 ## 3. Log in and play
 
-Launch the instance, and on the title screen choose **alt**.
+Launch the instance. At the top of the title screen there is a new
+button reading **alt  speed-running** — click it.
 
 Then **Find a match**. You will be paired with another player, shown
 your seed type with ten seconds to plan, and the race starts when the

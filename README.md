@@ -17,7 +17,7 @@ an invite, but matchmaking will refuse you.
 ## Get started
 
 1. **[Download the latest release](../../releases/latest)** — take
-   `alt-0.1.0.mrpack` for Prism, MultiMC, Modrinth App or ATLauncher;
+   `alt-<version>.mrpack` for Prism, MultiMC, Modrinth App or ATLauncher;
    take the two `.jar` files if you use the official Minecraft
    launcher.
 2. **[Follow INSTALL.md](INSTALL.md)** for the exact steps, including
@@ -31,64 +31,9 @@ The rest of this file is what the project is and how it works.
 
 ---
 
-## Install
-
-You need Minecraft: Java Edition and the official launcher. Everything
-below is free and takes about five minutes.
-
-### 1. Install Fabric Loader for 1.16.1
-
-Download the installer from [fabricmc.net/use](https://fabricmc.net/use/installer/)
-and run it:
-
-- **Minecraft Version:** `1.16.1` — untick "Stable Only" if it isn't listed
-- **Loader Version:** `0.19.5` or newer
-- Click **Install**
-
-This adds a `fabric-loader-1.16.1` profile to your launcher. It does not
-touch your existing installations.
-
-### 2. Get the two mod files
-
-You need **both**. Put them in the same folder (step 3).
-
-| File | Where |
-|---|---|
-| `speedrunmcalt-<version>.jar` | [latest release](../../releases/latest) |
-| `fabric-api-0.18.0+build.387-1.16.1.jar` | [latest release](../../releases/latest), or [Modrinth](https://modrinth.com/mod/fabric-api/version/0.18.0+build.387-1.16.1) |
-
-Both are attached to every release, so you do not need to hunt for the
-Fabric API separately.
-
-> **The Fabric API version matters.** Use exactly
-> `0.18.0+build.387-1.16.1`. Newer builds that look like they support
-> 1.16 (for example `0.42.0+1.16`) actually require 1.16.2 and the game
-> will refuse to start with an "Incompatible mods found" screen. If you
-> hit that error, this is why.
-
-### 3. Drop them in your mods folder
-
-| OS | Path |
-|---|---|
-| macOS | `~/Library/Application Support/minecraft/mods` |
-| Windows | `%appdata%\.minecraft\mods` |
-| Linux | `~/.minecraft/mods` |
-
-Create the `mods` folder if it isn't there.
-
-### 4. Launch
-
-Open the Minecraft launcher, select the **`fabric-loader-1.16.1`**
-installation, and hit Play.
-
-You should see an **`alt - speed-running`** button at the top of the
-title screen.
-
----
-
 ## Playing
 
-1. Click **alt - speed-running** on the title screen.
+1. Click **alt  speed-running** at the top of the title screen.
 2. It verifies your account automatically — you should see your
    username, rating and season points. No password, no separate signup;
    it confirms ownership through Mojang using the session you are
@@ -102,7 +47,9 @@ title screen.
 6. First to kill the dragon wins. Ratings update automatically.
 
 **Press F6 to forfeit** if you want out of a bad seed. It asks for
-confirmation first. Forfeiting counts as a loss.
+confirmation first. Your opponent wins and your rating moves as it would
+for any loss, but the match is recorded and shown as a **forfeit**, not
+a loss.
 
 ---
 
