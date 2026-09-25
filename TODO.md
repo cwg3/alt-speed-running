@@ -4,6 +4,14 @@ Known outstanding work, roughly in the order it would matter.
 
 ## Operational
 
+- [ ] **Four cloud paths have never actually run.** Written tonight,
+  logic-tested locally, but no instance has executed them:
+  `run-check.sh` CLOUD=1, `verify-and-release.sh` CLOUD=1,
+  `CHECK=village`, and the `CHECK=route` seed-field fix. The route bug
+  they were written alongside is exactly this shape - a second path
+  nobody exercises stays broken until someone uses it. The current
+  pool batch exercises all four; if it is abandoned, they are still
+  unproven.
 - [ ] **Release assets go stale silently.** v0.1.0's jar was built
   hours before it was published and predated the fountain ending — a
   tester on it would have killed the dragon and waited forever for a
