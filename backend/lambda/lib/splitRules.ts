@@ -63,8 +63,12 @@ const REQUIRES: Partial<Record<SplitName, SplitName[]>> = {
  * Set SPLIT_FLOORS_MS and SPLIT_GAPS_MS on the ReportSplit function to
  * the real values. Format:
  *
- *   SPLIT_FLOORS_MS = {"kill_dragon":180000, ...}
- *   SPLIT_GAPS_MS   = {"kill_dragon":{"after":"enter_end","ms":20000}, ...}
+ *   SPLIT_FLOORS_MS = {"kill_dragon":<ms>, ...}
+ *   SPLIT_GAPS_MS   = {"kill_dragon":{"after":"enter_end","ms":<ms>}, ...}
+ *
+ * Placeholders, not the real numbers - an example that quoted the
+ * production floor would put it straight back in the repository this
+ * whole arrangement exists to keep it out of.
  */
 function envJson<T>(name: string, fallback: T): T {
 	const raw = process.env[name];
