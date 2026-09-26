@@ -1,6 +1,11 @@
 import { ConditionalCheckFailedException, DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { emptyStats, foldRun, review, ReviewResult } from './runStats';
+// One list of synthetic players, defined in seedPool.ts and imported
+// rather than restated. A second copy would drift, and the two places
+// that care - who is excluded from seenSeeds, and who cannot move a
+// rating - must not be allowed to disagree about who the bots are.
+import { isSyntheticPlayer } from './seedPool';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -16,6 +21,42 @@ const ELO_K_FACTOR = 32;
 // floored at 1 so beating even a much weaker opponent still counts.
 const SEASON_POINTS_BASE = 10;
 
+export interface MatchScore {
+	winnerDelta: number;
+	loserDelta: number;
+	seasonPoints: number;
+}
+
+/**
+ * The scoring math, kept separate from the writes so it can be tested
+ * without standing up a DynamoDB double - which is the only reason the
+ * exhibition rule had no test when it was the rating's only safeguard.
+ *
+ * An exhibition scores nothing: no Elo either way, no season points.
+ * Returning zeros rather than skipping the call keeps one code path for
+ * the match record, so a result screen reads the same fields whatever
+ * kind of match it was.
+ */
+export function scoreMatch(
+	winnerRating: number,
+	loserRating: number,
+	exhibition: boolean,
+): MatchScore {
+	if (exhibition) {
+		return { winnerDelta: 0, loserDelta: 0, seasonPoints: 0 };
+	}
+	const expectedWinner = 1 / (1 + Math.pow(10, (loserRating - winnerRating) / 400));
+	const winnerDelta = Math.round(ELO_K_FACTOR * (1 - expectedWinner));
+	return {
+		winnerDelta,
+		loserDelta: -winnerDelta,
+		seasonPoints: Math.max(
+			1,
+			Math.round(SEASON_POINTS_BASE + (loserRating - winnerRating) / 20),
+		),
+	};
+}
+
 export interface MatchPlayer {
 	uuid: string;
 	username: string;
@@ -24,6 +65,8 @@ export interface MatchPlayer {
 
 export interface CompletionResult {
 	alreadyCompleted: boolean;
+	/** A synthetic player was involved, so nothing was scored. */
+	exhibition?: boolean;
 	winner?: { uuid: string; ratingDelta: number; seasonPointsAwarded: number };
 	loser?: { uuid: string; ratingDelta: number };
 }
@@ -187,17 +230,29 @@ export async function applyMatchCompletion(
 		throw err;
 	}
 
+	// An EXHIBITION is any match with a synthetic player on either side.
+	// It is recorded in full - match row, splits, replay, review - and
+	// scores nothing.
+	//
+	// Nothing checked this before, so a bot match moved the ladder
+	// exactly like a human one. That is not hypothetical: ~180 synthetic
+	// matches had to be undone by scripts/resetLadder.ts, and the only
+	// thing containing it is that PaceBot must be launched by hand.
+	// Anything that lets a player summon a bot turns this into a rating
+	// farm, so the guard belongs HERE, at the one place that applies
+	// score, rather than in whichever feature eventually offers one.
+	//
+	// The COUNTS are withheld along with the rating, not just the
+	// rating. The leaderboard shows a W-L-F record, and a record quietly
+	// padded with bot wins is the same falsehood in a different column.
+	// Half of this fix would read as done and would not be.
+	const exhibition = isSyntheticPlayer(winner.uuid) || isSyntheticPlayer(loser.uuid);
+
 	// Elo uses the rating snapshot taken when the match was created (see
 	// queueJoin.ts) - not live-refetched, since ratings shouldn't
 	// legitimately change mid-match.
-	const expectedWinner = 1 / (1 + Math.pow(10, (loser.skillRating - winner.skillRating) / 400));
-	const winnerDelta = Math.round(ELO_K_FACTOR * (1 - expectedWinner));
-	const loserDelta = -winnerDelta;
-
-	const seasonPoints = Math.max(
-		1,
-		Math.round(SEASON_POINTS_BASE + (loser.skillRating - winner.skillRating) / 20),
-	);
+	const { winnerDelta, loserDelta, seasonPoints } =
+		scoreMatch(winner.skillRating, loser.skillRating, exhibition);
 
 	// Record counts as well as rating. A leaderboard that shows only a
 	// rating cannot say whether 1229 came from two matches or two
@@ -211,31 +266,37 @@ export async function applyMatchCompletion(
 	// identical - the opponent still wins - but giving up on a bad seed
 	// and being beaten to the dragon are different things, and the match
 	// history screen already refuses to conflate them.
-	await ddb.send(new UpdateCommand({
-		TableName: playersTableName,
-		Key: { uuid: winner.uuid },
-		UpdateExpression: 'SET skillRating = skillRating + :delta, seasonPoints = seasonPoints + :points '
-			+ 'ADD wins :one, matches :one',
-		ExpressionAttributeValues: { ':delta': winnerDelta, ':points': seasonPoints, ':one': 1 },
-	}));
-	await ddb.send(new UpdateCommand({
-		TableName: playersTableName,
-		Key: { uuid: loser.uuid },
-		UpdateExpression: 'SET skillRating = skillRating + :delta '
-			+ (forfeitedBy === loser.uuid
-				? 'ADD forfeits :one, matches :one'
-				: 'ADD losses :one, matches :one'),
-		ExpressionAttributeValues: { ':delta': loserDelta, ':one': 1 },
-	}));
+	if (!exhibition) {
+		await ddb.send(new UpdateCommand({
+			TableName: playersTableName,
+			Key: { uuid: winner.uuid },
+			UpdateExpression: 'SET skillRating = skillRating + :delta, seasonPoints = seasonPoints + :points '
+				+ 'ADD wins :one, matches :one',
+			ExpressionAttributeValues: { ':delta': winnerDelta, ':points': seasonPoints, ':one': 1 },
+		}));
+		await ddb.send(new UpdateCommand({
+			TableName: playersTableName,
+			Key: { uuid: loser.uuid },
+			UpdateExpression: 'SET skillRating = skillRating + :delta '
+				+ (forfeitedBy === loser.uuid
+					? 'ADD forfeits :one, matches :one'
+					: 'ADD losses :one, matches :one'),
+			ExpressionAttributeValues: { ':delta': loserDelta, ':one': 1 },
+		}));
+	}
 
 	// Keep the deltas on the match so a result screen can show what the
 	// game actually did, rather than the client having to infer it.
 	await ddb.send(new UpdateCommand({
 		TableName: matchesTableName,
 		Key: { matchId },
-		UpdateExpression: 'SET #results = :r',
-		ExpressionAttributeNames: { '#results': 'results' },
+		// The flag is stored, not inferred from the zero deltas: a genuine
+		// human match between equals can also produce a 0 delta, and a
+		// result screen must never have to guess which kind it was.
+		UpdateExpression: 'SET #results = :r, #exhibition = :ex',
+		ExpressionAttributeNames: { '#results': 'results', '#exhibition': 'exhibition' },
 		ExpressionAttributeValues: {
+			':ex': exhibition,
 			':r': {
 				[winner.uuid]: { ratingDelta: winnerDelta, seasonPointsAwarded: seasonPoints },
 				[loser.uuid]: { ratingDelta: loserDelta, seasonPointsAwarded: 0 },
@@ -284,6 +345,7 @@ export async function applyMatchCompletion(
 
 	return {
 		alreadyCompleted: false,
+		exhibition,
 		winner: { uuid: winner.uuid, ratingDelta: winnerDelta, seasonPointsAwarded: seasonPoints },
 		loser: { uuid: loser.uuid, ratingDelta: loserDelta },
 	};
