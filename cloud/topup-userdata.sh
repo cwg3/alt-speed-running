@@ -28,16 +28,43 @@ echo "=== top-up runner booted $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
 ACCT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
 BUCKET="alt-seedwork-${ACCT}"
 S3LOG="s3://${BUCKET}/topup-logs/${STAMP}.log"
+TOPIC="arn:aws:sns:${REGION:-us-west-2}:${ACCT}:alt-pool-topup-alerts"
+# Set BEFORE the trap is armed, so an exit from anywhere still has
+# something true to report. "UNKNOWN" is a real outcome: it means the
+# runner died before reaching its own verdict, which is different from
+# both OK and FAILED and must not be reported as either.
+STATUS="UNKNOWN - died before reaching its own verdict"
 echo "log -> $S3LOG"
 ( while :; do sleep 30; aws s3 cp "$LOG" "$S3LOG" --quiet 2>/dev/null || true; done ) &
 PUSHER=$!
 push_log() { kill "$PUSHER" 2>/dev/null || true; aws s3 cp "$LOG" "$S3LOG" --quiet 2>/dev/null || true; }
 
+# The runner is the only thing that knows how its own run ended, and
+# until now nothing left the instance except a log in a bucket nobody
+# was watching - so a failed run was only ever found by going to look.
+# This publishes the verdict from the EXIT trap rather than after
+# topup.sh, so a death anywhere still reports.
+#
+# NOTE ON THE NEVER-PUBLISH RULE: this may EMAIL pool numbers, and that
+# is fine - it goes to the owner's inbox, not to a public surface. What
+# must never happen is this SCRIPT containing them, which is why the
+# numbers are grepped out of the log at runtime and no threshold or
+# count is written here. See CLAUDE.md.
+notify() {
+	aws sns publish --region "${REGION:-us-west-2}" --topic-arn "$TOPIC" \
+		--subject "$(printf 'alt top-up: %.80s' "$STATUS")" \
+		--message "$(printf '%s\n\nlog: %s\n\n%s\n' "$STATUS" "$S3LOG" \
+			"$(grep -E 'drawable|SHORT by|released |generate [0-9]+|^!!' \
+				"$LOG" 2>/dev/null | tail -25)")" \
+		>/dev/null 2>&1 \
+		|| echo "  note: SNS publish failed - the verdict is only in S3"
+}
+
 # instance-initiated-shutdown-behavior=terminate is set on the launch, so
 # a shutdown here ends the instance. This trap means it terminates on ANY
 # exit path, including a failure - an orchestrator that dies and leaves
 # itself running bills until someone notices.
-trap 'echo "=== shutting down $(date -u +%H:%M:%SZ) ==="; push_log; shutdown -h now' EXIT
+trap 'echo "=== shutting down $(date -u +%H:%M:%SZ) ==="; notify; push_log; shutdown -h now' EXIT
 
 # ONE RUNNER AT A TIME. The schedule fires every 12h and a catch-up run
 # on a raised floor can take most of that, so two orchestrators
@@ -68,6 +95,7 @@ if [ -n "$SELF" ]; then
 	if [ -n "$OTHERS" ]; then
 		echo "=== another top-up runner is already going - standing down ==="
 		echo "=== top-up SKIPPED $(date -u '+%Y-%m-%dT%H:%M:%SZ') : overlap ==="
+		STATUS="SKIPPED - another runner was already going"
 		exit 0
 	fi
 	echo "  overlap guard: no other runner"
@@ -112,7 +140,9 @@ cd backend && npm ci --omit=dev --silent 2>&1 | tail -2; cd ..
 RC=$?
 if [ "$RC" -eq 0 ]; then
   echo "=== top-up OK $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
+  STATUS="OK"
 else
+  STATUS="FAILED rc=$RC"
   # `rc=$?` straight after the call reported 0 on a failed build once,
   # because nothing in the chain propagated the error and the empty-input
   # guard then said "nothing to do" - which is what a QUIET night says.

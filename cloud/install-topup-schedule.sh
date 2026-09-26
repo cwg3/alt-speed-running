@@ -7,6 +7,10 @@
 #                   minute field, so every entry must share a minute.
 #   FLOOR=100       drawable seeds each type should have
 #   ITYPE_RUNNER    orchestrator size (default t4g.small - it only waits)
+#   ALERT_EMAIL=    subscribe this address to the run-verdict topic. NOT
+#                   stored here and not in git - an address in a public
+#                   repo is a published address. Pass it once; AWS keeps
+#                   the subscription and emails a confirmation link.
 #
 # EventBridge Scheduler calls ec2:RunInstances directly. There is no
 # Lambda because the decision to build already lives in topup.sh, and a
@@ -29,6 +33,7 @@ REGION="${REGION:-us-west-2}"
 AT="${AT:-03:00,15:00}"
 FLOOR="${FLOOR:-100}"
 ROLE=alt-topup-runner
+TOPIC_NAME=alt-pool-topup-alerts
 SCHED_ROLE=alt-topup-scheduler
 SCHEDULE=alt-pool-topup
 ITYPE_RUNNER="${ITYPE_RUNNER:-t4g.small}"
@@ -89,6 +94,8 @@ RUNNER_POLICY=$(cat <<JSON
   "Resource":"arn:aws:dynamodb:${REGION}:${ACCT}:table/BackendStack-SeedPoolTable*"},
  {"Effect":"Allow","Action":["dynamodb:Scan"],
   "Resource":"arn:aws:dynamodb:${REGION}:${ACCT}:table/BackendStack-PlayersTable*"},
+ {"Effect":"Allow","Action":["sns:Publish"],
+  "Resource":"arn:aws:sns:${REGION}:${ACCT}:${TOPIC_NAME}"},
  {"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:ListBucket","s3:DeleteObject"],
   "Resource":["arn:aws:s3:::alt-seedwork-${ACCT}","arn:aws:s3:::alt-seedwork-${ACCT}/*"]},
  {"Effect":"Allow","Action":["ec2:RunInstances","ec2:DescribeInstances",
@@ -117,6 +124,36 @@ if [ "$MODE" = "--dry-run" ]; then
 	echo "=== user-data that would run ==="
 	echo "  cloud/topup-userdata.sh  ($(wc -l < "$ROOT/cloud/topup-userdata.sh") lines)"
 	exit 0
+fi
+
+# WHY THE RUNNER REPORTS ITSELF. Before this, the only trace of a run was
+# a log in a bucket, so a failure was found by someone remembering to
+# look - and a top-up that fails silently is indistinguishable from one
+# that had nothing to do. The runner knows its own verdict; it should say
+# it. create-topic is idempotent and returns the same ARN.
+echo "=== verdict topic ==="
+TOPIC_ARN=$(aws sns create-topic --region "$REGION" --name "$TOPIC_NAME" \
+	--query TopicArn --output text)
+echo "  $TOPIC_ARN"
+if [ -n "${ALERT_EMAIL:-}" ]; then
+	# Only subscribe an address that is not already there, confirmed or
+	# not: re-subscribing sends another confirmation email every install.
+	EXISTING=$(aws sns list-subscriptions-by-topic --region "$REGION" \
+		--topic-arn "$TOPIC_ARN" \
+		--query "Subscriptions[?Endpoint=='${ALERT_EMAIL}'].SubscriptionArn" \
+		--output text 2>/dev/null)
+	if [ -z "$EXISTING" ]; then
+		aws sns subscribe --region "$REGION" --topic-arn "$TOPIC_ARN" \
+			--protocol email --notification-endpoint "$ALERT_EMAIL" >/dev/null
+		echo "  subscribed - CONFIRM THE EMAIL or nothing is delivered"
+	else
+		case "$EXISTING" in
+			PendingConfirmation) echo "  subscription still UNCONFIRMED - check the inbox" ;;
+			*) echo "  already subscribed and confirmed" ;;
+		esac
+	fi
+else
+	echo "  no ALERT_EMAIL given - topic only, no subscriber"
 fi
 
 echo "=== runner role ==="
