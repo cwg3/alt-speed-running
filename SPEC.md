@@ -1197,6 +1197,117 @@ Recorded because the alternative is re-investigating it: the first two
 metrics tried here - fill fraction and roof exposure - both measured
 something other than the reported experience.
 
+## Racing a bot
+
+NOT BUILT. This section is the design, written down before any code,
+because the feature is big enough that discovering these decisions in
+the implementation would be expensive.
+
+**The problem it solves.** With nobody else queued, the ladder is not
+slow, it is unplayable - and a player who finds it unplayable once does
+not come back to check later. That is the single largest adoption risk
+for a new ladder competing with an incumbent that already has players.
+It is also what "recruit pairs, not individuals" is working around:
+one tester has nobody to race.
+
+**What PaceBot is today: a test fixture, not a service.**
+`backend/scripts/pace-bot.sh` is a shell script somebody runs by hand.
+It writes its own session row instead of authenticating, and its
+default is a finish far faster than any real run. It exists so the
+LOSING side of a match is reachable without two humans - replay upload
+from the side that never reports a final split, rating loss, client
+teardown. Promoting it to something a player can summon is not a small
+change to that script; it is a different thing that happens to share a
+name.
+
+### Three decisions
+
+**1. It scores nothing. DONE.** Enforced in `matchCompletion.ts`: any
+match with a synthetic player either side is an exhibition, recorded in
+full and scoring no Elo, no season points and no W-L-F. This is not a
+precaution, it is a repair - ~180 synthetic matches had to be undone
+once, and the only thing containing it since was that the bot needed a
+human to launch it. A summonable bot removes that containment, so the
+guard had to land first. It also protects the point of the project: a
+transparent rating is the differentiator, and a rating that partly
+reflects beating a bot is not one.
+
+**2. Practice draws ONLY from seeds that player has already seen.**
+This is the decision most likely to be got wrong by accident, because
+both obvious options are bad. Draw from the ranked pool without
+recording the seed as seen, and a player can rehearse a world and then
+be dealt it for real - seed knowledge laundered through practice. Record
+it as seen, and practice burns the per-player lifetime budget that the
+pool floor exists to protect. Already-seen is the third option and it
+costs nothing: they have seen it by definition so nothing leaks, no new
+seeds are consumed, and rehearsing a known world is what practice
+actually is. Availability then grows as they play, instead of competing
+with ranked for the expensive openings.
+
+**3. Do NOT invent the rating-to-pace curve.** Scaling the bot's pace to
+the player is the best part of the idea and the part with no data behind
+it. The ladder reset deleted every replay and history row that a curve
+would be fitted to. Guessing it would repeat the most expensive pattern
+in this project - every guessed number here was later corrected by
+measurement, and the guess shaped the code around it in the meantime.
+Ship named tiers anchored on published community pace for this category,
+labelled as exactly that, and replace them with pace derived from real
+recorded runs per rating band once such runs exist. That also makes the
+bot honest: it runs somebody's real pace rather than a fabricated one.
+
+### Execution: the bot does not need a process
+
+The obvious shapes all fight the same constraint. A single Lambda caps
+at 15 minutes of wall clock, which suggests capping the bot's target
+finish just under that so one invocation can drive a whole run. That
+does work, and it is cheaper than it sounds - an idle invocation for a
+quarter hour costs a fraction of a cent, and the invocation only has to
+outlive the BOT's last split, not the human's, so a fast bot can race a
+slow player inside the cap.
+
+But it buys a ceiling in the wrong place. The players who most need an
+opponent are the ones with nobody to queue against, which skews new,
+and a bot that can only ever run faster than roughly a quarter of an
+hour beats exactly those players every time. Decision 3 wants a SLOW
+tier most of all, and that is the tier the cap forbids. It also has no
+graceful failure: an invocation that dies mid-race leaves a ghost frozen
+in place.
+
+Step Functions removes the cap - a Wait state per split, no duration
+limit, a few state transitions per race. But the better observation is
+that none of this is needed, because **a pace is data, not a process.**
+The bot's entire run is a list of split timestamps. Compute them when
+the match is created, store them on the match row, and let the client
+render the ghost from that schedule. Nothing has to be running anywhere
+for the duration. The only reason `pace-bot.sh` posts splits over time
+is that it is impersonating a client in order to test the server; a
+product bot has no such need.
+
+Consequence worth accepting deliberately: a client-rendered ghost means
+the player could read their opponent's whole schedule. For an unrated
+exhibition that is closer to a feature than a leak - it is a target
+time - but it does mean the suspense is cosmetic, and that should be
+admitted in the UI rather than discovered.
+
+### Two rules for the surrounding behaviour
+
+**Offer the bot only after the live queue has actually failed.** If it is
+instantly available it will out-compete waiting a couple of minutes for
+a human, and a ladder where everyone races bots has no ladder.
+
+**A bot match must never be mistakable for a human one** - in the match
+screen, in history, in replays, in any shared result. The exhibition
+flag is stored on the match precisely so no surface has to infer it.
+
+### Open questions
+
+- Which pace tiers, and anchored on what published source.
+- Whether a practice result belongs in match history at all, or in a
+  separate practice log.
+- What the ghost does when the player is far behind its schedule -
+  finish and leave, or wait at the fountain.
+- Whether spectators can watch an exhibition.
+
 ## To do
 
 Engineering debt that is not itself a match guarantee, kept here so it
