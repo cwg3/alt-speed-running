@@ -4,7 +4,7 @@
 # watched rather than discovered the next morning.
 set -uo pipefail
 REGION="${REGION:-us-west-2}"
-FLOOR="${FLOOR:-50}"
+FLOOR="${FLOOR:-100}"
 MAX_CANDIDATES="${MAX_CANDIDATES:-}"
 ITYPE_RUNNER="${ITYPE_RUNNER:-t4g.small}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,7 +16,16 @@ AMI=$(aws ssm get-parameter --region "$REGION" \
 UD=$(mktemp)
 FLOOR="$FLOOR" MAXC="$MAX_CANDIDATES" python3 - "$ROOT/cloud/topup-userdata.sh" > "$UD" <<'PY'
 import os, sys
-s = open(sys.argv[1]).read().replace('${FLOOR:-50}', os.environ['FLOOR'])
+# Exact full-line match, and FAIL if it is not there. A .replace() that
+# matches nothing returns the string unchanged, so a drifted placeholder
+# shipped user-data that silently used the file's own default floor
+# instead of the one asked for - a wrong floor that looks like a success.
+src = open(sys.argv[1]).read()
+_old = 'export FLOOR="${FLOOR:-100}"'
+if _old not in src:
+    sys.exit('FLOOR placeholder not found in topup-userdata.sh - refusing '
+             'to ship user-data with an unknown floor')
+s = src.replace(_old, 'export FLOOR="%s"' % os.environ['FLOOR'])
 s = s.replace('${MAX_CANDIDATES:-}', os.environ.get('MAXC', ''))
 print(s, end='')
 PY

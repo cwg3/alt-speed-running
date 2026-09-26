@@ -14,8 +14,10 @@ Known outstanding work, roughly in the order it would matter.
   check read "cannot see it" as "not there". All fixed, all exercised
   against real batches.
 
-- [x] **The nightly top-up schedule is installed.** `alt-pool-topup`
-  fires at 03:00 UTC, `cron(00 03 * * ? *)`, targeting
+- [x] **The recurring top-up schedule is installed.** `alt-pool-topup`
+  fires twice a day, `cron(0 3,15 * * ? *)` UTC — 03:00 only until
+  2026-09-26, when the floor went to 100/type and a catch-up run stopped
+  fitting comfortably in one nightly slot — targeting
   `ec2:runInstances`, with `alt-topup-runner`, `alt-topup-scheduler` and
   `alt-seedwork` in place. Confirmed against the scheduler itself on
   2026-09-26 rather than inferred from having run the install script,
