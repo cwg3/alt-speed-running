@@ -167,15 +167,27 @@ if [ -z "$MAX_MINUTES" ]; then
 fi
 echo "  watchdog $MAX_MINUTES min (longest shard is $per seeds)"
 
+# WHY THE WATCHDOG REPORTS. A bare shutdown made a deadline look
+# identical to a crash, and threw away every completed shard sitting on
+# local disk. It now uploads what finished, the log, and a marker, and
+# the wait loop below reads that marker.
+#
 # --- user data --------------------------------------------------------
+# THIS HEREDOC IS UNQUOTED, so $VAR, $( ) and backticks are expanded HERE,
+# on this machine, at build time - not on the instance. A COMMENT IN THIS
+# BODY IS NOT INERT. The paragraph above used to live inside it and named
+# a command in backticks; that ran the command. Since a bare shutdown
+# means "in one minute", this orchestrator powered itself off mid-run
+# while its own log showed nothing wrong, and left a work instance with
+# nobody to collect it.
+#
+# So: no prose in this block, and no backticks at all. A literal $ must be
+# written \$ and anything needing a real backtick belongs outside.
 USERDATA=$(cat <<SCRIPT
 #!/bin/bash
 exec > /var/log/seedwork.log 2>&1
 set -x
-# Watchdog first, so a hang still ends in a terminated instance. It now
-# SAYS it fired, and salvages what finished: a bare `shutdown` made a
-# deadline look identical to a crash, and threw away every completed
-# shard sitting on local disk.
+# Watchdog first, so a hang still ends in a terminated instance.
 (
   sleep $((MAX_MINUTES * 60))
   echo "WATCHDOG: $MAX_MINUTES minutes elapsed, giving up"
