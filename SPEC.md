@@ -704,17 +704,50 @@ goes back to the pool, since nothing was wrong with it.
 
 **The mod whitelist is a rule with no mechanism behind it.** The client
 reads its own version and nothing else: no mod list is collected, none
-reaches the match record, and there is no client attestation to compare
-against. So an illegal mod is caught the way anything else is — a
-position timeline that does not match the splits, and a human looking.
+reaches the match record, and there is nothing to compare one against.
+So an illegal mod is caught the way anything else is — a position
+timeline that does not match the splits, and a human looking.
 
 Publishing it unenforced is the right order. The standard here is a
 whitelist rather than a banned list, and a runner has to be able to know
 in advance whether they are compliant; a rule that appears only when
 somebody is accused of breaking it is the failure mode this project
-exists to avoid. What is missing, in the order it should be built: a mod
-list in the match record, then a signed attestation, then a check that
-rejects a queue join rather than voiding a finished run.
+exists to avoid.
+
+**A client-side check can only stop honest mistakes, never a cheater.**
+Anyone able to patch the client can patch whatever reports its mod list,
+signed or not. That is not an argument for skipping it — most violations
+will be somebody who installed a performance mod and never read a rules
+page, and stopping those is achievable and worth doing. It is an
+argument for not mistaking it for anti-cheat. Deliberate cheating is
+caught by run evidence, and inspecting mods does not change that.
+
+So, in order:
+
+1. **Record and display it, with no gate.** Mod ids and versions from
+   the loader, a few hundred bytes alongside what `completeMatch`
+   already reports, shown on the match detail screen to both players.
+   That makes an accusation checkable AND clearable — today a mod
+   dispute is unfalsifiable in both directions, which fails an innocent
+   player harder than a guilty one — and it says what people actually
+   run before the list is fixed from one runner's guesses.
+2. **Then refuse at the queue join**, in `queueJoin.ts` and never in
+   `completeMatch`. Turn somebody away at the door; never void a
+   finished run. A run voided over a mod the player did not know was
+   illegal is the grievance this ladder exists to answer.
+
+**Signed attestation is deliberately not on that list.**
+Self-attestation from a client we do not control buys nothing against
+the person actually cheating, costs key management, and does its real
+damage by letting this document claim an enforcement that is not there.
+A "not built" replaced by a false "built" is worse than the gap.
+
+**The list is backend data, not baked into the jar.** `split-rules` is
+the precedent, including the part worth copying: an absent config
+degrades to loose, never to strict. A list change then reaches everyone
+at once instead of waiting on a client release, and nobody is refused
+for being a version behind. Unlike the split floors, the list itself is
+public — it lives in the repo and is served from there.
 
 **The countdown is a real mechanic, not a nicety.** the incumbent tells
 both players which seed TYPE they have drawn - village, desert temple,

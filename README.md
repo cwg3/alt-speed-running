@@ -311,7 +311,16 @@ input.
 |---|---|
 | Sodium, Lithium, Starlight | performance and rendering; no game state, no world information |
 | SpeedRunIGT | timing and splits |
-| Fairplay-style pack validators | prove a resource pack is not showing you what vanilla hides |
+| MCSR Fairplay | validates your resource pack against the rules, so "my pack is legal" is demonstrable rather than asserted |
+
+**Fairplay is the incumbent's tool, and named here anyway.** It checks
+your own packs on your own machine and reports to nobody, and a validator
+written by the people who wrote the pack rules is the reference
+implementation of those rules — reimplementing it to avoid the
+awkwardness would be pride, not integrity. The cost is real and worth
+stating: if their tool moves, this rule moves with it, and that is an
+argument for eventually shipping our own check rather than a reason to
+leave players with nothing today.
 
 Explicitly not legal: macros, autoclickers, input-altering scripts, and
 anything that surfaces world information — seed readers, structure or
