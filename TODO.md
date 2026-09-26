@@ -36,6 +36,11 @@ Known outstanding work, roughly in the order it would matter.
   before packaging, which is the only reason this is a staleness problem
   and not a broken-download one.
 
+  0.1.1 was built and uploaded as part of publishing, from the commit it
+  names, which is the habit this item is asking for. The version was
+  bumped rather than rebuilt over 0.1.0 - two different builds under one
+  number is the failure a version exists to prevent.
+
 - [ ] **Backups were run by hand and stopped happening.** The last one
   predated the leaderboard, the ladder reset, the publish guard and the
   whole top-up pipeline. `tools/backup.sh` now does it in one command —
@@ -47,7 +52,69 @@ Known outstanding work, roughly in the order it would matter.
   `cdk synth` warns - so it fails quietly. Copy is in the backup bundle
   under `secrets/`. Any new machine needs it before its first deploy.
 
+## Mods
+
+- [ ] **The whitelist is published and not enforced.** That is the
+  order on purpose - a rule has to be knowable before anybody is
+  measured against it - but step 2 is still to build: a check at the
+  QUEUE JOIN, in `queueJoin.ts`, which already carries each player's
+  list on the queue row. So it is a comparison and a 403. Refuse at the
+  door, never at `completeMatch`: voiding a finished run over a mod
+  somebody did not know was illegal is the grievance this ladder exists
+  to answer.
+
+  Signed attestation is deliberately NOT on that list. SPEC.md says
+  why - a client we do not control cannot attest to anything, and
+  claiming an enforcement that is not there is worse than the gap.
+
+- [ ] **The whitelist should be backend data, not README prose.** A
+  list change currently cannot reach anyone without a client release,
+  and nothing serves the list at all. `split-rules` is the precedent,
+  including the part worth copying: absent config degrades to loose,
+  never to strict. Unlike the split floors this list is public, so it
+  can live in the repo and be served from there.
+
+- [ ] **Nobody has seen a mod list in a live match.** Both players have
+  to be on 0.1.1 for two lists to appear on a detail screen.
+  `mixin-smoke` runs a dedicated server, so it never touches the client
+  path that draws this.
+
+- [ ] **MCSR Fairplay is named in the whitelist but untested here.** It
+  is the incumbent's tool, which is a real dependency: if theirs moves,
+  our rule moves with it. Shipping our own pack check would remove
+  that, and is not a reason to leave players with nothing meanwhile.
+
 ## Shipped
+
+- [x] **The mod list is recorded and shown to both players.** `ModList`
+  collects every loaded mod at login - Fabric cannot load one after
+  startup without a relaunch, which is another login - and it travels
+  the path `worldSetupVersion` already takes: player row, queue row,
+  match row, both detail screens. Nothing is gated on it.
+
+  An ABSENT list stays distinct from an EMPTY one the whole way to the
+  screen, which reads "mods not recorded" rather than "nothing beyond
+  the pack". No evidence and exculpatory evidence are different claims.
+  `sanitizeModList` returns undefined rather than `[]` for that reason,
+  and a test pins it along with the caps - `/auth/verify` is public, and
+  this field arrives before Mojang has said who is calling.
+
+  The display hides what the pack installs by asking the loader which
+  modules are nested inside Fabric API, not by matching names: a
+  `fabric-` prefix rule would hide anything calling itself
+  fabric-whatever. Shipped in 0.1.1.
+
+- [x] **The mod whitelist is published.** README carries the list
+  (Sodium, Lithium, Starlight, SpeedRunIGT, MCSR Fairplay), the
+  principle behind it - legal if it changes how the game is drawn or how
+  fast it runs, not legal if it changes game state, reveals what the seed
+  did not give you, or automates input - and an issue anyone can open to
+  argue a mod onto it, answered in public with a reason.
+
+  A whitelist rather than a banned list, which only ever names the
+  cheats somebody already thought of. A list nobody can petition is an
+  allowlist with better manners, which is the thing this project objects
+  to.
 
 - [x] **Leaderboard.** `GET /leaderboard`, public, ranked by rating with
   season points and a W-L-F record. Bots race but do not rank, and the
