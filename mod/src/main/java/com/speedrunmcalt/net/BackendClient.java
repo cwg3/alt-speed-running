@@ -218,7 +218,8 @@ public final class BackendClient {
 				opponent.get("username").getAsString(),
 				splits, ratingDelta, seasonPoints,
 				badYours, badOpponent, badReason,
-				yourRunStartedAt);
+				yourRunStartedAt,
+				optString(resp, "voidReason", null));
 	}
 
 	/**

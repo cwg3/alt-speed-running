@@ -194,6 +194,13 @@ export const handler = async (
 		body: JSON.stringify({
 			status: match.Item.status,
 			winnerUuid: match.Item.winnerUuid ?? null,
+			// WHY it was voided, not just that it was. Three different
+			// things void a match - both players agreeing a seed is bad,
+			// one player voiding a paced race, and the abandonment sweep -
+			// and the client was announcing the first of them for all
+			// three. It could not have done otherwise: this field existed
+			// on the row and was never sent.
+			voidReason: match.Item.voidReason ?? null,
 			yourResult: results[you.uuid] ?? null,
 			// Whether THIS caller's run has already begun. The client
 			// uses it to skip the pre-race countdown on a rejoin: a

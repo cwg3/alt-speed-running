@@ -42,10 +42,17 @@ public final class Forfeit {
 
 		Thread thread = new Thread(() -> {
 			try {
+				// Logged AFTER the backend accepts, not when the request
+				// leaves. A forfeit racing a bad-seed void is refused
+				// server-side, and this line used to record success
+				// anyway - which made the client log evidence of what was
+				// attempted rather than of what happened.
 				BackendClient.forfeit(token, matchId);
-				SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Forfeited match {}", matchId);
+				SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Forfeit ACCEPTED for match {}", matchId);
 			} catch (Exception e) {
-				SpeedrunMcAlt.LOGGER.warn("[speedrunmcalt] Forfeit request failed", e);
+				SpeedrunMcAlt.LOGGER.warn(
+						"[speedrunmcalt] Forfeit REFUSED for match {} - {}",
+						matchId, e.getMessage());
 			}
 			// Request or no request, the match is over for this player,
 			// so leave the world through the same teardown every other

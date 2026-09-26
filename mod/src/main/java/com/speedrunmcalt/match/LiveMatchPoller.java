@@ -87,15 +87,23 @@ public final class LiveMatchPoller {
 				}
 
 				if (live.isVoided()) {
-					SpeedrunMcAlt.LOGGER.info(
-							"[speedrunmcalt] Match VOIDED - both players agreed the seed was unplayable");
+					// The SERVER'S reason, not a guess. Three things void
+					// a match - both players agreeing a seed is bad, one
+					// player voiding a paced race, and the abandonment
+					// sweep - and this line announced the first of them
+					// for all three. The fallback covers a match voided
+					// before the row carried a reason.
+					String why = live.voidReason != null
+							? live.voidReason
+							: "no rating change";
+					SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] Match VOIDED - {}", why);
 					try {
 						// Not a win and not a loss. Passing null for the
 						// rating numbers would make MatchEnd go and fetch
 						// them; zeroes say plainly that nothing moved.
 						MatchEnd.complete(false, live.opponentUsername,
 								Integer.valueOf(0), Integer.valueOf(0),
-								"VOIDED - bad seed, no rating change", 4000);
+								"VOIDED - " + why, 4000);
 					} catch (Throwable t) {
 						SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Void teardown failed", t);
 					}

@@ -1412,26 +1412,40 @@ observation was real and the diagnosis was never tested.
 The ERROR marker that guards the consequence stays: a crashed worker
 must never be readable as a genuine zero, whatever the cause.
 
-**The client explains every void as a bad-seed vote.** `LiveMatchPoller`
-prints "both players agreed the seed was unplayable" whenever it sees
-`status: voided`, but the match row carries a `voidReason` and there
-is more than one. A match voided by the abandonment sweep reads
-`abandoned by both players` server-side and would still tell the
-player their seed was voted unplayable. Same class as the forfeit log
-below: the client asserting something the server did not say.
+**Two "the client asserts what the server did not say" bugs — RESOLVED.**
 
-**The client reports a forfeit it did not achieve.** `Forfeit` logs
-`Forfeited match <id>` when its request is sent, not when the backend
-accepts it. A forfeit racing a bad-seed void has already been refused
-server-side while the client logged success. Harmless today — the
-outcome was better for the player either way — but it means the client
-log is not evidence of what happened.
+`LiveMatchPoller` printed "both players agreed the seed was unplayable"
+for every void. Three things void a match — both players agreeing a seed
+is bad, one player voiding a paced race, and the abandonment sweep — and
+it announced the first for all three. The client could not have done
+better: `voidReason` was on the match row and `liveMatch` never sent it.
+It is served now and the client prints it.
 
-**The pool's villages predate the resource rule.** Its 29 villages
-were selected on "has a real smith chest" alone, before the iron and
-diamond thresholds were wired into verification. Every one is verified
-playable; none has been checked against either threshold. Re-verifying
-is about seven minutes.
+Worth keeping for the shape rather than the fix: adding Race a Pace added
+a THIRD void reason, and this line would have started lying in a new way
+without anything about it changing. A hardcoded explanation does not stay
+wrong in one place — it gets wronger as the system grows.
+
+`Forfeit` logged success when its request was SENT. A forfeit racing a
+bad-seed void is refused server-side while the client recorded it as
+done, which made the log evidence of what was attempted rather than what
+happened. It now logs ACCEPTED or REFUSED, after the answer.
+
+**Nothing records which checks a pool row passed.** This entry used to
+say the pool's 29 villages predated the iron and diamond thresholds and
+wanted seven minutes of re-verification. The count is long stale — the
+pool has been rebuilt several times since — and `verify-villages.sh` does
+implement both thresholds now.
+
+What cannot be answered is whether any PARTICULAR row went through them.
+A pool row carries its seed, its structure and its coordinates, and
+nothing about which verification it survived. So "have these villages
+been checked" is not a question the pool can answer about itself, and the
+only honest response is to re-verify everything or trust a rebuild
+nobody recorded.
+
+That is the real debt, and it outlives any one threshold: every future
+check will have the same gap unless a row starts carrying what passed it.
 
 **Seven guarantees have never run in a live match.** Flint mirroring,
 hoglin drops, drowned tridents, suspicious stew, wither skeleton

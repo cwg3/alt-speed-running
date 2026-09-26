@@ -18,6 +18,14 @@ public final class LiveMatchResult {
 	/** What the opponent said was wrong with it, possibly empty. */
 	public final String badSeedReason;
 	/**
+	 * Why the match was voided, in the server's own words, or null.
+	 *
+	 * The client used to assert "both players agreed the seed was
+	 * unplayable" for every void. Three things void a match and only one
+	 * of them is that.
+	 */
+	public final String voidReason;
+	/**
 	 * When THIS player's run began, in server-clock millis, or null if
 	 * it has not been claimed yet.
 	 *
@@ -30,7 +38,7 @@ public final class LiveMatchResult {
 	public LiveMatchResult(String status, String winnerUuid, String opponentUsername,
 			Map<String, Long> opponentSplits, Integer ratingDelta, Integer seasonPoints,
 			boolean badSeedYours, boolean badSeedOpponent, String badSeedReason,
-			Long yourRunStartedAt) {
+			Long yourRunStartedAt, String voidReason) {
 		this.status = status;
 		this.winnerUuid = winnerUuid;
 		this.opponentUsername = opponentUsername;
@@ -40,6 +48,7 @@ public final class LiveMatchResult {
 		this.badSeedYours = badSeedYours;
 		this.badSeedOpponent = badSeedOpponent;
 		this.badSeedReason = badSeedReason;
+		this.voidReason = voidReason;
 		this.yourRunStartedAt = yourRunStartedAt;
 	}
 
