@@ -105,6 +105,38 @@ Known outstanding work, roughly in the order it would matter.
 
 ## Shipped
 
+- [x] **The two-player integration test passes again.** It had been
+  failing 8 of 20 against the deployed backend, and not one of those was
+  a backend bug: it posted `/matches/complete` with no splits behind it,
+  so the endpoint refused with a 409 - a kill_dragon split is the
+  precondition that stops a client claiming a win it never ran - and the
+  match stayed pending, which failed six more assertions downstream plus
+  the ghost-queue-row check, where the `matched: true` was the REJOIN
+  path answering for a match that never finished.
+
+  The test also sent no `elapsedMs`, so it could not have settled the
+  provisional close-finish hold, and it piped the response to
+  `/dev/null`, so it reported "still pending" instead of the refusal it
+  was being handed. It now runs Bob's route, settles the hold on the
+  window the server names, and keeps every body so a failure says why.
+  22 of 22.
+
+  **The test outlived the features it was testing.** Same shape as the
+  stale docs this file keeps warning about, one layer down - and two
+  comments were stale with it: `completeMatch.ts` still said a match
+  auto-completes from a kill_dragon split, which is what the test
+  believed, and `releaseSeeds.ts` still described seeds as consumed on
+  claim, which is why running the test was thought to cost a pool seed.
+  Both corrected. A test that passes for stale reasons is a test nobody
+  can read a regression out of.
+
+  It also cleans up its history rows now. Those only began to exist once
+  completion worked, so nothing had ever cleaned them and two `tpt-` rows
+  were sitting in the real history table. `splitStats` needs no cleanup -
+  it is written onto the player row, which the script deletes - and that
+  must stay true, because a synthetic run training a real anti-cheat
+  baseline is what the ladder reset existed to undo.
+
 - [x] **The mod list is recorded and shown to both players.** `ModList`
   collects every loaded mod at login - Fabric cannot load one after
   startup without a relaunch, which is another login - and it travels

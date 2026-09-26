@@ -17,6 +17,7 @@ PLAYERS="${PLAYERS_TABLE:-BackendStack-PlayersTable70A03D78-1LMEI6GSB9FIU}"
 SESSIONS="${SESSIONS_TABLE:-BackendStack-SessionsTable7C302024-77WDLRN5BZ7T}"
 QUEUE="${QUEUE_TABLE:-BackendStack-QueueTable4C3A1E0F-BI6XYSUC1HRJ}"
 MATCHES="${MATCHES_TABLE:-BackendStack-MatchesTable36E59E86-2WG7P01DU5BP}"
+HISTORY="${HISTORY_TABLE:-BackendStack-MatchHistoryTable03D3BE2E-1RQFTI8PF25A7}"
 
 A_UUID="tpt-alice"; A_TOK="tpt-tok-alice"
 B_UUID="tpt-bob";   B_TOK="tpt-tok-bob"
@@ -36,6 +37,23 @@ cleanup() {
   for u in "$A_UUID" "$B_UUID"; do
     aws dynamodb delete-item --region "$REGION" --table-name "$PLAYERS" --key "{\"uuid\":{\"S\":\"$u\"}}" >/dev/null 2>&1
     aws dynamodb delete-item --region "$REGION" --table-name "$QUEUE" --key "{\"uuid\":{\"S\":\"$u\"}}" >/dev/null 2>&1
+    # History rows, one per player per finished match. These only exist
+    # now that the run actually completes - while the completion was
+    # being refused there was nothing to clean, so nothing cleaned it,
+    # and two tpt- rows sat in the real history table.
+    #
+    # splitStats needs no line here: it is written onto the PLAYER row,
+    # which goes above, so a synthetic 12-minute run never reaches a real
+    # player's anti-cheat baseline. That is the thing the ladder reset
+    # existed to undo, and it must stay true of this script.
+    for ts in $(aws dynamodb query --region "$REGION" --table-name "$HISTORY" \
+        --key-condition-expression '#u = :u' \
+        --expression-attribute-names '{"#u":"uuid"}' \
+        --expression-attribute-values "{\":u\":{\"S\":\"$u\"}}" \
+        --query 'Items[].completedAt.N' --output text 2>/dev/null); do
+      aws dynamodb delete-item --region "$REGION" --table-name "$HISTORY" \
+        --key "{\"uuid\":{\"S\":\"$u\"},\"completedAt\":{\"N\":\"$ts\"}}" >/dev/null 2>&1
+    done
   done
   for t in "$A_TOK" "$B_TOK"; do
     aws dynamodb delete-item --region "$REGION" --table-name "$SESSIONS" --key "{\"token\":{\"S\":\"$t\"}}" >/dev/null 2>&1
@@ -55,6 +73,32 @@ done
 
 join() { curl -s -X POST "$API/queue/join" -H "Authorization: Bearer $1"; }
 field() { python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('$1',''))" <<<"$2" 2>/dev/null; }
+
+# report <token> <split> <elapsed-ms>
+report() {
+  curl -s --globoff -X POST "$API/matches/split" -H "Authorization: Bearer $1" \
+    -H "Content-Type: application/json" \
+    -d "$(printf '{"matchId":"%s","splitName":"%s","elapsedMs":%s}' "$MATCH_ID" "$2" "$3")"
+}
+
+# settle <token> <winner-uuid> <elapsed-ms>
+#
+# A finish is PROVISIONAL first. The race is won by the lowest run TIME,
+# not by whichever packet lands first, so the server holds the claim for a
+# moment and says when to come back. Claiming once and walking away reads
+# a held finish as a failed one - which is what this script used to do,
+# and why it reported "still pending" instead of "held for three seconds".
+settle() {
+  local body resp
+  body=$(printf '{"matchId":"%s","winnerUuid":"%s","elapsedMs":%s}' "$MATCH_ID" "$2" "$3")
+  for _ in 1 2 3 4 5; do
+    resp=$(curl -s --globoff -X POST "$API/matches/complete" -H "Authorization: Bearer $1" \
+      -H "Content-Type: application/json" -d "$body")
+    [ "$(field provisional "$resp")" = "True" ] || { printf '%s' "$resp"; return; }
+    sleep "$(python3 -c "import json,sys;d=json.load(sys.stdin);print(max(0.5,d.get('retryInMs',3000)/1000+0.5))" <<<"$resp")"
+  done
+  printf '%s' "$resp"
+}
 
 echo "Two-player matchmaking handshake"
 
@@ -86,9 +130,37 @@ check "queue is empty for both players" "$QCOUNT" "0"
 
 # 5. Completion must clear the pointer, or a finished match would be
 #    handed back on the next poll.
-curl -s -X POST "$API/matches/complete" -H "Authorization: Bearer $B_TOK" \
-  -H "Content-Type: application/json" \
-  -d "{\"matchId\":\"$MATCH_ID\",\"winnerUuid\":\"$B_UUID\"}" >/dev/null
+#
+#    THE WIN IS GATED BY THE SPLITS. /matches/complete refuses a winner
+#    with no kill_dragon split - 409 - because the plausibility rules
+#    live on the split path and they are what stop a client claiming a
+#    win it never ran. So Bob runs the route first.
+#
+#    This script used to post the completion with no splits, no
+#    elapsedMs, and `>/dev/null` over the answer. It therefore reported
+#    the match as still pending and could not say why: six assertions
+#    downstream failed on one refusal nobody could see. Keep the bodies.
+#
+#    The match is backdated so a twelve-minute run is plausible against
+#    real elapsed time. Reporting twelve minutes of progress against a
+#    match created seconds ago is exactly what step 8's ahead-of-clock
+#    rule refuses, and correctly.
+aws dynamodb update-item --region "$REGION" --table-name "$MATCHES" \
+  --key "{\"matchId\":{\"S\":\"$MATCH_ID\"}}" \
+  --update-expression "SET createdAt = :c" \
+  --expression-attribute-values "{\":c\":{\"N\":\"$(( (now - 1800) * 1000 ))\"}}" >/dev/null
+
+ROUTE_FAIL=""
+for leg in enter_nether:180000 piglin_barter:300000 obtain_rod:420000 \
+           enter_stronghold:540000 enter_end:600000 kill_dragon:720000; do
+  RESP=$(report "$B_TOK" "${leg%%:*}" "${leg##*:}")
+  [ "$(field recorded "$RESP")" = "True" ] || ROUTE_FAIL="$ROUTE_FAIL ${leg%%:*}->$RESP"
+done
+check "Bob's route is recorded as far as the dragon" "$ROUTE_FAIL" ""
+
+DONE=$(settle "$B_TOK" "$B_UUID" 720000)
+check "the fountain claim settles rather than staying provisional" \
+  "$(python3 -c "import json,sys;d=json.load(sys.stdin);print('winner' in d or d.get('alreadyCompleted') is True or d)" <<<"$DONE")" "True"
 PTR=$(aws dynamodb get-item --region "$REGION" --table-name "$PLAYERS" \
   --key "{\"uuid\":{\"S\":\"$A_UUID\"}}" --query 'Item.currentMatchId.S' --output text)
 check "currentMatchId cleared after completion" "$PTR" "None"

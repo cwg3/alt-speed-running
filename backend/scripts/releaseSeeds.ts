@@ -2,11 +2,17 @@
 //
 //   npx tsx scripts/releaseSeeds.ts <seed-pool-table> <matches-table> [--dry-run]
 //
-// A pair is claimed when a match is created and never handed back:
-// completion does not release it, because a finished match's seed
-// should not be dealt again while its replay is still interesting. Over
-// a testing session that leaks the pool away - and pinning a single
-// seed for practice marks every other row used on purpose.
+// SEEDS ARE NO LONGER CONSUMED BY A MATCH. claimSeedPair records a
+// sighting per player and leaves `used` alone (lib/seedPool.ts), so
+// `used = true` now means held pending verification or quarantined by a
+// bad-seed vote - and neither is free to release. The scan below filters
+// both out by name. What remains for this script is residue of the old
+// consume-on-claim model, and rows pinned by hand for practice.
+//
+// This header described that old model long after the code stopped
+// implementing it, and it was believed: it is why running the two-player
+// integration test was thought to cost a pool seed per run. It does not
+// cost anything.
 //
 // This releases any row whose assignedMatchId is absent, or names a
 // match that is no longer pending. A row belonging to a match still in

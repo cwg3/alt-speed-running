@@ -36,10 +36,15 @@ interface CompleteRequest {
  */
 const PROVISIONAL_MS = 3_000;
 
-// Explicit result reporting. In normal play the match auto-completes
-// from a kill_dragon split (see reportSplit.ts) and this endpoint isn't
-// needed - it stays as the manual/administrative path (forfeits,
-// disconnects, corrections).
+// Explicit result reporting, and the ONLY path that completes a match.
+// reportSplit records and awards nothing - the fountain ends the race, so
+// a kill_dragon split is a PRECONDITION here rather than a trigger there.
+//
+// This comment claimed the opposite for a while, and it cost something:
+// the two-player integration test posted a win with no splits behind it,
+// read the resulting 409 as "the match will not complete", and reported
+// six cascading failures that named nothing. A stale comment is not
+// harmless when a test believes it.
 //
 // Known, deliberate limitation: trusts whichever participant reports,
 // with no server-side verification of the actual race outcome. Real
