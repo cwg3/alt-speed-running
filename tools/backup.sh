@@ -17,6 +17,12 @@
 #               is meant to keep. A new machine needs them before its
 #               first deploy or top-up.
 #   the pack    what a tester actually installs.
+#   schedule/   the nightly top-up schedule and the roles it runs
+#               under, as AWS currently has them. The install script
+#               recreates all of it, so this is not strictly needed to
+#               restore - but it records what was ACTUALLY running,
+#               which is the question you have after something changes
+#               unexpectedly and the script no longer matches reality.
 #
 # WHY A SCRIPT. The previous backups were run by hand and then stopped
 # happening - the last one predated a leaderboard, a ladder reset, a
@@ -65,6 +71,31 @@ for f in "$ROOT/backend/split-rules.local.json" "$ROOT/seed-filter/headroom.loca
 	[ -f "$f" ] && cp "$f" "$WORK/secrets/" && echo "  $(basename "$f")"
 done
 
+echo "--- schedule"
+mkdir -p "$WORK/schedule"
+aws scheduler get-schedule --region "$REGION" --name alt-pool-topup \
+	> "$WORK/schedule/alt-pool-topup.json" 2>/dev/null \
+	&& echo "  alt-pool-topup ($(python3 -c "import json;d=json.load(open('$WORK/schedule/alt-pool-topup.json'));print(d['State'],d['ScheduleExpression'])" 2>/dev/null))" \
+	|| echo "  no schedule installed"
+for r in alt-topup-runner alt-topup-scheduler alt-seedwork; do
+	aws iam list-role-policies --role-name "$r" >/dev/null 2>&1 || continue
+	{
+		echo "{\"role\": \"$r\","
+		echo " \"inline\": ["
+		first=1
+		for pol in $(aws iam list-role-policies --role-name "$r" --query 'PolicyNames[]' --output text 2>/dev/null); do
+			[ "$first" = 1 ] || echo ","
+			first=0
+			aws iam get-role-policy --role-name "$r" --policy-name "$pol" --output json 2>/dev/null
+		done
+		echo " ],"
+		echo " \"attached\":"
+		aws iam list-attached-role-policies --role-name "$r" --output json 2>/dev/null
+		echo "}"
+	} > "$WORK/schedule/iam-${r}.json"
+	echo "  iam $r"
+done
+
 echo "--- pack"
 PACK=$(ls -t "$ROOT"/pack/*.mrpack 2>/dev/null | head -1)
 [ -n "$PACK" ] && cp "$PACK" "$WORK/" && echo "  $(basename "$PACK")"
@@ -81,6 +112,9 @@ Taken $(date -u '+%Y-%m-%d %H:%M:%SZ') by tools/backup.sh.
   first \`cdk deploy\` (split-rules) or pool top-up (headroom). Without
   them both degrade to loose defaults rather than failing, which is the
   quiet failure they are kept out of git to avoid.
+- \`schedule/\` the nightly top-up schedule and its IAM roles as they
+  actually were. \`cloud/install-topup-schedule.sh\` recreates them, so
+  this is a record rather than a restore path.
 - the \`.mrpack\` a tester installs.
 
 The seed pool is the irreplaceable part: \`seedtypes\` picks a random
