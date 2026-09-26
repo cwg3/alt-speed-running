@@ -5,6 +5,11 @@
 #   ./topup.sh [--dry-run]
 #
 #   FLOOR=50            drawable seeds each type should have
+#   MAX_CANDIDATES=     cap candidates per type for ONE run, overriding
+#                       the config. For proving the pipeline completes
+#                       without paying for a full build - the thing being
+#                       tested is whether it finishes unattended, and
+#                       that does not depend on volume.
 #   HEADROOM=1.6        candidates to generate per seed wanted
 #   TABLE=...           pool table
 #   WORKERS=16          parallel workers for the checks
@@ -71,14 +76,15 @@ PLAN=$(aws dynamodb scan --region "$REGION" --table-name "$TABLE" \
          --projection-expression "seedType,#u,heldUnverified,poolReject" \
          --expression-attribute-names '{"#u":"used"}' \
          --output json 2>/dev/null \
-  | FLOOR="$FLOOR" HEADROOM="$HEADROOM" HEADROOM_FILE="$HEADROOM_FILE" python3 -c "
+  | FLOOR="$FLOOR" HEADROOM="$HEADROOM" HEADROOM_FILE="$HEADROOM_FILE" \
+    MAX_CANDIDATES="${MAX_CANDIDATES:-}" python3 -c "
 import json, os, sys, collections
 floor = int(os.environ['FLOOR']); flat = float(os.environ['HEADROOM'])
 try:
     cfg = json.load(open(os.environ['HEADROOM_FILE']))
 except Exception:
     cfg = {}
-cap = int(cfg.get('_maxCandidatesPerType', 400))
+cap = int(os.environ.get('MAX_CANDIDATES') or cfg.get('_maxCandidatesPerType', 400))
 def headroom_for(t):
     v = cfg.get(t)
     return float(v) if isinstance(v, (int, float)) else flat

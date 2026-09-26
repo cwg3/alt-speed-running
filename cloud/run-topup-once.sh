@@ -5,6 +5,7 @@
 set -uo pipefail
 REGION="${REGION:-us-west-2}"
 FLOOR="${FLOOR:-50}"
+MAX_CANDIDATES="${MAX_CANDIDATES:-}"
 ITYPE_RUNNER="${ITYPE_RUNNER:-t4g.small}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ACCT=$(aws sts get-caller-identity --query Account --output text)
@@ -12,12 +13,15 @@ AMI=$(aws ssm get-parameter --region "$REGION" \
 	--name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
 	--query 'Parameter.Value' --output text)
 
-UD=$(mktemp); FLOOR="$FLOOR" python3 - "$ROOT/cloud/topup-userdata.sh" > "$UD" <<'PY'
+UD=$(mktemp)
+FLOOR="$FLOOR" MAXC="$MAX_CANDIDATES" python3 - "$ROOT/cloud/topup-userdata.sh" > "$UD" <<'PY'
 import os, sys
-print(open(sys.argv[1]).read().replace('${FLOOR:-50}', os.environ['FLOOR']), end='')
+s = open(sys.argv[1]).read().replace('${FLOOR:-50}', os.environ['FLOOR'])
+s = s.replace('${MAX_CANDIDATES:-}', os.environ.get('MAXC', ''))
+print(s, end='')
 PY
 
-echo "=== launching a $ITYPE_RUNNER runner, floor $FLOOR ==="
+echo "=== launching a $ITYPE_RUNNER runner, floor $FLOOR${MAX_CANDIDATES:+, capped at $MAX_CANDIDATES candidates/type} ==="
 ID=$(aws ec2 run-instances --region "$REGION" --image-id "$AMI" \
 	--instance-type "$ITYPE_RUNNER" --count 1 \
 	--instance-initiated-shutdown-behavior terminate \

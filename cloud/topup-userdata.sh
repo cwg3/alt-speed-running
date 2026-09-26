@@ -67,6 +67,7 @@ echo "  built $(stat -c%s seed-filter/seedtypes) bytes"
 export CLOUD=1
 export WORKERS="${WORKERS:-16}"
 export FLOOR="${FLOOR:-50}"
+export MAX_CANDIDATES="${MAX_CANDIDATES:-}"
 export ITYPE="${ITYPE:-m7g.4xlarge}"
 
 cd backend && npm ci --omit=dev --silent 2>&1 | tail -2; cd ..
