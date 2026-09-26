@@ -161,9 +161,43 @@ Deliberately still published: the vanilla probabilities in
 DEVIATIONS.md. Those are public Minecraft facts, and quoting them is
 the entire function of that file.
 
+## Decided
+
+- [x] **Eligibility is narrow on purpose.** Anyone with a legitimate
+  Minecraft account can play. Bans elsewhere, past conduct and
+  controversy are not considered; only cheating here removes you. It is
+  written down (README, "Who can play") so it is a rule that predates
+  any particular person rather than a decision made about one — which is
+  the difference between applying a policy and picking a side.
+
+- [x] **Conduct is a standard, not a word list.** "Don't say anything
+  you wouldn't say to their face." Not a rule against aggression - trash
+  talk is part of competition - but against being anonymous about it.
+  Word lists get lawyered; a standard asks a question people already
+  know the answer to.
+
 ## Deferred by decision
 
-- [ ] **Match chat** — waiting on a moderation policy.
+- [ ] **Match chat** — the policy now exists (README, "How to behave"),
+  so this is waiting on the three structural decisions that go with it,
+  which must be settled BEFORE chat ships rather than retrofitted:
+
+  1. **Messages attach to the match record**, not to a session. The
+     arcade property being rebuilt is attribution: a report should be
+     "look at the match", not one word against another. Ephemeral chat
+     cannot be reviewed, so it cannot be enforced.
+  2. **No DMs and no friends list.** Contact exists only inside a match
+     both players are in. Following someone home from a loss is where
+     most real harm online happens, and not building the surface is
+     cheaper than policing it.
+  3. **Retention.** Replays already have no expiry; chat attached to a
+     match inherits that. Decide deliberately whether it should, because
+     "forever" is a choice even when it is the default.
+
+  Also needs the enforcement path the policy promises: a human looks, the
+  reason is given in plain English, and it can be argued with. Same shape
+  as the anti-cheat flags, and it should reuse that machinery rather than
+  grow a second one.
 - [ ] **Download Replay / "My Replays"** — scoped in `REPLAY-SCOPE.md`,
   never built. Replays live server-side with no expiry.
 - [ ] **Spawn events in replays** — deliberately not built. Every mob

@@ -62,6 +62,56 @@ a loss.
 
 ---
 
+## Who can play
+
+Anyone with a legitimate Minecraft account.
+
+We don't consider bans from other platforms, past conduct, or
+controversy. This ladder judges runs. If you can log in, you can queue.
+
+The only thing that removes you is **cheating here** — and if that
+happens you get the evidence, in plain English, with a human decision
+behind it. Integrity checks flag runs for review; they never ban
+automatically, and every flag records a reason you can argue with.
+
+This is a deliberate choice rather than an oversight. A competitive
+ladder that adjudicates who deserves to compete ends up adjudicating
+everything, and we would rather adjudicate one thing well.
+
+---
+
+## How to behave
+
+**Don't say anything you wouldn't say to their face.**
+
+That's the whole rule. It is the arcade standard, and arcades were not
+polite places — trash talk has always been part of competition. What
+was never part of it is the stuff people only do because there is
+nobody standing in front of them.
+
+So this is not a rule against being aggressive. It is a rule against
+being anonymous about it.
+
+It is a standard, not a word list. Word lists get lawyered; this one
+asks a question you already know the answer to.
+
+Three things are built this way rather than moderated:
+
+- **Your name is real.** Accounts are verified through Mojang, so there
+  are no throwaways.
+- **There are no DMs and no friends list.** The only contact is inside a
+  match you are both in. Nobody can follow you home from a loss.
+- **Anything said in a match stays attached to that match**, and is not
+  ephemeral. A report is "look at the match", not one word against
+  another.
+
+Enforcement works like the cheating checks: a human looks, you get the
+reason in plain English, and you can argue with it. Behaviour that would
+get you thrown out of an arcade will get you thrown out of here — the
+standard only means anything if somebody stands behind it.
+
+---
+
 ## What is different from vanilla
 
 Both players get the same filtered seed, and some randomness is fixed so
