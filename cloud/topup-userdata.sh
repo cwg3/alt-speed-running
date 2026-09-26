@@ -39,6 +39,42 @@ push_log() { kill "$PUSHER" 2>/dev/null || true; aws s3 cp "$LOG" "$S3LOG" --qui
 # itself running bills until someone notices.
 trap 'echo "=== shutting down $(date -u +%H:%M:%SZ) ==="; push_log; shutdown -h now' EXIT
 
+# ONE RUNNER AT A TIME. The schedule fires every 12h and a catch-up run
+# on a raised floor can take most of that, so two orchestrators
+# overlapping stopped being hypothetical the moment the floor went up.
+# Two at once would both load HELD rows and both release them, double the
+# spend, and interleave their logs.
+#
+# The check is "is another instance tagged alt-pool-topup* still
+# running", not a lock file, because there is no lock to go stale: an
+# orchestrator that dies stops being running and the next fire proceeds.
+# The wildcard also covers the -test tag from run-topup-once.sh, so a
+# manual run and a scheduled one cannot collide either.
+TOK=$(curl -sf -X PUT http://169.254.169.254/latest/api/token \
+        -H 'X-aws-ec2-metadata-token-ttl-seconds: 300' 2>/dev/null)
+SELF=$(curl -sf -H "X-aws-ec2-metadata-token: ${TOK:-}" \
+        http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null)
+if [ -n "$SELF" ]; then
+	# Without a known SELF the != filter below would be != '', which
+	# matches every instance including this one - so the guard is
+	# skipped rather than run wrong. A missed run costs one cycle; a
+	# runner that stands down against its own reflection costs every
+	# cycle, silently, and looks exactly like a quiet night.
+	OTHERS=$(aws ec2 describe-instances --region "${REGION:-us-west-2}" \
+		--filters 'Name=tag:Name,Values=alt-pool-topup*' \
+		          'Name=instance-state-name,Values=pending,running' \
+		--query "Reservations[].Instances[?InstanceId!='${SELF}'].InstanceId" \
+		--output text 2>/dev/null | tr -d '[:space:]')
+	if [ -n "$OTHERS" ]; then
+		echo "=== another top-up runner is already going - standing down ==="
+		echo "=== top-up SKIPPED $(date -u '+%Y-%m-%dT%H:%M:%SZ') : overlap ==="
+		exit 0
+	fi
+	echo "  overlap guard: no other runner"
+else
+	echo "  note: could not read own instance-id - overlap guard skipped"
+fi
+
 export DEBIAN_FRONTEND=noninteractive
 # gcc and make are for seedtypes, which is compiled and NOT in git.
 dnf install -y git python3 nodejs gcc make 2>/dev/null \
@@ -66,7 +102,7 @@ echo "  built $(stat -c%s seed-filter/seedtypes) bytes"
 # container image already carries a built seedtypes. Nothing here compiles.
 export CLOUD=1
 export WORKERS="${WORKERS:-16}"
-export FLOOR="${FLOOR:-50}"
+export FLOOR="${FLOOR:-100}"
 export MAX_CANDIDATES="${MAX_CANDIDATES:-}"
 export ITYPE="${ITYPE:-m7g.4xlarge}"
 

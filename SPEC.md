@@ -988,13 +988,27 @@ ravine. Buried treasure was the starved type until 2026-09-25 and is no
 longer; its constraint is the two-magma-ravine rule, which is the
 expensive one to satisfy but not the one that empties a pool fastest.
 
-**Topping up is automatic, or meant to be.** `seed-filter/topup.sh`
-compares each type against a floor and builds only the shortfall,
-because replenishment is a RATE - a seed is consumed per player, so
-demand is linear in player count - while a fixed nightly quota pays for
-seeds whether or not anybody played. `cloud/topup-userdata.sh` runs that
-on an instance rather than a laptop, and `cloud/install-topup-schedule.sh`
-puts it on a nightly schedule.
+**Topping up is automatic.** `seed-filter/topup.sh` compares each type
+against a floor and builds only the shortfall, so a run with nothing
+short costs a couple of minutes rather than a fixed quota's worth of
+compute whether or not anybody played.
+
+The floor is NOT pool depth. Seeds are not consumed - `claimSeedPair`
+leaves `used` alone and exclusion is per-player `seenSeeds` - so a
+type's depth is a per-player LIFETIME BUDGET, and a drawable row count
+never falls no matter how much anyone plays. The shortfall is therefore
+measured as the number of drawable seeds of that type which the
+worst-off active player has not yet seen: a min across active players,
+because one player out of seeds is a shortage even when a newcomer has
+everything unseen. With nobody active it reduces to plain pool depth,
+which is the correct answer rather than a fallback. A players table that
+cannot be read is fatal instead, because building from pool depth while
+believing it measured demand is a wrong build that looks like a right
+one.
+
+`cloud/topup-userdata.sh` runs that on an instance rather than a laptop,
+and `cloud/install-topup-schedule.sh` puts it on a twice-daily
+schedule.
 
 **`nether` and `route` rejected 7 of 23 freshly filtered pairs -
 30%.** Six
