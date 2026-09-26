@@ -339,12 +339,18 @@ is deliberately symmetric: a record only one side can see settles nothing
 between two people arguing about a match, and being able to show that you
 were running nothing clears you as readily as it implicates anybody.
 
-**Nothing is gated on it, and it is not an anti-cheat.** Queuing is not
-refused over a mod, a finished run is never voided over one, and anyone
-able to patch the client can patch what it reports. Deliberate cheating
-is caught by the position timeline against the split record, with a human
+**Nothing is gated on it yet, and it is not an anti-cheat.** Anyone able
+to patch the client can patch what it reports. Deliberate cheating is
+caught by the position timeline against the split record, with a human
 looking — the mod list is evidence in that conversation, not a lock on
-the door. A gate at the queue join is the next step and is not built.
+the door.
+
+The check that refuses a queue join is written and **switched off**. The
+list has never been compared against what real clients actually carry,
+and turning it on before that would turn honest players away over a list
+nobody has checked. When it does go on, you will be refused at **Find
+Match**, with the mod named — never mid-match, and never after a run you
+have already finished. A run that happened, happened.
 
 **None of the listed mods has been run alongside `alt` yet.**
 SpeedRunIGT is the one to watch: `alt` keeps its own match clock and

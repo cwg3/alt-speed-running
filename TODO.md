@@ -64,18 +64,27 @@ Known outstanding work, roughly in the order it would matter.
 
 ## Mods
 
-- [ ] **The whitelist is published and not enforced.** That is the
-  order on purpose - a rule has to be knowable before anybody is
-  measured against it - but step 2 is still to build: a check at the
-  QUEUE JOIN, in `queueJoin.ts`, which already carries each player's
-  list on the queue row. So it is a comparison and a 403. Refuse at the
-  door, never at `completeMatch`: voiding a finished run over a mod
-  somebody did not know was illegal is the grievance this ladder exists
-  to answer.
+- [ ] **Turn the queue-join gate on.** It is BUILT and switched off:
+  `lib/modRules.ts` holds the list as data, `queueJoin` returns a 403
+  naming the mods, and `MOD_GATE_ENABLED` defaults to false. Two things
+  have to happen first, and neither is code:
 
-  Signed attestation is deliberately NOT on that list. SPEC.md says
-  why - a client we do not control cannot attest to anything, and
-  claiming an enforcement that is not there is worse than the gap.
+  1. **Read the recorded lists.** Nobody has looked at what real clients
+     carry, which is what step 1 was for. The list was written from
+     first principles and one runner's judgement.
+  2. **Confirm MCSR Fairplay's mod id.** README calls it legal and
+     `ALLOWED_MODS` does not contain it, because the id has never been
+     read off an install and an allowlist entry that never matches
+     refuses a legal mod in silence. A test asserts its absence so a
+     guessed id cannot be slipped in; update both together.
+
+  Enabling it is then one environment variable and a deploy. Signed
+  attestation stays off the list entirely - SPEC.md says why.
+
+- [ ] **`tools/pack-modules.sh` has to be re-run when Fabric API moves.**
+  `PACK_MODULES` is generated from the pinned jar, and an upstream rename
+  or addition would read as an unknown mod to the gate. Tied to
+  `fabric_api_version` in `mod/gradle.properties`.
 
 - [ ] **The whitelist should be backend data, not README prose.** A
   list change currently cannot reach anyone without a client release,

@@ -11,6 +11,7 @@ import {
 import { randomUUID } from 'crypto';
 import { resolveSessionToken } from './lib/auth';
 import { claimSeedPair, recordSeedsSeen } from './lib/seedPool';
+import { illegalMods } from './lib/modRules';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -40,6 +41,23 @@ const BASE_RATING_RANGE = 50;
 // aggressively it got matched against real players. A stranger who
 // closed the client mid-search would keep being paired into matches
 // they never joined, stranding whoever matched them.
+/**
+ * Whether a mod outside the whitelist refuses a queue join.
+ *
+ * DEFAULTS TO OFF, which is the opposite of the allowlist's default and
+ * deliberately so. The whitelist was written from first principles and
+ * one runner's judgement; step 1 exists partly to find out what people
+ * actually run, and no recorded list has been looked at yet. Turning
+ * this on first would refuse honest players over a list nobody has
+ * checked against reality - and MCSR Fairplay's id is still missing from
+ * it, so today it would refuse a mod the README calls legal.
+ *
+ * Same instinct as the split rules: absent or unproven data degrades to
+ * loose, never to strict. Set MOD_GATE_ENABLED=true once the recorded
+ * lists say the whitelist matches what real clients carry.
+ */
+const MOD_GATE_ENABLED = (process.env.MOD_GATE_ENABLED ?? 'false') === 'true';
+
 const QUEUE_STALE_MS = 30_000;
 const RANGE_GROWTH_PER_SECOND = 10;
 const MAX_RATING_RANGE = 500;
@@ -60,6 +78,13 @@ export const handler = async (
 		return { statusCode: 404, body: JSON.stringify({ error: 'no player record for this session' }) };
 	}
 	const myRating: number = player.Item.skillRating;
+
+	// What this player has loaded, recorded at login. undefined when the
+	// client never reported one, which stays distinct from an empty list
+	// all the way to the detail screen.
+	const myMods: string[] | undefined = Array.isArray(player.Item.mods)
+		? player.Item.mods
+		: undefined;
 
 	// A player whose opponent created the match must still be told about
 	// it. Only the caller that finds an opponent gets matched:true, so
@@ -113,6 +138,39 @@ export const handler = async (
 		}
 	}
 
+	// The mod rule, enforced at the DOOR.
+	//
+	// AFTER the rejoin path above, and that order is the whole design. A
+	// player already in a pending match is mid-run: refusing them here
+	// would strand a match in progress, and taking away a run somebody
+	// is already in - over a mod they did not know was illegal - is the
+	// grievance this ladder exists to answer. Never at /matches/complete
+	// either. Turned away before a match exists, or not at all.
+	//
+	// Each player is checked on their own join, so both sides of a pair
+	// have passed by the time they can be paired. The opponent's row is
+	// not re-checked here: it was checked when they queued, and a rule
+	// change mid-queue is not worth a second read per candidate.
+	if (MOD_GATE_ENABLED) {
+		const illegal = illegalMods(myMods);
+		if (illegal.length > 0) {
+			// Names the mods. "You are not allowed to queue" with no
+			// subject is the kind of refusal this project objects to
+			// when other people do it.
+			console.log(`[queueJoin] ${uuid} refused: ${illegal.join(' ')}`);
+			return {
+				statusCode: 403,
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					error: 'not on the mod whitelist: ' + illegal.join(', ')
+						+ ' - see the mod list in README, or open an issue to argue for it',
+					reason: 'mod_not_allowed',
+					mods: illegal,
+				}),
+			};
+		}
+	}
+
 	// Full table Scan is a known simplification, fine at test scale - see
 	// the seed pool / matches tables for the same reasoning elsewhere in
 	// this backend.
@@ -128,18 +186,9 @@ export const handler = async (
 	// later.
 	const myWorldSetup: number = player.Item.worldSetupVersion ?? 0;
 
-	// What this player has loaded, recorded at login. Carried onto the
-	// queue row so the match can be written without a second read per
-	// candidate - the same reason worldSetupVersion lives there.
-	//
-	// NOTHING IS MATCHED OR REFUSED ON THIS. It is recorded so a mod
-	// dispute can be settled by looking; the gate belongs here later
-	// (refuse at the door, never void a finished run) and is not built.
-	// undefined when the client never reported one, which stays distinct
-	// from an empty list all the way to the screen.
-	const myMods: string[] | undefined = Array.isArray(player.Item.mods)
-		? player.Item.mods
-		: undefined;
+	// myMods is carried onto the queue row below, so pairing never needs
+	// a second read per candidate - the same reason worldSetupVersion
+	// lives there.
 
 	let bestOpponent: any = null;
 	let bestDiff = Infinity;

@@ -702,7 +702,7 @@ goes back to the pool, since nothing was wrong with it.
 | Seed type announced with a 10-second countdown before the run | built — confirmed in play |
 | Mod list recorded in the match record | built — never seen in a live match |
 | Both players shown what the other had loaded | built — never seen in a live match |
-| Third-party mods refused at the queue join | **not built** — recorded, not gated |
+| Third-party mods refused at the queue join | built, **switched off** — `MOD_GATE_ENABLED` defaults to false |
 
 **The mod whitelist is a rule with no mechanism behind it.** The client
 reads its own version and nothing else: no mod list is collected, none
@@ -747,11 +747,38 @@ So, in order:
    itself fabric-whatever. Known limit: a mod taking the id of a real
    Fabric module would be filtered out of the *view*. It is still in the
    *record*, which is what a dispute is settled from.
-2. **Then refuse at the queue join**, in `queueJoin.ts` and never in
-   `completeMatch`. Turn somebody away at the door; never void a
-   finished run. A run voided over a mod the player did not know was
-   illegal is the grievance this ladder exists to answer. The data is
-   already on the queue row for this, and nothing compares it yet.
+2. **Then refuse at the queue join — BUILT, AND SWITCHED OFF.**
+   `lib/modRules.ts` holds the whitelist as data and `queueJoin` refuses
+   a 403 naming the offending mods, after the rejoin path so a player
+   mid-match is never stranded, and never in `completeMatch`: turned away
+   before a match exists, or not at all. A run voided over a mod the
+   player did not know was illegal is the grievance this ladder exists to
+   answer.
+
+   `MOD_GATE_ENABLED` defaults to **false**, which is the opposite of the
+   account allowlist's default and deliberately so. That default is
+   secure-by-default because forgetting to open a gate is a support
+   message while forgetting to close one is a stranger on the ladder.
+   This one is the other way round: the list was written from first
+   principles and one runner's judgement, no recorded list has been read
+   yet, and a wrong entry refuses an honest player who is complying.
+   Absent or unproven data degrades to loose, never to strict — the same
+   rule the split checking follows.
+
+   **Two preconditions before it is turned on.** MCSR Fairplay is named
+   in README as legal and its id is not in `ALLOWED_MODS`, because the id
+   has never been read off a real install and an entry that never matches
+   refuses a legal mod silently; a test asserts its absence so a guess
+   cannot be slipped in. And the recorded lists from real clients have to
+   be read first — that is what step 1 was for.
+
+   **The pack's own modules are generated, not matched.** The client asks
+   the loader what is nested inside Fabric API; a Lambda sees a flat list
+   and would be tempted to allow anything starting `fabric-`, which waves
+   through a mod that took the name. `tools/pack-modules.sh` reads the
+   real ids out of the pinned jar into `PACK_MODULES`, and it must be
+   re-run when `fabric_api_version` changes or an upstream rename will
+   read as an unknown mod.
 
 **Signed attestation is deliberately not on that list.**
 Self-attestation from a client we do not control buys nothing against
