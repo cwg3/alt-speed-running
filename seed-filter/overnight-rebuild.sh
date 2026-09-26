@@ -284,6 +284,20 @@ fi
 
 echo
 echo "=== nether + route, then release ==="
+# Its exit code was discarded, so a release step that correctly REFUSED -
+# "refusing to release unverified seeds" - vanished one level up and the
+# run finished by announcing success. The guard was right and nobody
+# upstream was listening, which is the same shape as the loader whose
+# status a pipe ate.
 "$ROOT/seed-filter/verify-and-release.sh"
+rc=$?
+if [ "$rc" -ne 0 ]; then
+  echo
+  echo "ERROR: verification and release failed (rc=$rc)." >&2
+  echo "  Seeds that were loaded stay HELD; nothing was released." >&2
+  echo "  The check output is in seed-filter/results - re-join it with" >&2
+  echo "  NETHER_CSV=... ROUTE_CSV=... rather than paying for it twice." >&2
+  exit "$rc"
+fi
 echo
 echo "=== finished $(date) ==="
