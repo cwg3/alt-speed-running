@@ -323,9 +323,46 @@ argument for eventually shipping our own check rather than a reason to
 leave players with nothing today.
 
 Explicitly not legal: macros, autoclickers, input-altering scripts, and
-anything that surfaces world information — seed readers, structure or
-ore locators, entity outlines through terrain, a map of a chunk you have
-not seen. Those are the run, not the graphics.
+anything that surfaces world information you did not observe — seed
+readers, structure or ore locators that read the world, entity outlines
+through terrain, a map of a chunk you have not seen. Those are the run,
+not the graphics.
+
+**The line is what you OBSERVED, not what you know by the end.** An
+earlier version of this rule said "structure locators" and stopped
+there, which reads as banning the calculators below — the most widely
+used tools in the category. That was a wording failure, not a policy: a
+locator reads the world and tells you something you were never shown, and
+a calculator does arithmetic on measurements you took yourself. The
+second is the same work with a pencil, done faster.
+
+### Ninjabrain Bot, and tools that are not mods
+
+**Ninjabrain Bot is legal.** It is standard equipment in RSG and legal in
+MCSR Ranked, and a ladder that banned it would not be a ladder anybody
+could run on.
+
+It reads the position and angle YOU copy out of the debug screen after
+YOU throw an eye, and triangulates. Every input is something the game
+already showed you and you chose to write down. It surfaces nothing the
+seed withheld — it removes the arithmetic between a measurement and its
+consequence. Throwing two eyes and working the intersection out on paper
+is the same information at a slower speed, and a rule that permits the
+paper and forbids the calculator is a rule about tedium.
+
+The same reasoning admits any calculator of that shape: your own
+measurements in, arithmetic out, nothing read from the world.
+
+**It is not a mod, and the mod list cannot see it.** Ninjabrain Bot is a
+separate program. It is not in your mods folder, the loader has never
+heard of it, and it will never appear in what this ladder records.
+
+That cuts both ways and both directions are worth stating. A clean mod
+list is NOT evidence that nobody used a calculator, so nobody should ever
+present it as such. And using one is not something the record could
+incriminate you with even if the rule changed, so the rule has to be a
+rule people follow because it is written down — which is the only kind
+this project claims to have anyway.
 
 **To get something added, [open an issue](../../issues/new).** You get an
 answer in public with a reason, and the list either changes or it does
@@ -336,8 +373,13 @@ manners, which is the thing this project exists to object to.
 reports its mod list when you log in, it goes into the match record, and
 the match detail screen prints what each of you had beyond the pack. That
 is deliberately symmetric: a record only one side can see settles nothing
-between two people arguing about a match, and being able to show that you
-were running nothing clears you as readily as it implicates anybody.
+between two people arguing about a match, and being able to show what you
+were running answers for you as readily as it answers for anybody else.
+
+It answers for MODS, and only mods. A separate program — a calculator
+like Ninjabrain Bot, legal and used by nearly everybody — never touches
+the loader and so never appears here. A clean list is therefore not proof
+that nothing else was open, and it must not be offered as one.
 
 **Nothing is gated on it yet, and it is not an anti-cheat.** Anyone able
 to patch the client can patch what it reports. Deliberate cheating is
