@@ -72,13 +72,21 @@ now=$(date +%s); now_ms=$((now*1000)); exp=$((now+7200))
 
 # Refresh the bot's player row and session each run. Rating is pinned to
 # 1500 so the skill-range matcher always considers it a fair pairing.
-# update-item, not put-item. put-item REPLACES the row, and the bot's
-# row now carries seenSeeds - the set of pairs it has already played.
-# Overwriting it reset the bot to having seen nothing every run, which
-# quietly made it useless as a test partner: the draw is supposed to
-# exclude seeds EITHER player has seen, and a bot with an empty set
-# never constrains it. Mirrors what verifySession does for real
-# players, which was always an update and was never affected.
+#
+# update-item, not put-item, because put-item REPLACES the row and would
+# wipe every field this script does not set: splitStats, the W-L-F
+# counts, matches, and the rating and createdAt that if_not_exists is
+# there to protect. The bot would arrive brand new every run. Mirrors
+# what verifySession does for real players, which was always an update.
+#
+# THE REASON THIS COMMENT USED TO GIVE IS OBSOLETE, and is noted rather
+# than deleted because it is the kind that still reads as true. It said
+# the row carried seenSeeds and that resetting it made the bot useless as
+# a test partner, since the draw excludes seeds EITHER player has seen.
+# Synthetic players are now filtered out of that read AND that write in
+# seedPool.ts, so the bot's set is never consulted - and the row no
+# longer carries one at all. Keeping the bot's sightings is not a reason
+# to use update-item; the fields listed above are.
 aws dynamodb update-item --region "$REGION" --table-name "$PLAYERS" \
   --key "{\"uuid\":{\"S\":\"$UUID\"}}" \
   --update-expression "SET username = :n, lastLoginAt = :t, createdAt = if_not_exists(createdAt, :t), skillRating = if_not_exists(skillRating, :r), seasonPoints = if_not_exists(seasonPoints, :z), worldSetupVersion = :w" \
