@@ -34,7 +34,10 @@ WORKERS="${3:-16}"
 # DEFAULT fixes both callers and any future one.
 ITYPE="${4:-m7g.4xlarge}"
 REGION="${REGION:-us-west-2}"
-MAX_MINUTES="${MAX_MINUTES:-180}"
+# Left EMPTY on purpose. A caller's value wins; otherwise it is derived
+# from the batch once the shard size is known, below. It used to default
+# to a flat 180 here, which is what silently decapitated a bigger batch.
+MAX_MINUTES="${MAX_MINUTES:-}"
 # Heap PER CONTAINER. Must fit the instance: a t4g.small has 2GB total,
 # so one worker at 1400m leaves room for the OS and docker. Chunk
 # generation over a wide radius is the memory-hungry part.
@@ -143,13 +146,46 @@ shards=$(ls "$TMP" | grep -c '^shard-')
 aws s3 cp "$TMP/" "s3://$BUCKET/$RUN/in/" --recursive --exclude '*' --include 'shard-*' --quiet
 echo "uploaded $shards shards of up to $per seeds"
 
+# WATCHDOG BUDGET. This was a flat value, sized for the batches of the
+# day it was written, and a larger batch was silently lost to it: raising
+# the pool floor grew the batch, the instance ran into the timer, shut
+# itself down having written nothing at all, and the orchestrator could
+# only report "ended without writing results" - which reads like a crash
+# rather than a deadline. Every finished shard went with it.
+#
+# Shards run in PARALLEL, so the wall clock is set by the LONGEST one -
+# `per`, not $n. MINUTES_PER_SEED is measured rather than guessed, and
+# then doubled; spawn is the slowest check, so applying its rate to every
+# check errs long. That is the right direction for a timer whose only job
+# is to stop a hang from billing forever: too short destroys finished
+# work, too long costs pennies.
+MINUTES_PER_SEED="${MINUTES_PER_SEED:-4}"
+BOOT_MINUTES="${BOOT_MINUTES:-15}"
+if [ -z "$MAX_MINUTES" ]; then
+	MAX_MINUTES=$(( per * MINUTES_PER_SEED + BOOT_MINUTES ))
+	[ "$MAX_MINUTES" -lt 180 ] && MAX_MINUTES=180
+fi
+echo "  watchdog $MAX_MINUTES min (longest shard is $per seeds)"
+
 # --- user data --------------------------------------------------------
 USERDATA=$(cat <<SCRIPT
 #!/bin/bash
 exec > /var/log/seedwork.log 2>&1
 set -x
-# Watchdog first, so a hang still ends in a terminated instance.
-( sleep $((MAX_MINUTES * 60)); shutdown -h now ) &
+# Watchdog first, so a hang still ends in a terminated instance. It now
+# SAYS it fired, and salvages what finished: a bare `shutdown` made a
+# deadline look identical to a crash, and threw away every completed
+# shard sitting on local disk.
+(
+  sleep $((MAX_MINUTES * 60))
+  echo "WATCHDOG: $MAX_MINUTES minutes elapsed, giving up"
+  aws s3 cp /work/ s3://$BUCKET/$RUN/out/ --recursive \
+    --exclude '*' --include 'out-*.csv' || true
+  echo "watchdog fired after $MAX_MINUTES minutes" > /work/watchdog
+  aws s3 cp /work/watchdog s3://$BUCKET/$RUN/out/watchdog || true
+  aws s3 cp /var/log/seedwork.log s3://$BUCKET/$RUN/out/seedwork.log || true
+  shutdown -h now
+) &
 dnf install -y docker awscli-2 || yum install -y docker
 systemctl start docker
 aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $IMAGE
@@ -209,8 +245,19 @@ while ! aws s3 ls "s3://$BUCKET/$RUN/out/done" >/dev/null 2>&1; do
   state=$(aws ec2 describe-instances --instance-ids "$IID" \
     --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo gone)
   if [ "$state" = terminated ] || [ "$state" = gone ]; then
-    echo "instance ended without writing results - check /var/log/seedwork.log via console output"
-    aws ec2 get-console-output --instance-id "$IID" --output text 2>/dev/null | tail -30 || true
+    # Say WHICH failure this was. "No results" covers a crash, an OOM and
+    # a watchdog deadline, and they need different fixes - the first two
+    # are bugs, the third just means the batch was bigger than the timer.
+    if aws s3 cp "s3://$BUCKET/$RUN/out/watchdog" - 2>/dev/null; then
+      echo "the WATCHDOG stopped it - the batch needed longer than $MAX_MINUTES min."
+      echo "  partial shards, if any, are in s3://$BUCKET/$RUN/out/"
+      echo "  re-run with a bigger MINUTES_PER_SEED or fewer seeds per shard."
+    else
+      echo "instance ended without writing results and without hitting the watchdog"
+    fi
+    aws s3 cp "s3://$BUCKET/$RUN/out/seedwork.log" - 2>/dev/null | tail -30 \
+      || aws ec2 get-console-output --instance-id "$IID" --output text 2>/dev/null | tail -30 \
+      || true
     exit 1
   fi
   sleep 30
