@@ -74,6 +74,48 @@ interface VerifyRequest {
 	 * different rates.
 	 */
 	worldSetupVersion?: number;
+	/**
+	 * Every mod the client has loaded, as "id@version".
+	 *
+	 * Absent from clients built before this was collected, and the
+	 * difference is kept: an absent list means nobody looked, an empty
+	 * one means there was nothing to find. Reporting the first as the
+	 * second would be inventing evidence.
+	 */
+	mods?: unknown;
+}
+
+/**
+ * Longest mod list and longest entry we will store.
+ *
+ * /auth/verify is public and unauthenticated at the point this arrives,
+ * so the body is a stranger's input until Mojang has spoken. A pack with
+ * Fabric API runs to a few dozen entries; these caps are generous
+ * against that and still bounded, which is the property that matters.
+ */
+const MAX_MODS = 200;
+const MAX_MOD_ENTRY = 80;
+
+/**
+ * The mod list as we are willing to store it, or undefined when the
+ * client sent none.
+ *
+ * Sorted and deduplicated so two clients running the same mods produce
+ * the same list - load order is not stable between launches, and the
+ * point of recording this is comparison.
+ */
+export function sanitizeModList(raw: unknown): string[] | undefined {
+	if (raw === undefined || raw === null) return undefined;
+	if (!Array.isArray(raw)) return undefined;
+	const seen = new Set<string>();
+	for (const entry of raw) {
+		if (typeof entry !== 'string') continue;
+		const trimmed = entry.trim();
+		if (!trimmed) continue;
+		seen.add(trimmed.slice(0, MAX_MOD_ENTRY));
+		if (seen.size >= MAX_MODS) break;
+	}
+	return [...seen].sort();
 }
 
 interface MojangProfile {
@@ -159,6 +201,18 @@ export const handler = async (
 	const profile = JSON.parse(text) as MojangProfile;
 	const now = Date.now();
 
+	// Recorded on the player, carried onto the queue row and then into
+	// the match - the same path worldSetupVersion takes. Login is the
+	// right moment: Fabric loads mods at startup, so this cannot change
+	// without a relaunch, which is another login.
+	//
+	// Nothing is gated on it. The whitelist in README.md is the rule;
+	// this is the evidence that lets a dispute about it be settled by
+	// looking, which clears an honest player as readily as it implicates
+	// a dishonest one. A client can lie here - see SPEC.md - and that is
+	// why no decision hangs on it.
+	const mods = sanitizeModList(body.mods);
+
 	// After Mojang, because the allowlist is keyed by the VERIFIED uuid
 	// rather than a claimed username - otherwise anyone could be turned
 	// away or let in by typing a name. Before the upsert, so a stranger
@@ -203,13 +257,18 @@ export const handler = async (
 			// Recorded every login, not if_not_exists: it changes when
 			// the player updates, and a stale value is worse than none
 			// because matchmaking pairs on it.
-			'worldSetupVersion = :wsv',
+			'worldSetupVersion = :wsv'
+			// Only when the client sent one. Writing an empty list for a
+			// client that reported nothing would turn "not collected"
+			// into "had no mods", which is a claim about somebody.
+			+ (mods ? ', mods = :mods, modsAt = :now' : ''),
 		ExpressionAttributeValues: {
 			':username': profile.name,
 			':now': now,
 			':defaultRating': DEFAULT_SKILL_RATING,
 			':zero': 0,
 			':wsv': body.worldSetupVersion ?? 0,
+			...(mods ? { ':mods': mods } : {}),
 		},
 	}));
 

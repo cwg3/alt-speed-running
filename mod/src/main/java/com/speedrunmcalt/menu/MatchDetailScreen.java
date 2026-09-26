@@ -3,6 +3,7 @@ package com.speedrunmcalt.menu;
 import com.speedrunmcalt.SpeedrunMcAlt;
 import com.speedrunmcalt.net.BackendClient;
 import com.speedrunmcalt.net.MatchDetail;
+import com.speedrunmcalt.net.ModList;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
@@ -199,6 +200,52 @@ public class MatchDetailScreen extends Screen {
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText(splitLabel(row.split)), cx, y, Palette.PURPLE);
 			y += ROW_HEIGHT;
+		}
+
+		// What each player had loaded, filtered to what the pack does
+		// not already install.
+		//
+		// Shown to both players rather than kept for a maintainer: a
+		// record only one side can see settles nothing between two
+		// people arguing about a match. It is deliberately not coloured
+		// as a warning - a legal performance mod is not an accusation,
+		// and the screen reports rather than judges.
+		y += 6;
+		for (int i = 0; i < d.players.size() && i < 2; i++) {
+			MatchDetail.Player p = d.players.get(i);
+			java.util.List<String> recorded = d.mods.get(p.uuid);
+			String body;
+			int colour;
+			if (recorded == null) {
+				// A match from before this was collected. "None" here
+				// would report an absence of data as a finding.
+				body = "mods not recorded";
+				colour = Palette.DIM;
+			} else {
+				java.util.List<String> extra = ModList.beyondPack(recorded);
+				if (extra.isEmpty()) {
+					body = "nothing beyond the pack";
+					colour = Palette.DIM;
+				} else {
+					StringBuilder sb = new StringBuilder();
+					for (int k = 0; k < extra.size() && k < 4; k++) {
+						sb.append(k > 0 ? ", " : "").append(ModList.pretty(extra.get(k)));
+					}
+					// Four is what fits; the rest are counted rather
+					// than dropped, because a line that silently ends
+					// reads as a complete list.
+					if (extra.size() > 4) {
+						sb.append(", +").append(extra.size() - 4).append(" more");
+					}
+					body = sb.toString();
+					colour = Palette.CYAN;
+				}
+			}
+			String label = p.username + ": ";
+			this.textRenderer.drawWithShadow(matrices, label, left, y, Palette.YELLOW);
+			this.textRenderer.drawWithShadow(matrices, body,
+					left + this.textRenderer.getWidth(label), y, colour);
+			y += 11;
 		}
 
 		if (d.worldSetupVersion != com.speedrunmcalt.world.WorldSetupVersion.CURRENT) {

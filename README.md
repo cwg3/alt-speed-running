@@ -332,12 +332,19 @@ answer in public with a reason, and the list either changes or it does
 not. A list nobody can petition is just an allowlist with better
 manners, which is the thing this project exists to object to.
 
-**Enforcement is not built.** Nothing reads your mod list, there is no
-attestation and no `ModCheck` equivalent here, so today this rule rests
-on the same thing everything else rests on: the position timeline, the
-split record, and a human looking when the two do not agree. Published
-anyway — knowing where the line is has to come before anyone is measured
-against it.
+**What is loaded is recorded and shown to both players.** Your client
+reports its mod list when you log in, it goes into the match record, and
+the match detail screen prints what each of you had beyond the pack. That
+is deliberately symmetric: a record only one side can see settles nothing
+between two people arguing about a match, and being able to show that you
+were running nothing clears you as readily as it implicates anybody.
+
+**Nothing is gated on it, and it is not an anti-cheat.** Queuing is not
+refused over a mod, a finished run is never voided over one, and anyone
+able to patch the client can patch what it reports. Deliberate cheating
+is caught by the position timeline against the split record, with a human
+looking — the mod list is evidence in that conversation, not a lock on
+the door. A gate at the queue join is the next step and is not built.
 
 **None of the listed mods has been run alongside `alt` yet.**
 SpeedRunIGT is the one to watch: `alt` keeps its own match clock and
@@ -360,6 +367,9 @@ Worth knowing up front, because this is a competitive ladder:
 
 - Your Minecraft username and UUID
 - Your split times and match results
+- **Which mods you have loaded**, collected once at login — Fabric
+  cannot load a mod after that without a relaunch — and shown to your
+  opponent on the match detail screen, as they are shown to you
 - A **position timeline** — where you were, roughly once a second,
   during a match. This is used to check that reported splits match
   where you actually were. It is not video, it is about 4KB per run,

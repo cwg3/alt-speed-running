@@ -700,7 +700,9 @@ goes back to the pool, since nothing was wrong with it.
 |---|---|
 | Both players race the same seed in separate worlds | built |
 | Seed type announced with a 10-second countdown before the run | built — confirmed in play |
-| Third-party mods restricted to a published whitelist | **not built** — the rule is published in the README; nothing enforces it |
+| Mod list recorded in the match record | built — never seen in a live match |
+| Both players shown what the other had loaded | built — never seen in a live match |
+| Third-party mods refused at the queue join | **not built** — recorded, not gated |
 
 **The mod whitelist is a rule with no mechanism behind it.** The client
 reads its own version and nothing else: no mod list is collected, none
@@ -724,17 +726,32 @@ caught by run evidence, and inspecting mods does not change that.
 
 So, in order:
 
-1. **Record and display it, with no gate.** Mod ids and versions from
-   the loader, a few hundred bytes alongside what `completeMatch`
-   already reports, shown on the match detail screen to both players.
-   That makes an accusation checkable AND clearable — today a mod
-   dispute is unfalsifiable in both directions, which fails an innocent
-   player harder than a guilty one — and it says what people actually
-   run before the list is fixed from one runner's guesses.
+1. **Record and display it, with no gate — BUILT.** `ModList` collects
+   every loaded mod as `id@version` and `BackendClient.verify` sends it
+   at login, which is the only moment it can change: Fabric loads mods
+   at startup, so one report covers the session. `verifySession` stores
+   it on the player row, `queueJoin` carries it onto the queue row and
+   into the match's uuid-keyed `mods` map, and `MatchDetailScreen`
+   prints each player's list to both of them. A mod dispute is now
+   checkable AND clearable, which it was not in either direction.
+
+   **An absent list is not an empty one.** A client that reported
+   nothing has no entry, and the screen says "mods not recorded" rather
+   than "nothing beyond the pack" — the difference between no evidence
+   and exculpatory evidence. `sanitizeModList` returns `undefined`
+   rather than `[]` for exactly this reason, and it is tested.
+
+   The display filters out what the pack installs anyway, by asking the
+   loader which modules are nested inside Fabric API rather than by
+   matching names — a `fabric-` prefix rule would hide anything calling
+   itself fabric-whatever. Known limit: a mod taking the id of a real
+   Fabric module would be filtered out of the *view*. It is still in the
+   *record*, which is what a dispute is settled from.
 2. **Then refuse at the queue join**, in `queueJoin.ts` and never in
    `completeMatch`. Turn somebody away at the door; never void a
    finished run. A run voided over a mod the player did not know was
-   illegal is the grievance this ladder exists to answer.
+   illegal is the grievance this ladder exists to answer. The data is
+   already on the queue row for this, and nothing compares it yet.
 
 **Signed attestation is deliberately not on that list.**
 Self-attestation from a client we do not control buys nothing against

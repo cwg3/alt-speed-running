@@ -95,6 +95,12 @@ export const handler = async (
 			completedAt: m.completedAt ?? null,
 			forfeited: m.forfeited ?? false,
 			worldSetupVersion: m.worldSetupVersion ?? 0,
+			// uuid -> "id@version" strings, for the players in this match
+			// only. Participants already see each other's names, splits
+			// and traces; what somebody had installed is the same kind of
+			// fact and is the one both sides need to settle an argument
+			// about it. A uuid absent from the map reported nothing.
+			mods: m.mods ?? {},
 			results: m.results ?? {},
 			rows,
 		}),

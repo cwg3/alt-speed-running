@@ -128,6 +128,19 @@ export const handler = async (
 	// later.
 	const myWorldSetup: number = player.Item.worldSetupVersion ?? 0;
 
+	// What this player has loaded, recorded at login. Carried onto the
+	// queue row so the match can be written without a second read per
+	// candidate - the same reason worldSetupVersion lives there.
+	//
+	// NOTHING IS MATCHED OR REFUSED ON THIS. It is recorded so a mod
+	// dispute can be settled by looking; the gate belongs here later
+	// (refuse at the door, never void a finished run) and is not built.
+	// undefined when the client never reported one, which stays distinct
+	// from an empty list all the way to the screen.
+	const myMods: string[] | undefined = Array.isArray(player.Item.mods)
+		? player.Item.mods
+		: undefined;
+
 	let bestOpponent: any = null;
 	let bestDiff = Infinity;
 	let skippedForVersion = 0;
@@ -195,6 +208,7 @@ export const handler = async (
 			UpdateExpression: 'SET username = :username, skillRating = :rating, '
 				+ joinedAtClause + ', '
 				+ 'worldSetupVersion = :wsv, '
+				+ (myMods ? 'mods = :mods, ' : '')
 				+ 'lastSeenAt = :now, expiresAt = :expires',
 			ExpressionAttributeValues: {
 				':username': player.Item.username,
@@ -202,6 +216,7 @@ export const handler = async (
 				// On the queue row so matching can compare it without a
 				// second read per candidate.
 				':wsv': myWorldSetup,
+				...(myMods ? { ':mods': myMods } : {}),
 				':now': now,
 				// DynamoDB TTL (seconds) so abandoned rows are reaped
 				// rather than accumulating forever. Correctness comes
@@ -293,6 +308,17 @@ export const handler = async (
 			// rather than from nothing - otherwise a match whose
 			// opponent never polls would look abandoned from birth.
 			lastSeenAt: { [uuid]: now, [bestOpponent.uuid]: now },
+			// What each player had loaded when they logged in, uuid-keyed
+			// like lastSeenAt and runStarts. A uuid MISSING from this map
+			// reported no list, which the detail screen shows as "not
+			// recorded" rather than as "none" - the difference is the
+			// difference between no evidence and exculpatory evidence.
+			mods: {
+				...(myMods ? { [uuid]: myMods } : {}),
+				...(Array.isArray(bestOpponent.mods)
+					? { [bestOpponent.uuid]: bestOpponent.mods }
+					: {}),
+			},
 			// Per-player run starts, filled in by /matches/start at each
 			// player's first playable tick. Present but empty so that
 			// claim is a single conditional write rather than a

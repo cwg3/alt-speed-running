@@ -55,6 +55,18 @@ public final class BackendClient {
 		// different worlds, and the race stops being the same race.
 		body.addProperty("worldSetupVersion",
 				com.speedrunmcalt.world.WorldSetupVersion.CURRENT);
+		// What else is loaded, for the match record. Sent at login
+		// because Fabric loads mods at startup - the list cannot change
+		// without a relaunch, so one report covers the whole session.
+		//
+		// Nothing is gated on it. It is recorded so that a mod dispute
+		// can be settled by looking, which clears an honest player as
+		// readily as it implicates a dishonest one. See ModList.
+		JsonArray mods = new JsonArray();
+		for (String entry : ModList.installed()) {
+			mods.add(entry);
+		}
+		body.add("mods", mods);
 
 		JsonObject resp = post(API_BASE + "/auth/verify", body, null);
 		return new VerifyResult(
@@ -419,13 +431,32 @@ public final class BackendClient {
 			rows.add(new MatchDetail.Row(r.get("split").getAsString(), times, deltas));
 		}
 
+		// uuid -> what that player had loaded. Absent for matches that
+		// predate the recording, and the screen says so rather than
+		// printing an empty list: "not recorded" and "nothing beyond
+		// the pack" are different claims.
+		java.util.Map<String, java.util.List<String>> mods = new java.util.LinkedHashMap<>();
+		if (resp.has("mods") && resp.get("mods").isJsonObject()) {
+			for (java.util.Map.Entry<String, com.google.gson.JsonElement> e
+					: resp.getAsJsonObject("mods").entrySet()) {
+				if (!e.getValue().isJsonArray()) {
+					continue;
+				}
+				java.util.List<String> list = new java.util.ArrayList<>();
+				for (com.google.gson.JsonElement m : e.getValue().getAsJsonArray()) {
+					list.add(m.getAsString());
+				}
+				mods.put(e.getKey(), list);
+			}
+		}
+
 		return new MatchDetail(
 				resp.get("matchId").getAsString(), players,
 				resp.get("winnerUuid").isJsonNull() ? null : resp.get("winnerUuid").getAsString(),
 				str(resp, "seedType", "unknown"),
 				resp.has("forfeited") && !resp.get("forfeited").isJsonNull()
 						&& resp.get("forfeited").getAsBoolean(),
-				num(resp, "worldSetupVersion"), rows);
+				num(resp, "worldSetupVersion"), rows, mods);
 	}
 
 	public static void forfeit(String sessionToken, String matchId) throws IOException {

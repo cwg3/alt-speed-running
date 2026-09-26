@@ -42,9 +42,19 @@ public final class MatchDetail {
 	public final boolean forfeited;
 	public final int worldSetupVersion;
 	public final List<Row> rows;
+	/**
+	 * uuid -> the mods that player had loaded, "id@version".
+	 *
+	 * A uuid ABSENT from this map was not recorded, which is not the
+	 * same as having had nothing installed - matches from before the
+	 * recording existed have no entry, and saying "none" for them would
+	 * be inventing evidence.
+	 */
+	public final Map<String, List<String>> mods;
 
 	public MatchDetail(String matchId, List<Player> players, String winnerUuid,
-			String seedType, boolean forfeited, int worldSetupVersion, List<Row> rows) {
+			String seedType, boolean forfeited, int worldSetupVersion, List<Row> rows,
+			Map<String, List<String>> mods) {
 		this.matchId = matchId;
 		this.players = players;
 		this.winnerUuid = winnerUuid;
@@ -52,5 +62,6 @@ public final class MatchDetail {
 		this.forfeited = forfeited;
 		this.worldSetupVersion = worldSetupVersion;
 		this.rows = rows;
+		this.mods = mods;
 	}
 }
