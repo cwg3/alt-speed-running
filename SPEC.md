@@ -1248,13 +1248,21 @@ the draw is a policy and policies get revised. The fairness guarantee
 must not depend on which pool practice happens to pull from.
 
 **Which pool it pulls from is then a COST decision, not a safety one.**
-Drawing from already-seen seeds is free: nothing leaks because they have
-seen it by definition, no new seeds are consumed, and rehearsing a known
-world is what practice actually is - availability grows as they play
-instead of competing with ranked for the expensive openings. Drawing
-fresh seeds would also be safe under the invariant above, it would just
-bill practice against the per-player lifetime budget the pool floor
-exists to protect. Start with already-seen for that reason alone.
+Already-seen first, because it is free: nothing leaks, no new seeds are
+consumed, and rehearsing a known world is what practice actually is.
+
+**But already-seen ONLY does not work, and an earlier draft of this
+section said it did.** A player who has seen nothing has nothing to
+practice on - and that is a NEW player, with nobody to queue against,
+which is the exact person this feature exists for. The rule as written
+made the feature unavailable precisely when it is needed most.
+
+So: **prefer a seed they have seen, fall back to a fresh one.** The
+fallback is safe because of the invariant above rather than because of
+the draw, which is the whole reason the invariant is stated separately.
+It costs a seed from their lifetime budget, and for somebody who has
+played nothing that budget is entirely intact. Availability then grows
+as they play and the fallback stops being reached.
 
 **3. Do NOT invent the rating-to-pace curve.** Scaling the bot's pace to
 the player is the best part of the idea and the part with no data behind
