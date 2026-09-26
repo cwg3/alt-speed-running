@@ -64,7 +64,16 @@ public final class MatchEnd {
 		}
 
 		// Snapshot before the teardown clears it.
-		final long myTime = MatchState.elapsedMillis();
+		//
+		// NULL WHEN THE DRAGON IS NOT DEAD. elapsedMillis() is the run
+		// clock, and that is only a finish time if the player finished -
+		// the backend uses the same kill_dragon test as the precondition
+		// for claiming one. Without it the number is "how long you had
+		// been going", which must not be printed beside an opponent's
+		// finish as though the two were comparable.
+		final Long myTime = MatchState.mySplits.containsKey("kill_dragon")
+				? Long.valueOf(MatchState.elapsedMillis())
+				: null;
 		final Long opponentTime = MatchState.opponentSplits.get("kill_dragon");
 		final String opponent = opponentName != null ? opponentName : MatchState.opponentUsername;
 

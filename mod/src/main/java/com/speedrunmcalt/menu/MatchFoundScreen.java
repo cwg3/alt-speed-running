@@ -26,15 +26,30 @@ public class MatchFoundScreen extends Screen {
 	private final String opponent;
 	/** Non-null when this is a pace, and then it is the time to beat. */
 	private final String paceLabel;
+	/**
+	 * This pace had to spend a world the player had never seen.
+	 *
+	 * Shown only when TRUE. Practice normally reuses a world they
+	 * already know and costs nothing, so saying that every time is
+	 * noise - but a fresh seed is one fewer world they can ever be dealt
+	 * in a ranked match, and that is worth a line at the moment it
+	 * happens.
+	 */
+	private final boolean usedFreshSeed;
 
 	public MatchFoundScreen(String opponent) {
 		this(opponent, null);
 	}
 
 	public MatchFoundScreen(String opponent, String paceLabel) {
+		this(opponent, paceLabel, false);
+	}
+
+	public MatchFoundScreen(String opponent, String paceLabel, boolean usedFreshSeed) {
 		super(new LiteralText(paceLabel == null ? "Match found" : "Race a Pace"));
 		this.opponent = opponent == null ? "opponent" : opponent;
 		this.paceLabel = paceLabel;
+		this.usedFreshSeed = usedFreshSeed;
 	}
 
 	@Override
@@ -73,8 +88,16 @@ public class MatchFoundScreen extends Screen {
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText("a time to beat - nothing is rated"),
 					cx, cy + 24, Palette.DIM);
-			drawCenteredText(matrices, this.textRenderer,
-					new LiteralText("loading world..."), cx, cy + 38, Palette.DIM);
+			if (usedFreshSeed) {
+				drawCenteredText(matrices, this.textRenderer,
+						new LiteralText("a world you have not played - it costs you one seed"),
+						cx, cy + 38, Palette.DIM);
+				drawCenteredText(matrices, this.textRenderer,
+						new LiteralText("loading world..."), cx, cy + 52, Palette.DIM);
+			} else {
+				drawCenteredText(matrices, this.textRenderer,
+						new LiteralText("loading world..."), cx, cy + 38, Palette.DIM);
+			}
 		} else {
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText("loading world..."), cx, cy + 24, Palette.DIM);

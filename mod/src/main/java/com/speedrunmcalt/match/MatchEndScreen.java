@@ -26,7 +26,7 @@ public class MatchEndScreen extends Screen {
 
 	private final boolean won;
 	private final String opponent;
-	private final long myTimeMs;
+	private final Long myTimeMs;
 	private final Long opponentTimeMs;
 	private final Integer ratingDelta;
 	/**
@@ -40,12 +40,20 @@ public class MatchEndScreen extends Screen {
 	private final String paceLabel;
 	private final Integer seasonPoints;
 
-	public MatchEndScreen(boolean won, String opponent, long myTimeMs, Long opponentTimeMs,
+	public MatchEndScreen(boolean won, String opponent, Long myTimeMs, Long opponentTimeMs,
 			Integer ratingDelta, Integer seasonPoints) {
 		this(won, opponent, myTimeMs, opponentTimeMs, ratingDelta, seasonPoints, null);
 	}
 
-	public MatchEndScreen(boolean won, String opponent, long myTimeMs, Long opponentTimeMs,
+	/**
+	 * @param myTimeMs the player's FINISH time, or null if they did not
+	 *                 finish. Nullable for the same reason opponentTimeMs
+	 *                 is: the run clock at the moment a match ended is
+	 *                 not a finish time unless the player actually
+	 *                 finished, and printing it as one under a heading
+	 *                 that invites comparison says something untrue.
+	 */
+	public MatchEndScreen(boolean won, String opponent, Long myTimeMs, Long opponentTimeMs,
 			Integer ratingDelta, Integer seasonPoints, String paceLabel) {
 		super(new LiteralText(won ? "Victory" : "Defeat"));
 		this.paceLabel = paceLabel;
@@ -90,8 +98,22 @@ public class MatchEndScreen extends Screen {
 				new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW });
 		y += 18;
 
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("your time   " + MatchState.formatTime(myTimeMs)), cx, y, ACCENT);
+		// A LOSS IS USUALLY NOT A SLOWER FINISH - it is no finish at all.
+		//
+		// This printed the run clock at the moment the match ended, which
+		// is a finish time only if the player finished. Against a pace it
+		// was actively misleading: "your time 10:01 / their time 10:00"
+		// reads as losing by a second, when the player may have been
+		// nowhere near the end. The pace's time is exact by construction,
+		// so the comparison looked precise as well as wrong.
+		if (myTimeMs != null) {
+			drawCenteredText(matrices, this.textRenderer,
+					new LiteralText("your time   " + MatchState.formatTime(myTimeMs)),
+					cx, y, ACCENT);
+		} else {
+			drawCenteredText(matrices, this.textRenderer,
+					new LiteralText("you did not finish"), cx, y, DIM);
+		}
 		y += 12;
 
 		String theirs = opponentTimeMs == null ? "--:--" : MatchState.formatTime(opponentTimeMs);

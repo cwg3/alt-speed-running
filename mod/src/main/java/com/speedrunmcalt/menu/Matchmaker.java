@@ -113,7 +113,8 @@ public final class Matchmaker {
 		// fires the next thing on screen says MATCH FOUND: the overlay
 		// in a world, this screen in a menu.
 		if (waited == 0 && client.world == null) {
-			client.openScreen(new MatchFoundScreen(opponent, match.paceLabel));
+			client.openScreen(new MatchFoundScreen(
+					opponent, match.paceLabel, match.usedFreshSeed));
 		}
 
 		if (waited == 0 && client.world != null && client.inGameHud != null) {
