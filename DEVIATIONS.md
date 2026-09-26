@@ -89,6 +89,50 @@ and the nether are paired from separate searches. This deliberately
 breaks the correlation vanilla has between them, because that
 correlation is what makes inferring one from the other possible.
 
+**What the seed is required to supply.** Distances are measured from the
+actual world spawn, not the origin. Every seed is one of five opening
+types and carries that type's structure within 3 chunks (ruined portal),
+4 (shipwreck), 5 (desert temple, buried treasure) or 7 (village), plus
+real wood near spawn and — on village and temple seeds — a river within
+6 chunks. In the nether: a bastion within 14 chunks of nether spawn and
+at least 10 chunks clearer than the next nearest, and a fortress within
+16 chunks **of that bastion** rather than of spawn. Arrival is never in
+Basalt Deltas.
+
+**A ruined portal has to be completable.** Vanilla's are frequently not
+— flat debris, or buried. A qualifying one is a vertical frame at least
+4 by 5 of real obsidian, missing at most 2 non-corner blocks, with no
+crying obsidian in a slot that must be filled, at least partly above
+ground, and with a chest. If the seed's own portal fails that check at
+world creation, the mod places one.
+
+**What the mod places.** Lava pools about two chunks out on village and
+temple seeds; lava and water at a ruined portal, so both the obsidian
+and the bucket route are open; a shipwreck's missing chests, when
+vanilla generated a half-wreck; a small landing pad, only when the
+nether arrival has no standable ground.
+
+**Chest loot is topped up to a floor.** The loot table rolls normally
+and only the shortfall is added, so a good roll stays a good roll:
+
+| Where | Floor |
+|---|---|
+| Village smith | 3 iron (+4 from the golem), or 4 iron and 3 diamonds |
+| Desert temple | 7 iron, 52 hunger points of food |
+| Ruined portal | 27 nuggets (three ingots — a bucket), 2–4 obsidian |
+| Shipwreck, buried treasure | 7 iron equivalent, 88 hunger points |
+| Bastion, across its chests | 3 iron, 5 obsidian, 48–64 string |
+
+Iron is counted in the unit the route uses — ingots at a village,
+nuggets at a portal, both together on the ocean routes — and food in
+hunger points rather than items, because thirteen rotten flesh is not
+thirteen meals. Top-ups are deterministic: same container, same slot,
+both players. A temple's string and sand are route material and are
+**not** yet guaranteed.
+
+[SPEC.md](SPEC.md) tracks each of these against what the code actually
+does today, including the ones marked not built.
+
 ## 5. Client-side only
 
 No effect on gameplay or fairness.

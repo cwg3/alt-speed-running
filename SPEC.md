@@ -700,6 +700,21 @@ goes back to the pool, since nothing was wrong with it.
 |---|---|
 | Both players race the same seed in separate worlds | built |
 | Seed type announced with a 10-second countdown before the run | built — confirmed in play |
+| Third-party mods restricted to a published whitelist | **not built** — the rule is published in the README; nothing enforces it |
+
+**The mod whitelist is a rule with no mechanism behind it.** The client
+reads its own version and nothing else: no mod list is collected, none
+reaches the match record, and there is no client attestation to compare
+against. So an illegal mod is caught the way anything else is — a
+position timeline that does not match the splits, and a human looking.
+
+Publishing it unenforced is the right order. The standard here is a
+whitelist rather than a banned list, and a runner has to be able to know
+in advance whether they are compliant; a rule that appears only when
+somebody is accused of breaking it is the failure mode this project
+exists to avoid. What is missing, in the order it should be built: a mod
+list in the match record, then a signed attestation, then a check that
+rejects a queue join rather than voiding a finished run.
 
 **The countdown is a real mechanic, not a nicety.** the incumbent tells
 both players which seed TYPE they have drawn - village, desert temple,

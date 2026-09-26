@@ -114,21 +114,234 @@ standard only means anything if somebody stands behind it.
 
 ## What is different from vanilla
 
-Both players get the same filtered seed, and some randomness is fixed so
-neither player can be handed a better run by luck:
+A match is not pure vanilla and never claims to be. Two kinds of thing
+change: some randomness is **mirrored or fixed**, so neither player is
+handed a better run by luck, and the world is **partly built** rather
+than only found.
 
-- Overworld and nether are seeded **independently**, so you cannot infer
-  nether structure locations from overworld terrain
-- Iron golems always drop 4 iron
-- Gravel gives 2 flint per 20 blocks, on a schedule both players share
-- Dead bushes always drop 2 sticks
+This is the short version. [DEVIATIONS.md](DEVIATIONS.md) is the
+complete list, with the vanilla behaviour quoted beside each change.
+[SPEC.md](SPEC.md) adds the part that is promised but **not built yet**.
+
+### The seed is filtered
+
+Vanilla will happily spawn you in open ocean with no route at all. The
+pool only admits seeds with a real opening, and every seed is one of
+five types — village, desert temple, ruined portal, shipwreck, buried
+treasure. You are told the type before the world loads. You are not
+told the layout.
+
+The structure is close, measured from your **actual world spawn** and
+not from the origin — Minecraft's spawn search routinely lands a few
+hundred blocks out, and measuring from the origin passes seeds whose
+"nearby" village is a long walk:
+
+| Type | Structure within |
+|---|---|
+| Ruined portal | 3 chunks |
+| Shipwreck | 4 chunks |
+| Desert temple, buried treasure | 5 chunks |
+| Village | 7 chunks |
+
+Also filtered: real wood near spawn — counted as actual logs in the
+generated world, not a wooded biome clipping the search radius and not
+a shipwreck's own submerged hull; a river within 6 chunks on village
+and temple seeds, for boat routing; and a blacksmith whose chest
+genuinely generated. Villages qualify on what they contain rather than
+which biome they sit in, so all five variants are eligible.
+
+The five types are dealt in even proportion, and you will never be
+given a seed you have played before.
+
+**The overworld and the nether are seeded independently.** You cannot
+infer nether structure positions from overworld terrain — Divine Travel
+does not work here, deliberately.
+
+### The nether is guaranteed too
+
+- A **bastion within 14 chunks of nether spawn**, and unambiguous: at
+  least 10 chunks clearer than the next nearest one, so which bastion
+  was meant is never what decides a match
+- A **fortress within 16 chunks of that bastion** — not of spawn. The
+  leg that matters is the second one, because the route is spawn →
+  bastion → fortress
+- All four bastion types are eligible. The type is recorded, not
+  filtered out
+- Your arrival is never in Basalt Deltas, and if it would put you on a
+  sliver of netherrack over open lava, a small pad is placed
+
+Not built: nothing checks that the terrain **between** spawn, bastion
+and fortress is walkable. You can be walled off and have to route
+around it.
+
+### Ruined portals are completable
+
+Vanilla ruined portals are often unrunnable — twelve obsidian lying
+flat on the ground, or a frame buried under terrain. Ruined portal
+seeds are **filtered, not built**: the portal is the seed's own vanilla
+one, and to qualify it must be
+
+- a vertical frame at least 4 wide by 5 tall, of real obsidian,
+- missing at most 2 non-corner blocks (a portal lights without its
+  corners),
+- with no crying obsidian in a slot you would have to fill — clearing
+  that needs a diamond pickaxe, which is not on the route,
+- at least partly above ground and not submerged,
+- and it must have a chest, because the missing obsidian, the light
+  source and the iron are all guaranteed *into* that chest.
+
+If the seed's own portal fails verification at world creation, one is
+placed instead. Lava and water for the bucket route are placed either
+way, so both routes are always open.
+
+Known gap: **shipwrecks get no equivalent check.** One was dealt
+entombed under terrain, with all three chests present and unreachable.
+A player's bad-seed vote found that, not our filters.
+
+### Chest loot has a floor
+
+Vanilla loot tables spread wide enough that the same seed type can be a
+comfortable opening or a dead run. So the roll happens normally and
+only the **shortfall is topped up**. A seed that rolls well keeps its
+good roll, so there is still a spread above the floor and a reason to
+read what you actually found.
+
+| Where | Guaranteed |
+|---|---|
+| Village smith | 3 iron, plus the golem's 4 — or 4 iron and 3 diamonds |
+| Desert temple | 7 iron, 52 hunger points of food |
+| Ruined portal | 27 nuggets — three ingots, exactly a bucket — and 2–4 obsidian, varying by seed |
+| Shipwreck, buried treasure | 7 iron equivalent, 88 hunger points of food |
+| Bastion, across all its chests | 3 iron, 5 obsidian, 48–64 string — four to five beds |
+
+Iron is counted in the unit the route cares about: ingots at a village,
+nuggets at a ruined portal, both together on the ocean routes. Food is
+counted in **hunger points, not items**, because thirteen rotten flesh
+is not thirteen meals. Iron golems always drop 4.
+
+Top-ups are deterministic — same container, same slot, both players.
+
+Not guaranteed yet: a temple's **string and sand**. Both are route
+material rather than junk — string is wool is beds, and sand is how you
+get out of the pit the chests sit in.
+
+### Placed, not found
+
+Searching for a seed that satisfies everything a route needs at once is
+not affordable, so the seed supplies the structure and the mod supplies
+the rest. Both players get identical worlds; neither gets a vanilla one.
+
+- **Lava pools** about two chunks out on village and temple seeds —
+  three of them, to cast a portal from
+- **A portal frame**, when the seed's own one does not pass
+- **A shipwreck's three chests**, when vanilla generated a half-wreck
+  holding one
+- **A nether arrival pad**, only when the arrival is otherwise
+  unstandable
+- **No hostile mobs or bats inside the opening structure**, so they do
+  not pollute a pie-ray reading
+
+Ocean seeds are checked rather than built: two magma ravines within 10
+chunks, with the bubble columns that make them findable in the first
+place.
+
+### Rolls both players share
+
+These still vary — you cannot predict them — but both players get the
+same sequence, so one runner cannot take seven blaze rods while the
+other takes three.
+
+- **Blaze rods**, on a fixed per-match sequence with a pity floor
+- **Piglin barters**, fixed per trade index, with obsidian and pearls
+  guaranteed over a window of trades
+- **Hoglin drops**, on a fixed per-match sequence
+- **Flint from gravel**, two per twenty breaks — vanilla's rate without
+  vanilla's tail, so the first piece arrives inside ten
+
+These only apply to kills the game credits to a player. A hoglin that
+burns to death unseen falls through to vanilla rolls, which is a real
+hole: cooking hoglins is legitimate, and a cook gets vanilla variance
+while a melee kill gets the schedule.
+
+### Rolls fixed outright
+
 - Shearing a sheep always gives 3 wool
 - Thrown eyes of ender never break
+- Dead bushes always drop 2 sticks
+- Spawner timing and position are seed-deterministic, rather than drawn
+  from the single `Random` the whole world shares — two players on one
+  seed diverge the moment anything else touches it
+
+### Hazards removed
+
+Each of these can end a run that was otherwise identical to the
+opponent's, with no skill component on either side.
+
 - Ender pearls never spawn endermites
-- Piglin bartering guarantees obsidian and pearls over a window of
-  trades
-- Blaze spawner timing is deterministic per spawner rather than being
-  pulled from shared world randomness
+- Drowned never hold tridents
+- Suspicious stew has its harmful effects stripped
+- Wither skeletons cannot crowd past a cap, so they cannot wall a
+  corridor
+
+### The pack, and your other mods
+
+The download is one file. `alt-<version>.mrpack` carries the `alt` mod
+and Fabric API embedded rather than fetched, and your launcher installs
+Minecraft and the Fabric loader itself — so nobody picks a loader
+version and nobody can pick the wrong one. On the official Minecraft
+launcher, which cannot import a pack, you place the same two jars by
+hand.
+
+**The versions are exact, not minimums**: 1.16.1, one Fabric loader
+build, one Fabric API build. [INSTALL.md](INSTALL.md) says why each one
+is pinned.
+
+Nothing else is bundled.
+
+**Any mod not listed below is not legal in a match.** That is a
+whitelist, and it is deliberate: a banned list is a list of the cheats
+somebody already thought of, and it leaves a runner unable to tell
+whether the thing they just installed is on it. The principle behind the
+list is the thing to argue with — a mod is legal if it changes how the
+game is *drawn* or how fast it runs, and not legal if it changes game
+state, reveals information the seed did not give you, or automates
+input.
+
+| Legal alongside `alt` | What it does |
+|---|---|
+| Sodium, Lithium, Starlight | performance and rendering; no game state, no world information |
+| SpeedRunIGT | timing and splits |
+| Fairplay-style pack validators | prove a resource pack is not showing you what vanilla hides |
+
+Explicitly not legal: macros, autoclickers, input-altering scripts, and
+anything that surfaces world information — seed readers, structure or
+ore locators, entity outlines through terrain, a map of a chunk you have
+not seen. Those are the run, not the graphics.
+
+**To get something added, [open an issue](../../issues/new).** You get an
+answer in public with a reason, and the list either changes or it does
+not. A list nobody can petition is just an allowlist with better
+manners, which is the thing this project exists to object to.
+
+**Enforcement is not built.** Nothing reads your mod list, there is no
+attestation and no `ModCheck` equivalent here, so today this rule rests
+on the same thing everything else rests on: the position timeline, the
+split record, and a human looking when the two do not agree. Published
+anyway — knowing where the line is has to come before anyone is measured
+against it.
+
+**None of the listed mods has been run alongside `alt` yet.**
+SpeedRunIGT is the one to watch: `alt` keeps its own match clock and
+reports splits to the backend, and two timers disagreeing in front of a
+disputed match is worth finding now rather than then. If you run one of
+these and something breaks, that is a bug report we want.
+
+Resource packs are yours, with one limit: **fullbright packs, anything
+pushing brightness past 5.0, and anything altering shadow rendering are
+not permitted** — nor is anything that makes blocks see-through or
+otherwise shows you what vanilla hides. The brightness slider is
+unlocked in the mod instead, which is the sanctioned way to get the same
+thing — see [Recommended settings](#recommended-settings).
 
 ---
 
