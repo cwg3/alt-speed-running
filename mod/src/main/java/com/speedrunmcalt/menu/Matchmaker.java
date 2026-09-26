@@ -31,7 +31,6 @@ public final class Matchmaker {
 	 * something that is not a match. One flag, set in one place.
 	 */
 	private static volatile String paceLabel;
-	private static volatile boolean paceUsedFreshSeed;
 	private static volatile long searchStartMillis;
 	// Bumped on cancel so an in-flight search thread knows to stop
 	// without needing to interrupt it mid-request.
@@ -113,8 +112,7 @@ public final class Matchmaker {
 		// fires the next thing on screen says MATCH FOUND: the overlay
 		// in a world, this screen in a menu.
 		if (waited == 0 && client.world == null) {
-			client.openScreen(new MatchFoundScreen(
-					opponent, match.paceLabel, match.usedFreshSeed));
+			client.openScreen(new MatchFoundScreen(opponent, match.paceLabel));
 		}
 
 		if (waited == 0 && client.world != null && client.inGameHud != null) {
@@ -229,10 +227,6 @@ public final class Matchmaker {
 		return paceLabel;
 	}
 
-	/** Whether the pace cost a world this player had never seen. */
-	public static boolean paceUsedFreshSeed() {
-		return paceUsedFreshSeed;
-	}
 
 	public static long searchSeconds() {
 		return state == State.SEARCHING
@@ -286,12 +280,11 @@ public final class Matchmaker {
 				}
 				opponent = result.opponentUsername;
 				paceLabel = result.paceLabel;
-				paceUsedFreshSeed = result.usedFreshSeed;
 				state = State.LAUNCHING;
 				Cues.matchFound();
 				SpeedrunMcAlt.LOGGER.info(
-						"[speedrunmcalt] Racing pace {} - matchId={} type={} freshSeed={}",
-						result.paceLabel, result.matchId, result.seedType, result.usedFreshSeed);
+						"[speedrunmcalt] Racing pace {} - matchId={} type={}",
+						result.paceLabel, result.matchId, result.seedType);
 				pendingToken = token;
 				waited = 0;
 				pending = result;

@@ -49,15 +49,6 @@ public final class QueueJoinResult {
 	 * rather than a separate boolean that could disagree with it.
 	 */
 	public final String paceLabel;
-	/**
-	 * A paced match had to spend a world this player had never seen.
-	 *
-	 * Worth telling them: a fresh seed is one fewer world they can ever
-	 * be dealt in a ranked match. False means it reused one they already
-	 * knew, which costs nothing.
-	 */
-	public final boolean usedFreshSeed;
-
 	/** True when the opponent is a pace rather than a person. */
 	public boolean isPace() {
 		return paceLabel != null;
@@ -67,9 +58,8 @@ public final class QueueJoinResult {
 			long overworldSeed, long netherSeed, String seedType,
 			int structureX, int structureZ, String bastionType,
 			int bastionX, int bastionZ, int smithX, int smithZ,
-			boolean runAlreadyStarted, String paceLabel, boolean usedFreshSeed) {
+			boolean runAlreadyStarted, String paceLabel) {
 		this.paceLabel = paceLabel;
-		this.usedFreshSeed = usedFreshSeed;
 		this.matched = matched;
 		this.matchId = matchId;
 		this.opponentUsername = opponentUsername;
@@ -88,7 +78,7 @@ public final class QueueJoinResult {
 
 	public static QueueJoinResult waiting() {
 		return new QueueJoinResult(false, null, null, 0, 0, null, 0, 0, null, 0, 0, 0, 0,
-				false, null, false);
+				false, null);
 	}
 
 	public static QueueJoinResult matched(String matchId, String opponentUsername,
@@ -98,7 +88,7 @@ public final class QueueJoinResult {
 			boolean runAlreadyStarted) {
 		return matched(matchId, opponentUsername, overworldSeed, netherSeed, seedType,
 				structureX, structureZ, bastionType, bastionX, bastionZ, smithX, smithZ,
-				runAlreadyStarted, null, false);
+				runAlreadyStarted, null);
 	}
 
 	/**
@@ -113,9 +103,9 @@ public final class QueueJoinResult {
 			long overworldSeed, long netherSeed, String seedType,
 			int structureX, int structureZ, String bastionType,
 			int bastionX, int bastionZ, int smithX, int smithZ,
-			boolean runAlreadyStarted, String paceLabel, boolean usedFreshSeed) {
+			boolean runAlreadyStarted, String paceLabel) {
 		return new QueueJoinResult(true, matchId, opponentUsername, overworldSeed, netherSeed,
 				seedType, structureX, structureZ, bastionType, bastionX, bastionZ,
-				smithX, smithZ, runAlreadyStarted, paceLabel, usedFreshSeed);
+				smithX, smithZ, runAlreadyStarted, paceLabel);
 	}
 }

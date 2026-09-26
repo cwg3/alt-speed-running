@@ -94,21 +94,19 @@ public class RacePaceScreen extends Screen {
 				new LiteralText("A time to beat, for when nobody is queued."),
 				cx, this.height / 2 - 48, Palette.DIM);
 
-		// ONE line of caveat, not three.
+		// ONE line, carrying all three things a player should know before
+		// choosing rather than after.
 		//
 		// This started as three, and four lines of identical grey read as
 		// a block - which is precisely how a player skips them. These
 		// exist to be read BEFORE committing rather than discovered
 		// afterwards, so saying less is what makes them work.
 		//
-		// The two facts kept are the two a player could feel misled by:
-		// that nothing is at stake, and that a pace does not vary. The
-		// third - that it prefers a world you already know - moved to
-		// MatchFoundScreen, which says it only when it is NOT true and a
-		// seed is actually being spent. A reassurance shown every time is
-		// noise; a cost shown when it is incurred is information.
+		// The seed cost belongs HERE, before the button is pressed - a
+		// paced world is one this player can then never be dealt in a
+		// ranked match, and that is a decision, not a notification.
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("Nothing is rated. A pace runs the same splits every time."),
+				new LiteralText("Nothing is rated. A pace repeats its splits, and it spends a seed."),
 				cx, this.height / 2 + 4, Palette.DIM);
 
 		super.render(matrices, mouseX, mouseY, delta);

@@ -1232,37 +1232,42 @@ guard had to land first. It also protects the point of the project: a
 transparent rating is the differentiator, and a rating that partly
 reflects beating a bot is not one.
 
-**2. A seed raced in ANY mode is never dealt to that player again.**
-This is the invariant, and it is not new - `queueJoin.ts` records
-seenSeeds when the pair is CLAIMED, before the match row exists, so a
-player who quits thirty seconds in has still spent the seed. Race a Pace
-changes nothing about it and must not be allowed to: **a paced match has
-to be created through that same record-first path.** The exploit if it
-is not is precise and severe - rehearse a world against a pace, abandon,
-then be dealt that world in a ranked match against somebody seeing it
-for the first time. Whoever builds this should treat "does it record at
-deal time" as the first test, not the last.
+**2. A seed raced in ANY mode is never dealt to that player again, and
+practice draws a seed like everything else.**
 
-State it as an invariant rather than as a property of the draw, because
-the draw is a policy and policies get revised. The fairness guarantee
-must not depend on which pool practice happens to pull from.
+An earlier draft of this section had practice PREFER a world the player
+had already played, on the grounds that it leaks nothing and costs no new
+seeds. It was wrong twice over, and both reasons are worth keeping
+written down.
 
-**Which pool it pulls from is then a COST decision, not a safety one.**
-Already-seen first, because it is free: nothing leaks, no new seeds are
-consumed, and rehearsing a known world is what practice actually is.
+**This is a RANDOM SEED ladder.** The skill is reacting to a world nobody
+has seen. A world the player already knows does not train that - they
+know the village, the bastion, the route - so it is set-seed practice,
+a different discipline. Worse, the pace itself stops meaning anything: a
+time set on an unknown world is not a target when it is raced against a
+memorised one. The cheap option was cheap because it was worthless.
 
-**But already-seen ONLY does not work, and an earlier draft of this
-section said it did.** A player who has seen nothing has nothing to
-practice on - and that is a NEW player, with nobody to queue against,
-which is the exact person this feature exists for. The rule as written
-made the feature unavailable precisely when it is needed most.
+**And the never-twice rule was never about ratings.** It exists so nobody
+arrives at a world they have already learned. Rating is what makes
+breaking it unfair; it is not what makes it wrong. Carving an exception
+wherever nothing is at stake is how a rule becomes a habit instead of a
+rule.
 
-So: **prefer a seed they have seen, fall back to a fresh one.** The
-fallback is safe because of the invariant above rather than because of
-the draw, which is the whole reason the invariant is stated separately.
-It costs a seed from their lifetime budget, and for somebody who has
-played nothing that budget is entirely intact. Availability then grows
-as they play and the fallback stops being reached.
+So Race a Pace draws through the same call as ranked, with one uuid
+instead of two, and there is no second implementation to drift. The seed
+is recorded as seen when it is CLAIMED, before the match row exists, so
+loading a paced world and quitting still spends it.
+
+**The cost is real and the answer is a deeper pool, not an exception.**
+Every paced race permanently spends one of that player's worlds, so
+somebody practising hard burns their own ranked supply. That is an
+argument for raising the floor as practice picks up - which the top-up's
+demand trigger already measures, because it counts unseen seeds per
+active player rather than pool depth.
+
+Deliberately not built, and noted so it is not reinvented by accident: a
+set-seed practice mode, where replaying a known world is the POINT rather
+than a shortcut. That is a real feature and a different one.
 
 **3. Do NOT invent the rating-to-pace curve.** Scaling the bot's pace to
 the player is the best part of the idea and the part with no data behind

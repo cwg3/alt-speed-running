@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { randomUUID } from 'crypto';
 import { resolveSessionToken } from './lib/auth';
-import { claimSeedForPractice, isSyntheticPlayer, recordSeedsSeen } from './lib/seedPool';
+import { claimSeedPair, isSyntheticPlayer, recordSeedsSeen } from './lib/seedPool';
 import { PACE_TIERS, paceFinishMs, scheduleForTier, tierById } from './lib/paceSchedule';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
@@ -50,10 +50,16 @@ if (!isSyntheticPlayer(PACE_UUID)) {
  * withholds Elo, season points and the W-L-F record. That guard exists
  * independently of this file and is asserted at load.
  *
- * IT CANNOT LAUNDER SEED KNOWLEDGE. The seed is recorded as seen BEFORE
- * the match row is written, exactly as the ranked path does. A player who
- * rehearses a world and quits has still spent it, so it can never come
- * back to them in a ranked match against somebody seeing it cold.
+ * IT SPENDS A SEED, LIKE ANY OTHER MATCH. The world is one the player has
+ * never played, drawn by the same call ranked uses, and recorded as seen
+ * BEFORE the match row is written. A player who loads it and quits has
+ * still spent it, so it can never come back to them against somebody
+ * seeing it cold.
+ *
+ * That cost is the point rather than a regret. This is a random-seed
+ * ladder: a world they already knew would not practise the skill, and a
+ * pace time set on an unknown world measures nothing when raced against
+ * a memorised one.
  */
 export const handler = async (
 	event: APIGatewayProxyEventV2,
@@ -135,8 +141,12 @@ export const handler = async (
 
 	const matchId = randomUUID();
 
-	const claim = await claimSeedForPractice(
-		SEED_POOL_TABLE_NAME, matchId, PLAYERS_TABLE_NAME, uuid);
+	// A seed this player has never played, exactly as a ranked match gets.
+	// A pace raced on a world they already know would not be practice for
+	// this ladder - the skill here is reacting to an unknown world, and a
+	// pace time set on one means nothing raced against a memorised one.
+	const claim = await claimSeedPair(
+		SEED_POOL_TABLE_NAME, matchId, PLAYERS_TABLE_NAME, [uuid]);
 	if (!claim.ok) {
 		return json(503, { error: 'no seed available', reason: claim.reason });
 	}
@@ -179,9 +189,6 @@ export const handler = async (
 			// player cannot read the result before they start.
 			paceSchedule: schedule,
 			paceFinishMs: paceFinishMs(schedule),
-			// Which of the player's own seeds this cost. False means it
-			// was a world they had already played, which is free.
-			paceUsedFreshSeed: claim.fresh,
 			worldSetupVersion: Number(player.Item.worldSetupVersion ?? 1),
 			seedPairId: pair.seedPairId,
 			overworldSeed: pair.overworldSeed,
@@ -230,9 +237,6 @@ export const handler = async (
 		exhibition: true,
 		paceTier: tier.id,
 		paceLabel: tier.label,
-		// Told plainly, because it cost them a world they can now never
-		// be dealt in a ranked match.
-		usedFreshSeed: claim.fresh,
 		worldSetupVersion: Number(player.Item.worldSetupVersion ?? 1),
 		seedPairId: pair.seedPairId,
 		overworldSeed: pair.overworldSeed,

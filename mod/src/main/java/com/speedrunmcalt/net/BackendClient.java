@@ -129,8 +129,7 @@ public final class BackendClient {
 				optInt(resp, "smithX", 0),
 				optInt(resp, "smithZ", 0),
 				false,
-				optString(resp, "paceLabel", "pace"),
-				resp.has("usedFreshSeed") && resp.get("usedFreshSeed").getAsBoolean());
+				optString(resp, "paceLabel", "pace"));
 	}
 
 	/** Tolerates a backend older than this client, and nulls in JSON. */
