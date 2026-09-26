@@ -72,7 +72,16 @@ public class MatchEndScreen extends Screen {
 		this.addButton(new ButtonWidget(cx - 100, y, 200, 20,
 				new LiteralText("Find another match"),
 				b -> this.client.openScreen(new AltMenuScreen(new TitleScreen()))));
+		// Straight to the picker, because the most likely reason somebody
+		// just raced a pace is that there was nobody to queue against -
+		// and that has not changed in the last ten minutes. Sending them
+		// back to the lobby to find the button again is a step that knows
+		// what they want and asks anyway.
 		this.addButton(new ButtonWidget(cx - 100, y + 26, 200, 20,
+				new LiteralText("Race a Pace"),
+				b -> this.client.openScreen(new com.speedrunmcalt.menu.RacePaceScreen(
+						new AltMenuScreen(new TitleScreen())))));
+		this.addButton(new ButtonWidget(cx - 100, y + 52, 200, 20,
 				new LiteralText("Back to title"),
 				b -> this.client.openScreen(new TitleScreen())));
 	}
@@ -116,7 +125,14 @@ public class MatchEndScreen extends Screen {
 		}
 		y += 12;
 
-		String theirs = opponentTimeMs == null ? "--:--" : MatchState.formatTime(opponentTimeMs);
+		// A PACE'S TIME IS NEVER UNKNOWN. It is the tier - that is what a
+		// pace IS - so "--:--" here was the screen forgetting the one
+		// opponent whose finish is fixed before the race starts. It fell
+		// back whenever the last poll had not landed the reveal, which is
+		// exactly when the match ended.
+		String theirs = paceLabel != null
+				? paceLabel
+				: opponentTimeMs == null ? "--:--" : MatchState.formatTime(opponentTimeMs);
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText("their time  " + theirs), cx, y, DIM);
 		y += 18;
