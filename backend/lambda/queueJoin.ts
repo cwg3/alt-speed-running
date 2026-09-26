@@ -133,6 +133,25 @@ export const handler = async (
 					// quitting during the countdown itself - and they do
 					// still get their planning time.
 					yourRunStartedAt: (existing.Item.runStarts ?? {})[uuid] ?? null,
+					// A REJOINED MATCH MAY BE A PACE, and has to say so.
+					//
+					// Rejoining an unfinished paced race is correct - the
+					// alternative is a player stranded on a match they
+					// cannot get back into. What was wrong is that this
+					// response carried none of what makes it a pace, so
+					// the client announced "MATCH FOUND vs Pace 17:00": a
+					// pace, dressed as a person, on a screen the player
+					// reached by pressing Find Match. They had chosen a
+					// pace earlier and left it pending; this handed it
+					// back as though the queue had found them an
+					// opponent.
+					...(existing.Item.paceLabel
+						? {
+							exhibition: true,
+							paceTier: existing.Item.paceTier ?? null,
+							paceLabel: existing.Item.paceLabel,
+						}
+						: {}),
 				}),
 			};
 		}

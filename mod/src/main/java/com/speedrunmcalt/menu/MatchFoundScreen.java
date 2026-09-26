@@ -63,9 +63,16 @@ public class MatchFoundScreen extends Screen {
 				cx / 2, (cy - 20) / 2, Palette.YELLOW);
 		matrices.pop();
 
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText(pace ? "target " + paceLabel : "vs " + opponent),
-				cx, cy + 6, Palette.YELLOW);
+		// Same rule as the end screen: yellow means a person, so a pace
+		// does not get it. Purple for the label, cyan for the time.
+		if (pace) {
+			Palette.drawCenteredSegments(matrices, this.textRenderer, cx, cy + 6,
+					new String[] { "target ", "Pace ", paceLabel },
+					new int[] { Palette.DIM, Palette.PURPLE, Palette.CYAN });
+		} else {
+			drawCenteredText(matrices, this.textRenderer,
+					new LiteralText("vs " + opponent), cx, cy + 6, Palette.YELLOW);
+		}
 		if (pace) {
 			// Said here, before the run, not in a results screen
 			// afterwards. A player should know what they are racing

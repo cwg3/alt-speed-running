@@ -94,13 +94,6 @@ public class RacePaceScreen extends Screen {
 				new LiteralText("A time to beat, for when nobody is queued."),
 				cx, this.height / 2 - 48, Palette.DIM);
 
-		// Shown ONLY while a search is running, so it is a consequence at
-		// the moment it applies rather than another permanent grey line.
-		if (Matchmaker.state() == Matchmaker.State.SEARCHING) {
-			drawCenteredText(matrices, this.textRenderer,
-					new LiteralText("Picking a pace will cancel your queue search."),
-					cx, this.height / 2 - 34, Palette.DIM);
-		}
 
 		// ONE line, carrying all three things a player should know before
 		// choosing rather than after.
@@ -116,6 +109,19 @@ public class RacePaceScreen extends Screen {
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText("Nothing is rated. A pace repeats its splits, and it spends a seed."),
 				cx, this.height / 2 + 4, Palette.DIM);
+
+		// Shown ONLY while a search is running, so it is a consequence at
+		// the moment it applies rather than another permanent grey line.
+		//
+		// BELOW the caveat, not above the tiers. Sitting at -34 it drew
+		// into the top of the button row - the row starts at -30 and a
+		// line of text is taller than the four pixels that left. The gap
+		// between here and Back is the only real space on the screen.
+		if (Matchmaker.state() == Matchmaker.State.SEARCHING) {
+			drawCenteredText(matrices, this.textRenderer,
+					new LiteralText("Picking a pace will cancel your queue search."),
+					cx, this.height / 2 + 18, Palette.DIM);
+		}
 
 		super.render(matrices, mouseX, mouseY, delta);
 	}

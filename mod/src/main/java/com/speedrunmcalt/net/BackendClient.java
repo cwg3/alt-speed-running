@@ -96,7 +96,11 @@ public final class BackendClient {
 				optInt(resp, "bastionZ", 0),
 				optInt(resp, "smithX", 0),
 				optInt(resp, "smithZ", 0),
-				resp.has("yourRunStartedAt") && !resp.get("yourRunStartedAt").isJsonNull());
+				resp.has("yourRunStartedAt") && !resp.get("yourRunStartedAt").isJsonNull(),
+				// Null unless this is a rejoin of a paced match, in which
+				// case the whole client labels it as a pace rather than
+				// announcing a person called "Pace 17:00".
+				optString(resp, "paceLabel", null));
 	}
 
 	/**

@@ -129,8 +129,11 @@ public final class Matchmaker {
 					// status message look like branding.
 					new net.minecraft.text.LiteralText(heading).styled(
 							st -> st.withColor(net.minecraft.text.TextColor.fromRgb(Palette.YELLOW))),
+					// Cyan for a pace, yellow for a person - the in-world
+					// title follows the same rule as the screens.
 					new net.minecraft.text.LiteralText(sub).styled(
-							st -> st.withColor(net.minecraft.text.TextColor.fromRgb(Palette.YELLOW))),
+							st -> st.withColor(net.minecraft.text.TextColor.fromRgb(
+									match.isPace() ? Palette.CYAN : Palette.YELLOW))),
 					0, CHIME_TICKS, 10);
 		}
 
@@ -349,12 +352,18 @@ public final class Matchmaker {
 				}
 
 				opponent = result.opponentUsername;
+				// Set from the RESULT, both ways. A queue join can return
+				// a rejoined paced match, so this is not always null - and
+				// leaving it alone let a label from an earlier pace sit
+				// here stale across an ordinary search.
+				paceLabel = result.paceLabel;
 				state = State.LAUNCHING;
 				Cues.matchFound();
 				SpeedrunMcAlt.LOGGER.info(
-						"[speedrunmcalt] Matched vs {} - matchId={} type={} structure={},{} "
+						"[speedrunmcalt] Matched vs {}{} - matchId={} type={} structure={},{} "
 								+ "bastion={}@{},{} overworldSeed={} netherSeed={}",
-						result.opponentUsername, result.matchId, result.seedType,
+						result.opponentUsername, result.isPace() ? " (REJOINED PACE)" : "",
+						result.matchId, result.seedType,
 						result.structureX, result.structureZ, result.bastionType,
 						result.bastionX, result.bastionZ,
 						result.overworldSeed, result.netherSeed);

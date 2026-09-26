@@ -99,12 +99,25 @@ public class MatchEndScreen extends Screen {
 		// Same treatment as the HUD and the menu: "vs" recedes, the
 		// name is yellow. Player names are yellow everywhere.
 		// "vs Pace 10:00" reads as a person with a peculiar name. A pace
-		// is a target, so it gets the word that describes it.
-		com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer, cx, y,
-				new String[] {
-					paceLabel != null ? "target " : "vs ",
-					opponent == null ? "opponent" : opponent },
-				new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW });
+		// is a target, so it gets the word that describes it - and NOT
+		// the colour that means a person.
+		//
+		// Yellow is the player-name colour everywhere in this mod, so
+		// spending it on a pace says "a human called Pace 10:00" in
+		// exactly the way the wording is careful not to. Purple is what
+		// labels already wear here (split names, seed type), and cyan is
+		// what times wear - "your time" above is cyan too. So the line
+		// ends up with no yellow on it at all, which is the point.
+		if (paceLabel != null) {
+			com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer, cx, y,
+					new String[] { "target ", "Pace ", paceLabel },
+					new int[] { DIM, com.speedrunmcalt.menu.Palette.PURPLE,
+						com.speedrunmcalt.menu.Palette.CYAN });
+		} else {
+			com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer, cx, y,
+					new String[] { "vs ", opponent == null ? "opponent" : opponent },
+					new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW });
+		}
 		y += 18;
 
 		// A LOSS IS USUALLY NOT A SLOWER FINISH - it is no finish at all.
