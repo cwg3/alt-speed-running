@@ -120,6 +120,16 @@ newest_since_launch() {
     | sort | tail -1
 }
 
+# mod/run is gitignored, so it does not exist in a fresh clone - and the
+# joins below write into it with pathlib, which does not create parent
+# directories. A cloud runner completed every check and then threw
+# FileNotFoundError writing pairs-all.csv. Third time a gitignored
+# directory has broken this pipeline on a clean machine, after
+# seed-filter/output and the seedtypes binary; the fix is the same each
+# time and belongs wherever the pipeline WRITES, not wherever it happens
+# to have been noticed.
+mkdir -p "$ROOT/mod/run"
+
 echo "=== collecting held rows ==="
 aws dynamodb scan --region "$REGION" --table-name "$TABLE" --output json \
   | python3 -c "

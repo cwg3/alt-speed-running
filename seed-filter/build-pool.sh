@@ -58,6 +58,16 @@ source "$ROOT/seed-filter/run-check.sh"
 # rebuild.
 CANDIDATES=$((PER_TYPE * 12))
 
+# mod/run is gitignored, so it does not exist in a fresh clone - and the
+# joins below write into it with pathlib, which does not create parent
+# directories. A cloud runner completed every check and then threw
+# FileNotFoundError writing pairs-all.csv. Third time a gitignored
+# directory has broken this pipeline on a clean machine, after
+# seed-filter/output and the seedtypes binary; the fix is the same each
+# time and belongs wherever the pipeline WRITES, not wherever it happens
+# to have been noticed.
+mkdir -p "$ROOT/mod/run"
+
 echo "=== cubiomes: $CANDIDATES candidates per type ==="
 cd "$ROOT/seed-filter"
 ./seedtypes "$CANDIDATES" 2>&1 | grep -E "Start seed|Scanned|village|desert|ruined|shipwreck|buried|nether"
