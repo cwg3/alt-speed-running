@@ -1197,7 +1197,7 @@ Recorded because the alternative is re-investigating it: the first two
 metrics tried here - fill fraction and roof exposure - both measured
 something other than the reported experience.
 
-## Racing a bot
+## Race a Pace
 
 NOT BUILT. This section is the design, written down before any code,
 because the feature is big enough that discovering these decisions in
@@ -1274,30 +1274,85 @@ graceful failure: an invocation that dies mid-race leaves a ghost frozen
 in place.
 
 Step Functions removes the cap - a Wait state per split, no duration
-limit, a few state transitions per race. But the better observation is
-that none of this is needed, because **a pace is data, not a process.**
-The bot's entire run is a list of split timestamps. Compute them when
-the match is created, store them on the match row, and let the client
-render the ghost from that schedule. Nothing has to be running anywhere
-for the duration. The only reason `pace-bot.sh` posts splits over time
-is that it is impersonating a client in order to test the server; a
-product bot has no such need.
+limit, a few state transitions per race. But none of it is needed,
+because **a pace is data, not a process.** The bot's whole run is a list
+of split timestamps. Work them out when the match is created and store
+them on the match row. Nothing has to be running anywhere for the
+duration. The only reason `pace-bot.sh` posts splits over time is that
+it is impersonating a client in order to test the server, and a product
+bot has no such need.
 
-Consequence worth accepting deliberately: a client-rendered ghost means
-the player could read their opponent's whole schedule. For an unrated
-exhibition that is closer to a feature than a leak - it is a target
-time - but it does mean the suspense is cosmetic, and that should be
-admitted in the UI rather than discovered.
+### Do not hand the client the whole schedule
+
+Storing the run as data raises an obvious question: if the client is
+given that list up front, the player can read it and knows the result
+before they start.
+
+**It does not have to be given.** `liveMatch.ts` already answers a poll
+with the opponent's splits, which is how the in-game progress display
+works. Serve the bot's splits from the stored schedule filtered by
+elapsed time - reveal a split once its moment has passed, and not
+before. The client learns the bot's progress exactly as it would a
+human's, the server still runs no process, and there is nothing to read
+ahead. This costs a comparison in an endpoint that already exists.
+
+### The ghost must be able to have a bad run
+
+A fixed schedule has a second problem, separate from readability, and it
+is the one players would actually notice. If the bot runs the same
+times every race, it cannot get a bad blind travel, cannot die, cannot
+choke the dragon. It hits its mark every time and the only thing that
+varies in the match is the player. After a few races that is obvious,
+and an opponent that is obviously a recording stops being an opponent.
+
+So **the schedule is drawn fresh per match, not fixed per tier.** Two
+races at the same tier should not look alike.
+
+The lazy way to do that is to add noise around a target time, which
+means choosing a variance - a second invented number, on top of the
+pace curve decision 3 already refuses to guess. The better way follows
+from that same decision: **sample an actual recorded run** from the
+right rating band and play back its real splits. Real runs already
+contain realistic variance, including bad ones, so the distribution
+comes from measurement rather than from a parameter somebody picked.
+It also keeps the bot honest - it is running a real run a real player
+did, not a curve.
+
+Until enough runs exist to sample from, a named tier has to stand in,
+and while it does the bot WILL be repetitive. That is a reason to label
+it as a pace target rather than dress it up as a rival - which the
+feature's own name already does - and a reason not to ship it wide
+before there is something to sample.
+
+Not solved by any of this: a sampled run came from a different seed, so
+its times are not strictly commensurable with a run on this one.
+Sampling within the same opening type narrows the gap; it does not close
+it. Practice comparisons are indicative, not exact, and the UI should
+not imply otherwise.
+
+### The name is the disclosure
+
+**Race a Pace**, not "race a bot" and not "MATCH FOUND". The name says
+what the thing is: the player is racing a pace, and a pace is a time to
+beat rather than a person who might slip. Every honesty problem in this
+section - a readable schedule, a repetitive tier, times sampled from
+another seed - gets easier when the feature never claimed to be an
+opponent in the first place. A label in the title does work that a
+disclaimer in a settings menu does not.
+
+It follows that the surface should talk about a TARGET, show the pace's
+tier and its time, and not borrow the queue's language for finding a
+human.
 
 ### Two rules for the surrounding behaviour
 
-**Offer the bot only after the live queue has actually failed.** If it is
-instantly available it will out-compete waiting a couple of minutes for
-a human, and a ladder where everyone races bots has no ladder.
+**Offer it only after the live queue has actually failed.** If a pace is
+instantly available it will out-compete waiting a couple of minutes for a
+human, and a ladder where everyone races paces has no ladder.
 
-**A bot match must never be mistakable for a human one** - in the match
-screen, in history, in replays, in any shared result. The exhibition
-flag is stored on the match precisely so no surface has to infer it.
+**A paced match must never be mistakable for a human one** - in the match
+screen, in history, in replays, in any shared result. The exhibition flag
+is stored on the match precisely so no surface has to infer it.
 
 ### Open questions
 
