@@ -29,11 +29,26 @@ public class MatchEndScreen extends Screen {
 	private final long myTimeMs;
 	private final Long opponentTimeMs;
 	private final Integer ratingDelta;
+	/**
+	 * Captured at construction, NOT read from MatchState at render time.
+	 *
+	 * MatchEnd opens this screen and then calls MatchState.reset() in its
+	 * finally block, which runs long before the first frame - so reading
+	 * the field live gave null every time and quietly restored the very
+	 * "rating +0" line this exists to remove.
+	 */
+	private final String paceLabel;
 	private final Integer seasonPoints;
 
 	public MatchEndScreen(boolean won, String opponent, long myTimeMs, Long opponentTimeMs,
 			Integer ratingDelta, Integer seasonPoints) {
+		this(won, opponent, myTimeMs, opponentTimeMs, ratingDelta, seasonPoints, null);
+	}
+
+	public MatchEndScreen(boolean won, String opponent, long myTimeMs, Long opponentTimeMs,
+			Integer ratingDelta, Integer seasonPoints, String paceLabel) {
 		super(new LiteralText(won ? "Victory" : "Defeat"));
+		this.paceLabel = paceLabel;
 		this.won = won;
 		this.opponent = opponent;
 		this.myTimeMs = myTimeMs;
@@ -66,8 +81,12 @@ public class MatchEndScreen extends Screen {
 
 		// Same treatment as the HUD and the menu: "vs" recedes, the
 		// name is yellow. Player names are yellow everywhere.
+		// "vs Pace 10:00" reads as a person with a peculiar name. A pace
+		// is a target, so it gets the word that describes it.
 		com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer, cx, y,
-				new String[] { "vs ", opponent == null ? "opponent" : opponent },
+				new String[] {
+					paceLabel != null ? "target " : "vs ",
+					opponent == null ? "opponent" : opponent },
 				new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW });
 		y += 18;
 
@@ -80,7 +99,22 @@ public class MatchEndScreen extends Screen {
 				new LiteralText("their time  " + theirs), cx, y, DIM);
 		y += 18;
 
-		if (ratingDelta != null) {
+		// AN EXHIBITION HAS NO RATING LINE.
+		//
+		// "rating +0" is not a harmless way to say "unrated" - it reads
+		// as a rating that was worked out and happened not to move, which
+		// is a different and untrue statement. A pace scores nothing at
+		// all: no Elo, no season points, no W-L-F. Say that.
+		String pace = paceLabel;
+		if (pace != null) {
+			drawCenteredText(matrices, this.textRenderer,
+					new LiteralText(won ? "you beat the " + pace + " pace"
+							: "you did not beat the " + pace + " pace"),
+					cx, y, won ? WIN : LOSS);
+			y += 12;
+			drawCenteredText(matrices, this.textRenderer,
+					new LiteralText("nothing rated - practice only"), cx, y, DIM);
+		} else if (ratingDelta != null) {
 			String line = "rating  " + (ratingDelta >= 0 ? "+" : "") + ratingDelta;
 			if (seasonPoints != null && seasonPoints > 0) {
 				line += "    season  +" + seasonPoints;

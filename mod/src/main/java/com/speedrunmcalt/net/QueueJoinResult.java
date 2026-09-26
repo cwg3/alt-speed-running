@@ -42,12 +42,34 @@ public final class QueueJoinResult {
 	 * beats the player to their first playable tick.
 	 */
 	public final boolean runAlreadyStarted;
+	/**
+	 * The pace's label - "10:00" - or null when this is a real match.
+	 *
+	 * Null is the test for "is this a pace" everywhere in the client,
+	 * rather than a separate boolean that could disagree with it.
+	 */
+	public final String paceLabel;
+	/**
+	 * A paced match had to spend a world this player had never seen.
+	 *
+	 * Worth telling them: a fresh seed is one fewer world they can ever
+	 * be dealt in a ranked match. False means it reused one they already
+	 * knew, which costs nothing.
+	 */
+	public final boolean usedFreshSeed;
+
+	/** True when the opponent is a pace rather than a person. */
+	public boolean isPace() {
+		return paceLabel != null;
+	}
 
 	private QueueJoinResult(boolean matched, String matchId, String opponentUsername,
 			long overworldSeed, long netherSeed, String seedType,
 			int structureX, int structureZ, String bastionType,
 			int bastionX, int bastionZ, int smithX, int smithZ,
-			boolean runAlreadyStarted) {
+			boolean runAlreadyStarted, String paceLabel, boolean usedFreshSeed) {
+		this.paceLabel = paceLabel;
+		this.usedFreshSeed = usedFreshSeed;
 		this.matched = matched;
 		this.matchId = matchId;
 		this.opponentUsername = opponentUsername;
@@ -65,7 +87,8 @@ public final class QueueJoinResult {
 	}
 
 	public static QueueJoinResult waiting() {
-		return new QueueJoinResult(false, null, null, 0, 0, null, 0, 0, null, 0, 0, 0, 0, false);
+		return new QueueJoinResult(false, null, null, 0, 0, null, 0, 0, null, 0, 0, 0, 0,
+				false, null, false);
 	}
 
 	public static QueueJoinResult matched(String matchId, String opponentUsername,
@@ -73,8 +96,26 @@ public final class QueueJoinResult {
 			int structureX, int structureZ, String bastionType,
 			int bastionX, int bastionZ, int smithX, int smithZ,
 			boolean runAlreadyStarted) {
+		return matched(matchId, opponentUsername, overworldSeed, netherSeed, seedType,
+				structureX, structureZ, bastionType, bastionX, bastionZ, smithX, smithZ,
+				runAlreadyStarted, null, false);
+	}
+
+	/**
+	 * The same match, plus what makes it a pace.
+	 *
+	 * An overload rather than two more parameters on the one above,
+	 * because that signature is already long enough that a caller
+	 * miscounting positions is a real risk, and every existing caller
+	 * means "not a pace".
+	 */
+	public static QueueJoinResult matched(String matchId, String opponentUsername,
+			long overworldSeed, long netherSeed, String seedType,
+			int structureX, int structureZ, String bastionType,
+			int bastionX, int bastionZ, int smithX, int smithZ,
+			boolean runAlreadyStarted, String paceLabel, boolean usedFreshSeed) {
 		return new QueueJoinResult(true, matchId, opponentUsername, overworldSeed, netherSeed,
 				seedType, structureX, structureZ, bastionType, bastionX, bastionZ,
-				smithX, smithZ, runAlreadyStarted);
+				smithX, smithZ, runAlreadyStarted, paceLabel, usedFreshSeed);
 	}
 }

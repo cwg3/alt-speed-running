@@ -50,8 +50,17 @@ public class AltMenuScreen extends Screen {
 				new LiteralText("Leaderboard"),
 				button -> this.client.openScreen(new LeaderboardScreen(this))));
 
+		// Below Matches/Leaderboard, above Back. Deliberately NOT beside
+		// Find Match and deliberately not automatic: a pace is offered
+		// and chosen, never substituted for an opponent the player asked
+		// for. The backend refuses it anyway while somebody is queued.
 		this.addButton(new ButtonWidget(
 				cx - 100, this.height / 2 + 70, 200, 20,
+				new LiteralText("Race a Pace"),
+				button -> this.client.openScreen(new RacePaceScreen(this))));
+
+		this.addButton(new ButtonWidget(
+				cx - 100, this.height / 2 + 98, 200, 20,
 				new LiteralText("Back"), button -> this.client.openScreen(parent)));
 
 		// Kick off the handshake on open so the player doesn't have to

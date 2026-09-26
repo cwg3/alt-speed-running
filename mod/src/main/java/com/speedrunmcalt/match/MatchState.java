@@ -29,6 +29,14 @@ public final class MatchState {
 	// from the queue response, consumed once by MatchWorldSetup when the
 	// integrated server starts. Null seedType means no setup is pending,
 	// which is what stops a practice world being modified.
+	/**
+	 * The pace being raced - "10:00" - or null for a real match.
+	 *
+	 * Lives here rather than only on the join result because the END
+	 * screen needs it, and by then the join result is long gone. Cleared
+	 * by reset() with everything else.
+	 */
+	public static volatile String paceLabel = null;
 	public static volatile String seedType = null;
 	public static volatile int structureX = 0;
 	public static volatile int structureZ = 0;
@@ -217,6 +225,7 @@ public final class MatchState {
 	}
 
 	public static void reset() {
+		paceLabel = null;
 		matchStartMillis = -1;
 		firstBarterLogged = false;
 		barterCount = 0;

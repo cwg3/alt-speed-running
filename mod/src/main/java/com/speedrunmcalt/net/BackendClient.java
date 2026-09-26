@@ -99,6 +99,40 @@ public final class BackendClient {
 				resp.has("yourRunStartedAt") && !resp.get("yourRunStartedAt").isJsonNull());
 	}
 
+	/**
+	 * Race a Pace: an opponent for when nobody is queued.
+	 *
+	 * Returns the same shape as joinQueue on purpose. The world is built
+	 * from a paced match exactly as from a real one, so Matchmaker has a
+	 * single path into a world rather than two that can drift.
+	 *
+	 * The backend refuses with a plain sentence rather than a code when
+	 * somebody IS queued - post() turns that into an IOException carrying
+	 * the message, which is already what the screens show.
+	 */
+	public static QueueJoinResult racePace(String sessionToken, String tierId) throws IOException {
+		JsonObject body = new JsonObject();
+		body.addProperty("tier", tierId);
+		JsonObject resp = post(API_BASE + "/matches/pace", body, sessionToken);
+		JsonObject opponent = resp.getAsJsonObject("opponent");
+		return QueueJoinResult.matched(
+				resp.get("matchId").getAsString(),
+				opponent.get("username").getAsString(),
+				resp.get("overworldSeed").getAsLong(),
+				resp.get("netherSeed").getAsLong(),
+				optString(resp, "seedType", "village"),
+				optInt(resp, "structureX", 0),
+				optInt(resp, "structureZ", 0),
+				optString(resp, "bastionType", null),
+				optInt(resp, "bastionX", 0),
+				optInt(resp, "bastionZ", 0),
+				optInt(resp, "smithX", 0),
+				optInt(resp, "smithZ", 0),
+				false,
+				optString(resp, "paceLabel", "pace"),
+				resp.has("usedFreshSeed") && resp.get("usedFreshSeed").getAsBoolean());
+	}
+
 	/** Tolerates a backend older than this client, and nulls in JSON. */
 	private static String optString(JsonObject obj, String key, String fallback) {
 		if (!obj.has(key) || obj.get(key).isJsonNull()) {

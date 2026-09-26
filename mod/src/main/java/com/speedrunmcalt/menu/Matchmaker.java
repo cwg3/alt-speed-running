@@ -24,6 +24,14 @@ public final class Matchmaker {
 	private static volatile State state = State.IDLE;
 	private static volatile String error;
 	private static volatile String opponent;
+	/**
+	 * The pace being raced, or null for a real match.
+	 *
+	 * Read by the screens so that nothing anywhere says MATCH FOUND for
+	 * something that is not a match. One flag, set in one place.
+	 */
+	private static volatile String paceLabel;
+	private static volatile boolean paceUsedFreshSeed;
 	private static volatile long searchStartMillis;
 	// Bumped on cancel so an in-flight search thread knows to stop
 	// without needing to interrupt it mid-request.
@@ -105,18 +113,24 @@ public final class Matchmaker {
 		// fires the next thing on screen says MATCH FOUND: the overlay
 		// in a world, this screen in a menu.
 		if (waited == 0 && client.world == null) {
-			client.openScreen(new MatchFoundScreen(opponent));
+			client.openScreen(new MatchFoundScreen(opponent, match.paceLabel));
 		}
 
 		if (waited == 0 && client.world != null && client.inGameHud != null) {
 			String vs = opponent == null ? "opponent" : opponent;
+			// A pace is not a match and must never be announced as one.
+			// "MATCH FOUND / vs Pace 10:00" would read as a person with
+			// an odd name, which is the exact misunderstanding the
+			// feature's own name exists to prevent.
+			String heading = match.isPace() ? "RACE A PACE" : "MATCH FOUND";
+			String sub = match.isPace() ? "target " + match.paceLabel : "vs " + vs;
 			client.inGameHud.setTitles(
 					// Yellow, not phosphor. The green belongs to the "alt"
 					// wordmark and nothing else - using it here made a
 					// status message look like branding.
-					new net.minecraft.text.LiteralText("MATCH FOUND").styled(
+					new net.minecraft.text.LiteralText(heading).styled(
 							st -> st.withColor(net.minecraft.text.TextColor.fromRgb(Palette.YELLOW))),
-					new net.minecraft.text.LiteralText("vs " + vs).styled(
+					new net.minecraft.text.LiteralText(sub).styled(
 							st -> st.withColor(net.minecraft.text.TextColor.fromRgb(Palette.YELLOW))),
 					0, CHIME_TICKS, 10);
 		}
@@ -160,6 +174,7 @@ public final class Matchmaker {
 			// about three seconds left - after the poll came back,
 			// rather than when the match was made.
 			MatchState.opponentUsername = match.opponentUsername;
+			MatchState.paceLabel = match.paceLabel;
 			MatchState.sessionToken = token;
 			// Deliberately NOT started here. MatchClock starts it on the
 			// first tick the player can actually play, so world
@@ -208,6 +223,16 @@ public final class Matchmaker {
 		return opponent;
 	}
 
+	/** The pace's label while one is being raced, else null. */
+	public static String paceLabel() {
+		return paceLabel;
+	}
+
+	/** Whether the pace cost a world this player had never seen. */
+	public static boolean paceUsedFreshSeed() {
+		return paceUsedFreshSeed;
+	}
+
 	public static long searchSeconds() {
 		return state == State.SEARCHING
 				? (System.currentTimeMillis() - searchStartMillis) / 1000
@@ -218,6 +243,70 @@ public final class Matchmaker {
 		searchGeneration++;
 		state = State.IDLE;
 		opponent = null;
+		paceLabel = null;
+	}
+
+	/**
+	 * Race a pace instead of a person.
+	 *
+	 * Deliberately NOT a fallback the client takes on its own after a
+	 * quiet queue. A pace is offered and chosen, never substituted - a
+	 * player who wanted an opponent and silently got a recording would
+	 * be right to feel misled, and the backend refuses this anyway while
+	 * anybody is queued.
+	 *
+	 * Shares the tick handler and therefore the whole world-entry path
+	 * with a real match. The only thing that differs is what the screens
+	 * are told to call it.
+	 */
+	public static void racePace(MinecraftClient client, String tierId) {
+		if (state == State.SEARCHING || state == State.LAUNCHING) {
+			return;
+		}
+		String token = AltSession.sessionToken();
+		if (token == null) {
+			error = "not connected";
+			state = State.ERROR;
+			return;
+		}
+
+		final int generation = ++searchGeneration;
+		state = State.SEARCHING;
+		error = null;
+		opponent = null;
+		paceLabel = null;
+		searchStartMillis = System.currentTimeMillis();
+
+		Thread thread = new Thread(() -> {
+			try {
+				QueueJoinResult result = BackendClient.racePace(token, tierId);
+				if (generation != searchGeneration) {
+					return;
+				}
+				opponent = result.opponentUsername;
+				paceLabel = result.paceLabel;
+				paceUsedFreshSeed = result.usedFreshSeed;
+				state = State.LAUNCHING;
+				Cues.matchFound();
+				SpeedrunMcAlt.LOGGER.info(
+						"[speedrunmcalt] Racing pace {} - matchId={} type={} freshSeed={}",
+						result.paceLabel, result.matchId, result.seedType, result.usedFreshSeed);
+				pendingToken = token;
+				waited = 0;
+				pending = result;
+			} catch (Exception e) {
+				if (generation == searchGeneration) {
+					// The backend's refusals are written as sentences a
+					// player can act on - "someone is waiting to race" -
+					// so they go on screen as they are.
+					error = e.getMessage();
+					state = State.ERROR;
+					SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Race a Pace failed", e);
+				}
+			}
+		}, "speedrunmcalt-racepace");
+		thread.setDaemon(true);
+		thread.start();
 	}
 
 	public static void search(MinecraftClient client) {

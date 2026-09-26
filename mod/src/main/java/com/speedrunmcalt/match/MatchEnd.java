@@ -110,8 +110,10 @@ public final class MatchEnd {
 			client.execute(() -> {
 				try {
 					leaveWorld(client);
+					// Read BEFORE the reset in the finally below.
 					client.openScreen(new MatchEndScreen(
-							won, opponent, myTime, opponentTime, shownDelta, shownPoints));
+							won, opponent, myTime, opponentTime, shownDelta, shownPoints,
+							MatchState.paceLabel));
 				} catch (Exception e) {
 					SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Failed to leave match world", e);
 				} finally {
