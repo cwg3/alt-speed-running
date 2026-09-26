@@ -32,7 +32,16 @@ Known outstanding work, roughly in the order it would matter.
   exactly the question the bundle exists to answer, and the reason to
   back up what is running rather than only what can be rebuilt.
 
-- [ ] **Per-type candidate headroom.** `HEADROOM` is one number for
+- [x] **Per-type candidate headroom, and per-type ceilings.** Both
+  halves are done. `headroom.local.json` carries a multiplier per type,
+  and since 2026-09-26 a CEILING per type as well - the multiplier says
+  how many candidates a wanted seed needs, the ceiling caps one run.
+  A shared ceiling turned out to be the other half of the same bug: an
+  expensive type asked for what it needed, got clamped to the cheap
+  types' limit, and the run reported OK having left it short. Kept for
+  the shape of the original entry:
+
+  `HEADROOM` was one number for
   every type, and the types differ enormously in how many candidates
   survive. A shipwreck batch loses most of its candidates at the `spawn`
   check because ocean spawns are where a wooded biome is technically
@@ -52,6 +61,20 @@ Known outstanding work, roughly in the order it would matter.
   names, which is the habit this item is asking for. The version was
   bumped rather than rebuilt over 0.1.0 - two different builds under one
   number is the failure a version exists to prevent.
+
+  **A THIRD TIME, 2026-09-26, and inverted.** v0.1.2 through v0.1.5 were
+  built, SHA-verified against the freshly built jar, and uploaded
+  correctly - the downloads were right. The SOURCE was wrong: a day of
+  work sat on an unmerged branch, so `gh release create` tagged every
+  one of them at the default branch, and four releases pointed at a tree
+  without the feature in it.
+
+  Worth separating from the earlier two, because every check this entry
+  asks for PASSED. The packed jar contained the classes expected; the
+  hash matched the build. Checking the artifact cannot catch a wrong
+  tag. The check that does is comparing `git ls-remote origin
+  refs/heads/main` against `git rev-parse HEAD` before publishing
+  anything - see CLAUDE.md.
 
 - [ ] **Backups were run by hand and stopped happening.** The last one
   predated the leaderboard, the ladder reset, the publish guard and the
@@ -206,7 +229,16 @@ Known outstanding work, roughly in the order it would matter.
 
 ## Before testers
 
-- [ ] **Pool REPLENISHMENT, not pool depth.** The framing that
+- [x] **Pool REPLENISHMENT, not pool depth — now measured that way.**
+  Since 2026-09-26 `topup.sh` computes its shortfall from the number of
+  drawable seeds the worst-off ACTIVE PLAYER has not seen, rather than
+  from how many rows exist. Drawable row count never falls, because
+  nothing is consumed - so the old trigger could not see demand at all
+  and would have reported "nothing to build" forever while every
+  player's personal supply drained. The capacity arithmetic below is
+  still the right way to think about it and is kept:
+
+  The framing that
   matters: a strong runner averages about 9 minutes, which is roughly
   5 matches an hour once replays and downtime are counted, over a 4-5
   hour session. Call it 25 matches a day at full tilt.
