@@ -2,6 +2,8 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda
 import { ConditionalCheckFailedException, DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { resolveSessionToken } from './lib/auth';
+import { paceFinishMs, Schedule } from './lib/paceSchedule';
+import { isSyntheticPlayer } from './lib/seedPool';
 import { applyMatchCompletion, MatchPlayer } from './lib/matchCompletion';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
@@ -107,6 +109,63 @@ export const handler = async (
 			body: JSON.stringify({
 				error: 'no kill_dragon split recorded - the dragon must be dead before the fountain ends the race',
 			}),
+		};
+	}
+
+	// A PACE IS BEATEN ON TIME, NOT ON WHO REPORTS.
+	//
+	// The pace's finish is known the moment the match is created, so
+	// whether the player beat it is a comparison, never a claim to accept.
+	// Without this a player who finished AFTER the pace could still be
+	// awarded the win, purely because their client did not happen to poll
+	// in the gap between the pace finishing and their own fountain - the
+	// poll in liveMatch is what would otherwise have settled it. That is
+	// the "fastest connection instead of lowest time" bug this endpoint
+	// already refuses to have between two humans.
+	//
+	// The provisional window is skipped for the same reason it exists: it
+	// is there so a faster finish arriving moments later can replace a
+	// slower one, and against a pace nothing can arrive later. Holding the
+	// player for three seconds would be delay bought for nothing.
+	const paceSched = match.Item.paceSchedule as Schedule | undefined;
+	if (paceSched && isSyntheticPlayer(loser.uuid) && selfReported) {
+		const paceMs = paceFinishMs(paceSched);
+		// Prefer the reported fountain time; fall back to the dragon split,
+		// which is a precondition above and so is always present here. With
+		// neither there is no time to compare and the claim cannot stand.
+		const mine = Number.isFinite(body.elapsedMs)
+			? Number(body.elapsedMs)
+			: Number(splits[reporterUuid]?.kill_dragon ?? NaN);
+		if (!Number.isFinite(mine)) {
+			return {
+				statusCode: 400,
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					error: 'a paced finish must report elapsedMs - there is nothing to compare otherwise',
+				}),
+			};
+		}
+		const youWon = mine < paceMs;
+		const realWinner = youWon ? winner : loser;
+		const realLoser = youWon ? loser : winner;
+		const settled = await applyMatchCompletion(
+			MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, body.matchId,
+			realWinner, realLoser, splits, MATCH_HISTORY_TABLE_NAME);
+		return {
+			statusCode: 200,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(settled.alreadyCompleted
+				? { alreadyCompleted: true }
+				: {
+					// Said plainly, because the player asked a question
+					// with a yes-or-no answer: did I beat the time.
+					beatThePace: youWon,
+					yourTimeMs: mine,
+					paceTimeMs: paceMs,
+					exhibition: true,
+					winner: settled.winner,
+					loser: settled.loser,
+				}),
 		};
 	}
 

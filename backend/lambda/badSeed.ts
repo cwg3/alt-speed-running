@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { resolveSessionToken } from './lib/auth';
+import { isSyntheticPlayer } from './lib/seedPool';
 import { MatchPlayer } from './lib/matchCompletion';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
@@ -106,6 +107,66 @@ export const handler = async (
 			}
 		}
 		existing[uuid] = { at: now, reason };
+	}
+
+	// A PACE CANNOT AGREE, so a paced match voids on the player's word
+	// alone - and deliberately does NOT quarantine the seed.
+	//
+	// The two-vote rule exists to stop a unilateral escape from a match
+	// somebody is losing. An exhibition has nothing to escape: no rating
+	// moves, no record changes, nothing is at stake. Making the player
+	// wait for agreement that can never come would leave them staring at
+	// "waiting for your opponent" on an unplayable world, with forfeiting
+	// as the only exit.
+	//
+	// The seed is a different question and gets the opposite answer.
+	// Quarantine removes a seed from the pool for everybody, and a paced
+	// match hands any single player an unlimited supply of UNOPPOSED
+	// votes - so agreeing to void their own practice must not also let
+	// them drain the pool one seed at a time. Their words are still
+	// recorded on the match, so a pattern of complaints about one seed
+	// remains visible; it just is not self-executing.
+	const paceOpponent = isSyntheticPlayer(opponent.uuid);
+	if (paceOpponent) {
+		try {
+			await ddb.send(new UpdateCommand({
+				TableName: MATCHES_TABLE_NAME,
+				Key: { matchId },
+				UpdateExpression:
+					'SET #s = :void, completedAt = :now, voidReason = :reason',
+				ConditionExpression: '#s = :pending',
+				ExpressionAttributeNames: { '#s': 'status' },
+				ExpressionAttributeValues: {
+					':void': 'voided',
+					':pending': 'pending',
+					':now': now,
+					':reason': 'bad seed on a paced match, voided on the player\'s word',
+				},
+			}));
+		} catch (err) {
+			if ((err as { name?: string }).name === 'ConditionalCheckFailedException') {
+				return {
+					statusCode: 409,
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ error: 'match ended before the vote completed' }),
+				};
+			}
+			throw err;
+		}
+		return {
+			statusCode: 200,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				voided: true,
+				yourVote: true,
+				opponentVote: false,
+				// Said rather than implied. The player should not be left
+				// wondering why this seed is still in their rotation.
+				seedQuarantined: false,
+				message: 'practice match voided - the seed was not quarantined, '
+					+ 'because that needs a second opinion',
+			}),
+		};
 	}
 
 	const bothAgreed = Boolean(existing[uuid] && existing[opponent.uuid]);
