@@ -50,6 +50,30 @@ export type ClaimResult =
 	| { ok: false; reason: ClaimFailure };
 
 /**
+ * A practice claim also says whether it had to spend a seed the player
+ * had never seen. The caller shows that, because it costs the player
+ * something: a fresh seed is one fewer world they can ever be dealt in a
+ * ranked match.
+ */
+export type PracticeClaimResult =
+	| { ok: true; pair: SeedPair; fresh: boolean }
+	| { ok: false; reason: ClaimFailure };
+
+/**
+ * Which bucket the draw prefers.
+ *
+ * 'ranked' must have a seed NEITHER player has seen - that is the
+ * fairness rule. 'practice' prefers one the player HAS seen, because
+ * rehearsing a known world is what practice is and it costs no new
+ * seeds; it falls back to a fresh one, because a player who has seen
+ * nothing has nothing to rehearse, and that is a new player - exactly
+ * who Race a Pace is for. The fallback is safe because seenSeeds is
+ * recorded when the seed is DEALT, not when the match completes, so a
+ * practised world can never come back in ranked.
+ */
+type DrawMode = 'ranked' | 'practice';
+
+/**
  * Draws a seed neither player has played before.
  *
  * Seeds used to be CONSUMED: the claim set used = true and that pair
@@ -73,12 +97,13 @@ export type ClaimResult =
  * question from whether a given player has seen a seed, and
  * verify-and-release.sh depends on it.
  */
-export async function claimSeedPair(
+async function claimInternal(
 	seedPoolTableName: string,
 	matchId: string,
 	playersTableName: string,
 	playerUuids: string[],
-): Promise<ClaimResult> {
+	mode: DrawMode,
+): Promise<PracticeClaimResult> {
 	// TEMPORARY: restrict which seed types are handed out.
 	//
 	// Set SEED_TYPE_BIAS to a comma-separated list (for example
@@ -184,9 +209,31 @@ export async function claimSeedPair(
 	if (items.length === 0) {
 		return { ok: false, reason: 'pool_empty' };
 	}
-	const unseen = items.filter((i) => !seen.has(String(i.seedPairId)));
-	if (unseen.length === 0) {
-		return { ok: false, reason: 'all_seen' };
+	// THE ONLY STEP THAT DIFFERS BETWEEN THE TWO MODES. Everything above
+	// and below is shared on purpose: the scan, the crypto shuffle, the
+	// type-first draw and the claim are subtle enough that a second copy
+	// would drift, and a practice draw that drifted from the ranked one
+	// is how a seed gets dealt twice.
+	const alreadySeen = items.filter((i) => seen.has(String(i.seedPairId)));
+	const neverSeen = items.filter((i) => !seen.has(String(i.seedPairId)));
+	let candidates: typeof items;
+	let fresh = false;
+	if (mode === 'ranked') {
+		if (neverSeen.length === 0) {
+			return { ok: false, reason: 'all_seen' };
+		}
+		candidates = neverSeen;
+	} else if (alreadySeen.length > 0) {
+		candidates = alreadySeen;
+	} else {
+		// Nothing rehearsed yet. Spending a fresh seed is the price of
+		// being new, and it is a price a new player can afford - their
+		// whole budget is intact.
+		if (neverSeen.length === 0) {
+			return { ok: false, reason: 'all_seen' };
+		}
+		candidates = neverSeen;
+		fresh = true;
 	}
 
 	// Draw a TYPE first, then a seed inside it.
@@ -208,8 +255,8 @@ export async function claimSeedPair(
 	// rather than by returning nothing and stalling the queue - which
 	// is how a bias pinned to village once deadlocked matchmaking for
 	// four minutes.
-	const byType = new Map<string, typeof unseen>();
-	for (const i of unseen) {
+	const byType = new Map<string, typeof candidates>();
+	for (const i of candidates) {
 		const t = String(i.seedType ?? 'village');
 		const list = byType.get(t);
 		if (list) {
@@ -245,7 +292,7 @@ export async function claimSeedPair(
 					'SET lastAssignedMatchId = :matchId ADD timesPlayed :one',
 				ExpressionAttributeValues: { ':matchId': matchId, ':one': 1 },
 			}));
-			return { ok: true, pair: {
+			return { ok: true, fresh, pair: {
 				seedPairId: item.seedPairId,
 				overworldSeed: item.overworldSeed,
 				netherSeed: item.netherSeed,
@@ -267,6 +314,41 @@ export async function claimSeedPair(
 	}
 
 	return { ok: false, reason: 'pool_empty' };
+}
+
+/**
+ * The ranked draw: a seed NEITHER player has played.
+ *
+ * Unchanged in behaviour - it is the same code it always was, with the
+ * bucket choice pulled into a branch so practice can reuse the rest.
+ */
+export async function claimSeedPair(
+	seedPoolTableName: string,
+	matchId: string,
+	playersTableName: string,
+	playerUuids: string[],
+): Promise<ClaimResult> {
+	const r = await claimInternal(
+		seedPoolTableName, matchId, playersTableName, playerUuids, 'ranked');
+	return r.ok ? { ok: true, pair: r.pair } : r;
+}
+
+/**
+ * The Race a Pace draw: prefer a world this player already knows.
+ *
+ * Takes ONE uuid, because the other side of a paced match is not a
+ * player and has nothing to have seen. The caller must still record the
+ * seed as seen before creating the match - see recordSeedsSeen - which is
+ * what makes the fresh fallback safe.
+ */
+export async function claimSeedForPractice(
+	seedPoolTableName: string,
+	matchId: string,
+	playersTableName: string,
+	playerUuid: string,
+): Promise<PracticeClaimResult> {
+	return claimInternal(
+		seedPoolTableName, matchId, playersTableName, [playerUuid], 'practice');
 }
 
 /**

@@ -2,6 +2,8 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { resolveSessionToken } from './lib/auth';
+import { paceFinishMs, revealedSplits, Schedule } from './lib/paceSchedule';
+import { isSyntheticPlayer } from './lib/seedPool';
 import { applyMatchCompletion, MatchPlayer } from './lib/matchCompletion';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
@@ -83,7 +85,15 @@ export const handler = async (
 	// deny an opponent the win they are about to earn - a stalemate
 	// on demand. A forfeit is the honest version of this and is one
 	// click away.
-	if (match.Item.status === 'pending' && match.Item.lastSeenAt) {
+	//
+	// A PACE CANNOT ABANDON, and must never be judged to have. It has no
+	// lastSeenAt because nothing polls for it, so the fallback below read
+	// match.createdAt and would have handed the player a win by
+	// abandonment within a couple of minutes of starting - mid-run, on a
+	// race lasting a quarter of an hour. A pace is not absent; it is on a
+	// schedule, and the block after this one is what ends its match.
+	if (match.Item.status === 'pending' && match.Item.lastSeenAt
+		&& !isSyntheticPlayer(opponent.uuid)) {
 		const seen: Record<string, number> = match.Item.lastSeenAt;
 		const opponentSeen = seen[opponent.uuid] ?? match.Item.createdAt ?? now;
 		if (now - opponentSeen > ABANDON_MS) {
@@ -93,6 +103,37 @@ export const handler = async (
 				you, opponent, match.Item.splits ?? {}, MATCH_HISTORY_TABLE_NAME);
 			// Re-read so the response carries the result rather than
 			// the pending state we fetched a moment ago.
+			const after = await ddb.send(new GetCommand({
+				TableName: MATCHES_TABLE_NAME,
+				Key: { matchId },
+			}));
+			if (after.Item) {
+				match.Item = after.Item;
+			}
+		}
+	}
+
+	// THE PACE REACHING THE FOUNTAIN ends the match.
+	//
+	// Something has to, or a paced match stays pending forever: the player
+	// only calls /matches/complete when THEY finish, and a pace has no
+	// process of its own to report anything. This poll is the natural
+	// place, for the same reason the abandonment sweep lives here - it
+	// rides a request the client already makes every few seconds.
+	//
+	// It scores nothing, because the opponent is synthetic and
+	// matchCompletion withholds rating, season points and the W-L-F record
+	// for an exhibition. What the player gets is an honest answer about
+	// whether they beat the time.
+	if (match.Item.status === 'pending' && isSyntheticPlayer(opponent.uuid)) {
+		const sched = match.Item.paceSchedule as Schedule | undefined;
+		const runStart = (match.Item.runStarts ?? {})[you.uuid];
+		if (sched && typeof runStart === 'number' && runStart > 0
+			&& now - runStart >= paceFinishMs(sched)) {
+			console.log(`match ${matchId}: pace ${opponent.username} finished - ${you.username} did not beat it`);
+			await applyMatchCompletion(
+				MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, matchId,
+				opponent, you, match.Item.splits ?? {}, MATCH_HISTORY_TABLE_NAME);
 			const after = await ddb.send(new GetCommand({
 				TableName: MATCHES_TABLE_NAME,
 				Key: { matchId },
@@ -114,6 +155,38 @@ export const handler = async (
 	const badSeedVotes: Record<string, { at: number; reason: string }> =
 		match.Item.badSeedVotes ?? {};
 	const opponentBadSeed = badSeedVotes[opponent.uuid];
+
+	// RACE A PACE: the opponent's splits are computed, not reported, and
+	// this is where they are rationed.
+	//
+	// A pace's whole run is stored on the match row when the match is
+	// created, which is what lets it exist without any process running for
+	// the quarter of an hour the race takes. The cost of that shortcut is
+	// that the run is knowable in advance, so it must never leave the
+	// server whole: a player handed the schedule would know the result
+	// before mining a block. revealedSplits keeps only what has already
+	// come due, so the pace's progress arrives exactly as a human's would.
+	//
+	// Anchored to the PLAYER's run start, not to match creation. Loading
+	// and world generation differ by machine and must come out of neither
+	// side's clock - the same reason /matches/start exists. Before the
+	// player's run begins the pace has not moved, which is correct: there
+	// is nothing yet to be behind.
+	let opponentSplits: Record<string, number> = splits[opponent.uuid] ?? {};
+	let paceFinished = false;
+	const paceSchedule = match.Item.paceSchedule as Schedule | undefined;
+	if (paceSchedule && isSyntheticPlayer(opponent.uuid)) {
+		const runStart = (match.Item.runStarts ?? {})[you.uuid];
+		if (typeof runStart === 'number' && runStart > 0) {
+			const elapsed = now - runStart;
+			opponentSplits = revealedSplits(paceSchedule, elapsed) as Record<string, number>;
+			paceFinished = elapsed >= paceFinishMs(paceSchedule);
+		} else {
+			// No run start yet, so no elapsed time exists to reveal
+			// against. Empty, never the whole schedule.
+			opponentSplits = {};
+		}
+	}
 
 	return {
 		statusCode: 200,
@@ -141,8 +214,19 @@ export const handler = async (
 			opponent: {
 				uuid: opponent.uuid,
 				username: opponent.username,
-				splits: splits[opponent.uuid] ?? {},
+				splits: opponentSplits,
 			},
+			// Present only on a paced match, so a client that knows
+			// nothing about paces behaves exactly as before.
+			...(paceSchedule && isSyntheticPlayer(opponent.uuid)
+				? {
+					pace: {
+						label: String(match.Item.paceLabel ?? ''),
+						tier: String(match.Item.paceTier ?? ''),
+						finished: paceFinished,
+					},
+				}
+				: {}),
 		}),
 	};
 };

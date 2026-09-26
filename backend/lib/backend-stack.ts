@@ -315,6 +315,41 @@ export class BackendStack extends cdk.Stack {
 		// The client picks the moment (its first playable tick, so
 		// loading time is not charged to the run); the server owns the
 		// record, so quitting and rejoining cannot mint a fresh 0:00.
+		// Race a Pace. Separate from QueueJoin on purpose: this path must
+		// never be reachable by accident from the ranked one, and keeping
+		// them apart means the ranked draw cannot be changed by a change
+		// meant for practice.
+		const pacedMatchFn = new NodejsFunction(this, 'PacedMatchFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'pacedMatch.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			environment: {
+				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				PLAYERS_TABLE_NAME: playersTable.tableName,
+				QUEUE_TABLE_NAME: queueTable.tableName,
+				MATCHES_TABLE_NAME: matchesTable.tableName,
+				SEED_POOL_TABLE_NAME: seedPoolTable.tableName,
+				// Deliberately NOT given SEED_TYPE_BIAS. Practice draws
+				// from what the player has already seen, so narrowing by
+				// type would narrow an already small set to nothing.
+			},
+		});
+		sessionsTable.grantReadData(pacedMatchFn);
+		// Write: stamps currentMatchId, and records the seed as seen
+		// before the match row is written.
+		playersTable.grantReadWriteData(pacedMatchFn);
+		// Read to check nobody is waiting, write to remove the player's own
+		// stale row so a pace cannot run alongside a real match.
+		queueTable.grantReadWriteData(pacedMatchFn);
+		matchesTable.grantReadWriteData(pacedMatchFn);
+		seedPoolTable.grantReadWriteData(pacedMatchFn);
+
+		api.addRoutes({
+			path: '/matches/pace',
+			methods: [HttpMethod.POST],
+			integration: new HttpLambdaIntegration('PacedMatchIntegration', pacedMatchFn),
+		});
+
 		const startRunFn = new NodejsFunction(this, 'StartRunFunction', {
 			entry: path.join(__dirname, '..', 'lambda', 'startRun.ts'),
 			runtime: Runtime.NODEJS_24_X,
