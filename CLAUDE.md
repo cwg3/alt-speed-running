@@ -100,6 +100,16 @@ onto the MATCH FOUND title and onto the leaderboard.
 - **`cmd | tail` returns tail's exit code, not cmd's.** That is how a
   loader which could not read its input reported success. Use
   `PIPESTATUS[0]` or `set -o pipefail`.
+- **`git push origin main` pushes local `main`, not what you are on.**
+  A whole day of work - fifteen commits, four version bumps, four
+  releases - sat on a feature branch while every push reported success,
+  because the branch was never merged and local `main` genuinely had
+  nothing new. "Everything up-to-date" was true and useless.
+  `gh release create` then tagged each release at the *default branch*,
+  so four releases pointed at source without the feature in it. The
+  uploaded jars were correct, which is what made it invisible: installing
+  them worked. Check `git ls-remote origin refs/heads/main` against
+  `git rev-parse HEAD`, not the exit code of a push.
 - **Docs written during a problem outlive the fix.** The gravel stat,
   the F6 forfeit note and the "results are committed" line all survived
   the change that made them false.
