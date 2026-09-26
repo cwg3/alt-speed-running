@@ -98,7 +98,10 @@ rows = []
 for t, vs in d.items():
     for v in vs:
         rows.append(f"{v['seed']} {v['structure']['x']} {v['structure']['z']} {t}")
-out.write_text('\n'.join(rows) + '\n')
+# An empty list must write an EMPTY file. `'\n'.join([]) + '\n'` is a
+# lone newline - one byte - and `[ -s ]` calls that non-empty, so the
+# check below runs on a blank line, returns nothing, and is now fatal.
+out.write_text(('\n'.join(rows) + '\n') if rows else '')
 print(f'spawn: {len(rows)} candidates to check for wood at spawn')
 PY
 
@@ -132,7 +135,7 @@ python3 - <<'PY'
 import json, pathlib
 d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
 rows = [f"{v['seed']} {v['structure']['x']} {v['structure']['z']}" for v in d.get('ruined_portal', [])]
-pathlib.Path('/tmp/onr/rp-in.txt').write_text('\n'.join(rows) + '\n')
+pathlib.Path('/tmp/onr/rp-in.txt').write_text(('\n'.join(rows) + '\n') if rows else '')
 print(f'portalfilter: {len(rows)} ruined portal candidates to frame-check')
 PY
 if [ -s /tmp/onr/rp-in.txt ]; then
