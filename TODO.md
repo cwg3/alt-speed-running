@@ -14,11 +14,21 @@ Known outstanding work, roughly in the order it would matter.
   check read "cannot see it" as "not there". All fixed, all exercised
   against real batches.
 
-- [ ] **Install the nightly top-up schedule.** `topup.sh`,
-  `cloud/topup-userdata.sh` and `cloud/install-topup-schedule.sh` are
-  written and the runner has been driven by hand. The recurring schedule
-  is NOT installed - install it once a full unattended run has completed
-  end to end.
+- [x] **The nightly top-up schedule is installed.** `alt-pool-topup`
+  fires at 03:00 UTC, `cron(00 03 * * ? *)`, targeting
+  `ec2:runInstances`, with `alt-topup-runner`, `alt-topup-scheduler` and
+  `alt-seedwork` in place. Confirmed against the scheduler itself on
+  2026-09-26 rather than inferred from having run the install script,
+  and it has demonstrably fired unattended: a runner instance launched
+  at 03:00:10 UTC that morning, work instances followed it, and every
+  one of them terminated rather than being left running.
+
+  This item read "NOT installed" until then, which is the drift it warns
+  about everywhere else in this file - the schedule went in and the line
+  describing it stayed put. What caught it was `tools/backup.sh`, which
+  captures the schedule and its roles as AWS currently has them. That is
+  exactly the question the bundle exists to answer, and the reason to
+  back up what is running rather than only what can be rebuilt.
 
 - [ ] **Per-type candidate headroom.** `HEADROOM` is one number for
   every type, and the types differ enormously in how many candidates
