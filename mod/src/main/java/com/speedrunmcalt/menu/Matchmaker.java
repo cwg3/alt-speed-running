@@ -255,7 +255,18 @@ public final class Matchmaker {
 	 * are told to call it.
 	 */
 	public static void racePace(MinecraftClient client, String tierId) {
-		if (state == State.SEARCHING || state == State.LAUNCHING) {
+		// A SEARCH IN FLIGHT IS CANCELLED, NOT AN OBSTACLE. Changing your
+		// mind two minutes into an empty queue is the single most likely
+		// way anybody reaches this feature, and making them back out to
+		// press Cancel Search first is a step that already knows the
+		// answer. The generation bump below is what stands the poll
+		// thread down - it checks on every pass and returns.
+		//
+		// LAUNCHING still refuses, and that difference matters: it means
+		// a real opponent has been found and the world is being built.
+		// Throwing that away for a pace would abandon a human who is
+		// already loading into a match with you.
+		if (state == State.LAUNCHING) {
 			return;
 		}
 		String token = AltSession.sessionToken();

@@ -94,6 +94,14 @@ public class RacePaceScreen extends Screen {
 				new LiteralText("A time to beat, for when nobody is queued."),
 				cx, this.height / 2 - 48, Palette.DIM);
 
+		// Shown ONLY while a search is running, so it is a consequence at
+		// the moment it applies rather than another permanent grey line.
+		if (Matchmaker.state() == Matchmaker.State.SEARCHING) {
+			drawCenteredText(matrices, this.textRenderer,
+					new LiteralText("Picking a pace will cancel your queue search."),
+					cx, this.height / 2 - 34, Palette.DIM);
+		}
+
 		// ONE line, carrying all three things a player should know before
 		// choosing rather than after.
 		//
