@@ -1232,17 +1232,29 @@ guard had to land first. It also protects the point of the project: a
 transparent rating is the differentiator, and a rating that partly
 reflects beating a bot is not one.
 
-**2. Practice draws ONLY from seeds that player has already seen.**
-This is the decision most likely to be got wrong by accident, because
-both obvious options are bad. Draw from the ranked pool without
-recording the seed as seen, and a player can rehearse a world and then
-be dealt it for real - seed knowledge laundered through practice. Record
-it as seen, and practice burns the per-player lifetime budget that the
-pool floor exists to protect. Already-seen is the third option and it
-costs nothing: they have seen it by definition so nothing leaks, no new
-seeds are consumed, and rehearsing a known world is what practice
-actually is. Availability then grows as they play, instead of competing
-with ranked for the expensive openings.
+**2. A seed raced in ANY mode is never dealt to that player again.**
+This is the invariant, and it is not new - `queueJoin.ts` records
+seenSeeds when the pair is CLAIMED, before the match row exists, so a
+player who quits thirty seconds in has still spent the seed. Race a Pace
+changes nothing about it and must not be allowed to: **a paced match has
+to be created through that same record-first path.** The exploit if it
+is not is precise and severe - rehearse a world against a pace, abandon,
+then be dealt that world in a ranked match against somebody seeing it
+for the first time. Whoever builds this should treat "does it record at
+deal time" as the first test, not the last.
+
+State it as an invariant rather than as a property of the draw, because
+the draw is a policy and policies get revised. The fairness guarantee
+must not depend on which pool practice happens to pull from.
+
+**Which pool it pulls from is then a COST decision, not a safety one.**
+Drawing from already-seen seeds is free: nothing leaks because they have
+seen it by definition, no new seeds are consumed, and rehearsing a known
+world is what practice actually is - availability grows as they play
+instead of competing with ranked for the expensive openings. Drawing
+fresh seeds would also be safe under the invariant above, it would just
+bill practice against the per-player lifetime budget the pool floor
+exists to protect. Start with already-seen for that reason alone.
 
 **3. Do NOT invent the rating-to-pace curve.** Scaling the bot's pace to
 the player is the best part of the idea and the part with no data behind
