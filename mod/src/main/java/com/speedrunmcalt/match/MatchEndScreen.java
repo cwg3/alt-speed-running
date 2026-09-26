@@ -98,20 +98,24 @@ public class MatchEndScreen extends Screen {
 
 		// Same treatment as the HUD and the menu: "vs" recedes, the
 		// name is yellow. Player names are yellow everywhere.
-		// "vs Pace 10:00" reads as a person with a peculiar name. A pace
-		// is a target, so it gets the word that describes it - and NOT
-		// the colour that means a person.
 		//
-		// Yellow is the player-name colour everywhere in this mod, so
-		// spending it on a pace says "a human called Pace 10:00" in
-		// exactly the way the wording is careful not to. Purple is what
-		// labels already wear here (split names, seed type), and cyan is
-		// what times wear - "your time" above is cyan too. So the line
-		// ends up with no yellow on it at all, which is the point.
+		// A PACE WEARS YELLOW FOR THE WORD AND CYAN FOR THE TIME, the
+		// same as every other screen that names one.
+		//
+		// Yellow used to be held back from paces here, on the grounds
+		// that it is the player-name colour and "Pace 10:00" in it would
+		// read as a person with a peculiar name. The countdown screen
+		// had been drawing paces yellow the whole time, though - it
+		// renders them through the ordinary opponent path - so the rule
+		// only ever held on two screens out of three, and the same pace
+		// changed colour between the screen that announced it and the
+		// screen that scored it. One treatment everywhere is worth more
+		// than the distinction was; "target" and "vs" already say which
+		// kind of thing it is, in the word immediately before it.
 		if (paceLabel != null) {
 			com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer, cx, y,
 					new String[] { "target ", "Pace ", paceLabel },
-					new int[] { DIM, com.speedrunmcalt.menu.Palette.PURPLE,
+					new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW,
 						com.speedrunmcalt.menu.Palette.CYAN });
 		} else {
 			com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer, cx, y,
@@ -158,10 +162,18 @@ public class MatchEndScreen extends Screen {
 		// all: no Elo, no season points, no W-L-F. Say that.
 		String pace = paceLabel;
 		if (pace != null) {
-			drawCenteredText(matrices, this.textRenderer,
-					new LiteralText(won ? "you beat the " + pace + " pace"
-							: "you did not beat the " + pace + " pace"),
-					cx, y, won ? WIN : LOSS);
+			// The pace is coloured inside the sentence for the same reason
+			// it is on the line above: both name the same fact, and drawing
+			// "30:00" cyan in one place and red in the other made one pace
+			// look like two different numbers. The verdict words keep the
+			// win/loss colour, so the line still reads green or red at a
+			// glance - which is the only thing it has to do from across a
+			// room.
+			com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer, cx, y,
+					new String[] { won ? "you beat the " : "you did not beat the ",
+						pace, " pace" },
+					new int[] { won ? WIN : LOSS, com.speedrunmcalt.menu.Palette.CYAN,
+						com.speedrunmcalt.menu.Palette.YELLOW });
 			y += 12;
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText("nothing rated - practice only"), cx, y, DIM);

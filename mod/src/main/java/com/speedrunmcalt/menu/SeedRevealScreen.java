@@ -99,11 +99,25 @@ public class SeedRevealScreen extends Screen {
 		// not necessarily reading. These ten seconds are the one
 		// moment both players are certainly looking at the screen with
 		// nothing else to do, so the name belongs here.
-		String vs = MatchState.opponentUsername;
-		com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer,
-				cx, y + 30,
-				new String[] { "vs ", vs == null ? "opponent" : vs },
-				new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW });
+		// A PACE ARRIVES HERE AS AN OPPONENT NAME - the literal string
+		// "Pace 30:00" - and with no branch of its own it went out in one
+		// piece in the player-name yellow, so the time never got the cyan
+		// it wears on the announce and end screens. Split it, and the
+		// same pace is the same colour on all three.
+		String pace = MatchState.paceLabel;
+		if (pace != null) {
+			com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer,
+					cx, y + 30,
+					new String[] { "vs ", "Pace ", pace },
+					new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW,
+						com.speedrunmcalt.menu.Palette.CYAN });
+		} else {
+			String vs = MatchState.opponentUsername;
+			com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer,
+					cx, y + 30,
+					new String[] { "vs ", vs == null ? "opponent" : vs },
+					new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW });
+		}
 
 		long remaining = MatchState.countdownRemaining();
 		long seconds = (remaining + 999) / 1000;

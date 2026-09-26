@@ -63,12 +63,12 @@ public class MatchFoundScreen extends Screen {
 				cx / 2, (cy - 20) / 2, Palette.YELLOW);
 		matrices.pop();
 
-		// Same rule as the end screen: yellow means a person, so a pace
-		// does not get it. Purple for the label, cyan for the time.
+		// Same rule as the countdown and the end screen: yellow for the
+		// word "Pace", cyan for the time it names.
 		if (pace) {
 			Palette.drawCenteredSegments(matrices, this.textRenderer, cx, cy + 6,
 					new String[] { "target ", "Pace ", paceLabel },
-					new int[] { Palette.DIM, Palette.PURPLE, Palette.CYAN });
+					new int[] { Palette.DIM, Palette.YELLOW, Palette.CYAN });
 		} else {
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText("vs " + opponent), cx, cy + 6, Palette.YELLOW);

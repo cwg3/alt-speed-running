@@ -88,8 +88,21 @@ public class RacePaceScreen extends Screen {
 		this.renderBackground(matrices);
 		int cx = this.width / 2;
 
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("Race a Pace"), cx, this.height / 2 - 62, ACCENT);
+		// Same heading treatment as MATCHES and LEADERBOARD: uppercase,
+		// 1.5x, cyan. This was the last screen title still drawn at body
+		// size in mixed case, which left the three screens reached from
+		// the same menu looking like three different designs.
+		//
+		// MOVED FROM -62 TO -66 because the scale makes the line 13.5px
+		// tall rather than 9, and at -62 it ran into the subtitle at -48.
+		// Same trap as the searching note further down: a scaled line is
+		// taller than the gap the unscaled one used to fit in. -66 leaves
+		// the gap the screen had before.
+		matrices.push();
+		matrices.scale(1.5f, 1.5f, 1.0f);
+		drawCenteredText(matrices, this.textRenderer, new LiteralText("RACE A PACE"),
+				(int) (cx / 1.5f), (int) ((this.height / 2 - 66) / 1.5f), ACCENT);
+		matrices.pop();
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText("A time to beat, for when nobody is queued."),
 				cx, this.height / 2 - 48, Palette.DIM);
