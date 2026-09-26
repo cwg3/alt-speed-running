@@ -28,6 +28,22 @@ JAR=$(ls -t "$ROOT"/mod/build/libs/speedrunmcalt-*.jar 2>/dev/null | grep -v sou
 [ -n "$JAR" ] || { echo "no jar in mod/build/libs" >&2; exit 1; }
 
 [ -d "$MODS" ] || { echo "mods folder not found: $MODS" >&2; exit 1; }
+
+# REMOVE EVERY OTHER COPY FIRST. The jar is named for its version, so a
+# bump stops overwriting and starts ACCUMULATING: four builds in an
+# afternoon left four jars in the folder, all declaring the same mod id,
+# and the game quietly ran whichever one the loader preferred. Installing
+# looked like it worked every time.
+#
+# Same family as the rest of this script's reason for existing - "it
+# built" is not "it is installed", and "it is installed" is not "it is
+# the only one installed".
+for old in "$MODS"/speedrunmcalt-*.jar; do
+	[ -e "$old" ] || continue
+	[ "$(basename "$old")" = "$(basename "$JAR")" ] && continue
+	rm -f "$old" && echo "  removed stale $(basename "$old")"
+done
+
 cp "$JAR" "$MODS/$(basename "$JAR")" || exit 1
 
 echo "installed $(basename "$JAR") -> $MODS"
