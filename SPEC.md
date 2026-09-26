@@ -700,8 +700,8 @@ goes back to the pool, since nothing was wrong with it.
 |---|---|
 | Both players race the same seed in separate worlds | built |
 | Seed type announced with a 10-second countdown before the run | built — confirmed in play |
-| Mod list recorded in the match record | built — never seen in a live match |
-| Both players shown what the other had loaded | built — never seen in a live match |
+| Mod list recorded in the match record | built — **confirmed in play 2026-09-25** |
+| Both players shown what the other had loaded | built — **confirmed in play 2026-09-25**, both the recorded and the absent case |
 | Third-party mods refused at the queue join | built, **switched off** — `MOD_GATE_ENABLED` defaults to false |
 
 **The mod whitelist is a rule with no mechanism behind it.** The client
@@ -734,6 +734,20 @@ So, in order:
    into the match's uuid-keyed `mods` map, and `MatchDetailScreen`
    prints each player's list to both of them. A mod dispute is now
    checkable AND clearable, which it was not in either direction.
+
+   **Confirmed in play 2026-09-25**, on a PaceBot match. The detail
+   screen read `PaceBot: mods not recorded` against
+   `MissVanFan: nothing beyond the pack` - the two cases side by side,
+   which is the pair that had to be distinguishable. The bot writes its
+   own session row and never calls `/auth/verify`, so it has no list at
+   all, and the screen says that rather than reporting it as clean.
+
+   That run also exercised `beyondPack` against a REAL loader for the
+   first time: it swallowed all 39 Fabric API modules and the builtins
+   without a prefix rule, which is the hole the generated list exists to
+   avoid. Still unseen: a list with ENTRIES in it. The branch that
+   actually prints mod names has never rendered, and two real players'
+   lists have never appeared together, since a bot has none.
 
    **An absent list is not an empty one.** A client that reported
    nothing has no entry, and the screen says "mods not recorded" rather

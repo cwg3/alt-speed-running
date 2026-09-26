@@ -93,10 +93,18 @@ Known outstanding work, roughly in the order it would matter.
   never to strict. Unlike the split floors this list is public, so it
   can live in the repo and be served from there.
 
-- [ ] **Nobody has seen a mod list in a live match.** Both players have
-  to be on 0.1.1 for two lists to appear on a detail screen.
-  `mixin-smoke` runs a dedicated server, so it never touches the client
-  path that draws this.
+- [x] **A mod list has now been seen in a live match.** 2026-09-25, on a
+  PaceBot match: `PaceBot: mods not recorded` above
+  `MissVanFan: nothing beyond the pack`. Login, recording, carry-through
+  and both display branches, confirmed against a real client - and
+  `beyondPack` filtered a real loader's 39 Fabric API modules with no
+  prefix rule.
+
+- [ ] **The branch that prints actual mod names has never rendered.**
+  Every list seen so far is empty or absent. It needs a tester running
+  something legitimate beyond the pack - Sodium is the obvious one - and
+  two real players on 0.1.1 for two populated lists side by side. A bot
+  cannot supply either, because it has no list at all.
 
 - [ ] **MCSR Fairplay is named in the whitelist but untested here.** It
   is the incumbent's tool, which is a real dependency: if theirs moves,
