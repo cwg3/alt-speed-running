@@ -137,15 +137,15 @@ public class MatchDetailScreen extends Screen {
 		// WINNER is the headline: double size, emerald - the colour
 		// this mod already uses for winning. The name sits under it at
 		// body size in yellow, which is what a player name is
-		// everywhere else here.
+		// everywhere else here - and a pace splits yellow/cyan, which is
+		// what a pace is everywhere else here.
 		matrices.push();
 		matrices.scale(2.0f, 2.0f, 1.0f);
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText("WINNER"), cx / 2, 12 / 2, Palette.EMERALD);
 		matrices.pop();
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText(winner == null ? "-" : winner.username),
-				cx, 28, Palette.YELLOW);
+		Palette.drawCenteredName(matrices, this.textRenderer,
+				winner == null ? "-" : winner.username, cx, 28);
 
 		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, 42,
 				new String[] { d.seedType.replace('_', ' '), d.forfeited ? "   forfeited" : "" },
@@ -170,7 +170,12 @@ public class MatchDetailScreen extends Screen {
 			// the one screen built for comparing two players treat one
 			// of them as secondary. Which column is yours is already
 			// said by the winner line and by the left/right split.
-			this.textRenderer.drawWithShadow(matrices, p.username, x, y, Palette.YELLOW);
+			//
+			// A pace goes through the same call and comes out yellow for
+			// the word and cyan for the time. THIS SCREEN NEVER GETS A
+			// PACE FLAG - the detail endpoint sends a pace as an ordinary
+			// player row with a name - so the name is what has to say it.
+			Palette.drawName(matrices, this.textRenderer, p.username, x, y);
 		}
 		y += 16;
 
@@ -241,10 +246,13 @@ public class MatchDetailScreen extends Screen {
 					colour = Palette.CYAN;
 				}
 			}
-			String label = p.username + ": ";
-			this.textRenderer.drawWithShadow(matrices, label, left, y, Palette.YELLOW);
+			// The name is drawn rather than concatenated so a pace keeps
+			// its two colours down here too. The colon stays with the
+			// name, so the line still reads as one label.
+			int x = left + Palette.drawName(matrices, this.textRenderer, p.username, left, y);
+			this.textRenderer.drawWithShadow(matrices, ": ", x, y, Palette.YELLOW);
 			this.textRenderer.drawWithShadow(matrices, body,
-					left + this.textRenderer.getWidth(label), y, colour);
+					x + this.textRenderer.getWidth(": "), y, colour);
 			y += 11;
 		}
 

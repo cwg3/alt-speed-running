@@ -189,29 +189,6 @@ public class MatchHistoryScreen extends Screen {
 		return super.mouseClicked(mouseX, mouseY, button);
 	}
 
-	/**
-	 * Splits "Pace 10:00" into {"Pace ", "10:00"}, or null for a person.
-	 *
-	 * A HISTORY ROW HAS NO PACE FLAG. The endpoint sends a pace as an
-	 * opponent NAME, so the shape of the string is the only thing that
-	 * distinguishes one from a player - and the space is what does it,
-	 * because a Minecraft username cannot contain one. Anything with a
-	 * space is therefore not somebody's name.
-	 *
-	 * That is what keeps PaceBot whole and yellow. It is a real account
-	 * with real rating changes, it sits in this list next to the paces,
-	 * and a prefix test alone would have split it into "Pace" and "Bot"
-	 * and coloured a player like a target. The trailing space in "Pace "
-	 * and the m:ss check are both load-bearing.
-	 */
-	private static String[] paceParts(String opponentName) {
-		if (opponentName == null || !opponentName.startsWith("Pace ")) {
-			return null;
-		}
-		String time = opponentName.substring("Pace ".length());
-		return time.matches("\\d+:\\d{2}") ? new String[] { "Pace ", time } : null;
-	}
-
 	@Override
 	public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
 		this.renderBackground(matrices);
@@ -297,20 +274,11 @@ public class MatchHistoryScreen extends Screen {
 			// read down the columns.
 			this.textRenderer.drawWithShadow(matrices, "vs", left + VERDICT_W, y, Palette.DIM);
 			// A pace wears yellow for the word and cyan for the time, the
-			// same as the announce, countdown and end screens. Drawn as two
-			// pieces by hand because this is a left-aligned column, not a
-			// centred line - drawCenteredSegments would centre it and break
-			// the column the list is read down.
-			String[] parts = paceParts(e.opponentName);
-			if (parts != null) {
-				int px = left + VERDICT_W + 16;
-				this.textRenderer.drawWithShadow(matrices, parts[0], px, y, Palette.YELLOW);
-				this.textRenderer.drawWithShadow(matrices, parts[1],
-						px + this.textRenderer.getWidth(parts[0]), y, Palette.CYAN);
-			} else {
-				this.textRenderer.drawWithShadow(matrices, e.opponentName,
-						left + VERDICT_W + 16, y, Palette.YELLOW);
-			}
+			// same as the announce, countdown, end and detail screens.
+			// Left-aligned rather than centred, because this is a column
+			// the list is read down.
+			Palette.drawName(matrices, this.textRenderer, e.opponentName,
+					left + VERDICT_W + 16, y);
 
 			this.textRenderer.drawWithShadow(matrices, typeName(e.seedType),
 					left + 140, y, Palette.PURPLE);

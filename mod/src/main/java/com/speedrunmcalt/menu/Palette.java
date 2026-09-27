@@ -122,4 +122,64 @@ public final class Palette {
 			x += font.getWidth(parts[i]);
 		}
 	}
+
+	/**
+	 * Splits "Pace 10:00" into {"Pace ", "10:00"}, or null for a person.
+	 *
+	 * A NAME IS OFTEN ALL THERE IS TO GO ON. Several endpoints send a
+	 * pace as an opponent NAME with no flag beside it - a history row, a
+	 * match detail, the HUD's opponent - so the shape of the string is
+	 * the only thing that distinguishes one from a player, and the space
+	 * is what does it, because a Minecraft username cannot contain one.
+	 * Anything with a space is therefore not somebody's name.
+	 *
+	 * That is what keeps PaceBot whole and yellow. It is a real account
+	 * with real rating changes, it sits in the history list next to the
+	 * paces, and a prefix test alone would have split it into "Pace" and
+	 * "Bot" and coloured a player like a target. The trailing space in
+	 * "Pace " and the m:ss check are both load-bearing.
+	 */
+	public static String[] paceParts(String name) {
+		if (name == null || !name.startsWith("Pace ")) {
+			return null;
+		}
+		String time = name.substring("Pace ".length());
+		return time.matches("\\d+:\\d{2}") ? new String[] { "Pace ", time } : null;
+	}
+
+	/**
+	 * Draws an opponent at x: a person whole in yellow, a pace yellow for
+	 * the word and cyan for the time. Returns the width drawn, for lines
+	 * that put something after the name.
+	 *
+	 * Every screen that names an opponent goes through here. Each one
+	 * used to decide for itself, which is how the same pace ended up
+	 * yellow on the screen that scored it and two-coloured on the screen
+	 * that announced it.
+	 */
+	public static int drawName(MatrixStack matrices, TextRenderer font,
+			String name, int x, int y) {
+		String[] parts = paceParts(name);
+		if (parts == null) {
+			String text = name == null ? "" : name;
+			font.drawWithShadow(matrices, text, x, y, YELLOW);
+			return font.getWidth(text);
+		}
+		font.drawWithShadow(matrices, parts[0], x, y, YELLOW);
+		int w = font.getWidth(parts[0]);
+		font.drawWithShadow(matrices, parts[1], x + w, y, CYAN);
+		return w + font.getWidth(parts[1]);
+	}
+
+	/** drawName, centred on cx rather than starting at it. */
+	public static void drawCenteredName(MatrixStack matrices, TextRenderer font,
+			String name, int cx, int y) {
+		String[] parts = paceParts(name);
+		if (parts == null) {
+			String text = name == null ? "" : name;
+			font.drawWithShadow(matrices, text, cx - font.getWidth(text) / 2, y, YELLOW);
+			return;
+		}
+		drawCenteredSegments(matrices, font, cx, y, parts, new int[] { YELLOW, CYAN });
+	}
 }

@@ -457,9 +457,24 @@ public final class MatchHud {
 				drawShadowed(matrices, client, lead, x, Y,
 						com.speedrunmcalt.menu.Palette.PURPLE);
 				x += client.textRenderer.getWidth(lead);
-				drawShadowed(matrices, client, name, x, Y,
-						com.speedrunmcalt.menu.Palette.YELLOW);
-				x += client.textRenderer.getWidth(name);
+				// A pace keeps its yellow word and cyan time here too.
+				// This overlay and the menu's MATCH FOUND screen announce
+				// the same match to the same player seconds apart, and
+				// only one of them was saying which kind of opponent it
+				// was.
+				String[] found = com.speedrunmcalt.menu.Palette.paceParts(name);
+				if (found == null) {
+					drawShadowed(matrices, client, name, x, Y,
+							com.speedrunmcalt.menu.Palette.YELLOW);
+					x += client.textRenderer.getWidth(name);
+				} else {
+					drawShadowed(matrices, client, found[0], x, Y,
+							com.speedrunmcalt.menu.Palette.YELLOW);
+					x += client.textRenderer.getWidth(found[0]);
+					drawShadowed(matrices, client, found[1], x, Y,
+							com.speedrunmcalt.menu.Palette.CYAN);
+					x += client.textRenderer.getWidth(found[1]);
+				}
 				drawShadowed(matrices, client, "  - loading world", x, Y,
 						com.speedrunmcalt.menu.Palette.PURPLE);
 				return;
@@ -492,11 +507,31 @@ public final class MatchHud {
 		// "vs" stays recessive; the NAME is yellow, the same way the
 		// player's own name is yellow on the menu. In dim grey it was
 		// nearly invisible over bright water.
+		//
+		// A pace splits yellow/cyan here as well. The live endpoint sends
+		// one as a plain opponent name, so this line is the LAST place a
+		// pace match still looked like a person - the announce, countdown,
+		// end, history and detail screens all say it in two colours, and
+		// the HUD is the surface the player stares at for twenty minutes.
 		String opponent = MatchState.opponentUsername;
 		drawShadowed(matrices, client, "vs ", X, y, DIM);
-		drawShadowed(matrices, client, opponent == null ? "..." : opponent,
-				X + client.textRenderer.getWidth("vs "), y,
-				com.speedrunmcalt.menu.Palette.YELLOW);
+		String shown = opponent == null ? "..." : opponent;
+		int nx = X + client.textRenderer.getWidth("vs ");
+		String[] parts = com.speedrunmcalt.menu.Palette.paceParts(shown);
+		if (parts == null) {
+			drawShadowed(matrices, client, shown, nx, y,
+					com.speedrunmcalt.menu.Palette.YELLOW);
+		} else {
+			// Two drawShadowed calls, so each piece gets its own backdrop
+			// - the same way the "match found vs NAME" line above is
+			// built. The backdrops overlap by a couple of pixels and the
+			// seam is invisible against a world.
+			drawShadowed(matrices, client, parts[0], nx, y,
+					com.speedrunmcalt.menu.Palette.YELLOW);
+			drawShadowed(matrices, client, parts[1],
+					nx + client.textRenderer.getWidth(parts[0]), y,
+					com.speedrunmcalt.menu.Palette.CYAN);
+		}
 		y += LINE + 2;
 
 		for (int i = 0; i < ORDER.length; i++) {
