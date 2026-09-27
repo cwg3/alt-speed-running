@@ -4,6 +4,28 @@ Known outstanding work, roughly in the order it would matter.
 
 ## Operational
 
+- [ ] **`loadSeedPool.ts` should track which nether seeds are taken.**
+  The pairing loop starts `netherIndex` at 0 every run and never consults
+  the table, so any load that ADDS to an existing pool re-pairs nether
+  seeds that existing rows already hold. Correct for a from-scratch
+  `--replace` build, wrong for every additive load. CLAUDE.md already
+  records this and names both answers: reorder `nether_seeds.json`
+  unused-first before a load, or fix the loader to track what is taken.
+
+  The workaround was used on 2026-09-27 to merge a recovered batch of
+  village seeds - back up `nether_seeds.json`, rewrite it with only the
+  seeds absent from the table, load, restore. It works, and it is a trap set for next time: the
+  trimmed file is correct exactly once and drifts as soon as rows are
+  used. The permanent fix is to scan the table for nether seeds in use and
+  skip them while pairing, which makes the order of the file irrelevant.
+
+  Worth doing because the duplicates it produced were real: the pool
+  carried nether seeds paired 2-3x, all of them from earlier additive
+  loads. A runner meeting the same nether twice knows the bastion and
+  fortress layout, which is the advantage the never-twice rule exists to
+  deny. They are gone now, but only because the rows holding them were
+  deleted for an unrelated reason.
+
 - [x] **`verify-and-release.sh` renamed too.** It was mid-run when the
   rest of the rename happened, so it had to wait for the job to exit.
 
