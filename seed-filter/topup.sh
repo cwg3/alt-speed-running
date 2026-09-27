@@ -606,9 +606,17 @@ record_released({t: (rows.get(t, {}).get('released') or 0)
                  for t in plan['targets'] if plan['targets'][t]})
 # A type that was ALREADY not closing before this run is the more serious
 # of the two facts and goes first, because the subject line is truncated
-# and whatever is first is the part that gets read. "still short" after
-# one run is expected and says nothing on its own; "not converging" is
-# the thing that never fixes itself.
+# and whatever is first is the part that gets read. Being short after one
+# run is expected and says nothing on its own; not converging is the
+# thing that never fixes itself.
+#
+# NO BARE DOUBLE QUOTES ANYWHERE IN THIS BLOCK, including in a comment.
+# It is the body of python3 -c \"...\", so a \" ends the shell argument:
+# python then received this script truncated at that character, ran the
+# part before it, printed no VERDICT and exited 0. A silent partial run
+# of the reporting step is the exact failure the reporting step exists to
+# prevent, and it survived a dry run (which stops earlier) and a unit
+# test of this block alone (which never went through the shell).
 parts = []
 stalled = [t for t in plan.get('stalled') or [] if t in plan['targets']]
 if stalled:

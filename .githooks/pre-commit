@@ -1,4 +1,34 @@
 #!/bin/bash
-# Scans staged content. See tools/check-no-stats.sh for what and why.
-[ "${ALT_ALLOW_STATS:-0}" = 1 ] && exit 0
-exec "$(git rev-parse --show-toplevel)/tools/check-no-stats.sh" --staged
+# Scans staged content. Two guards, and they are independent:
+#
+#   check-no-stats.sh        what must not be PUBLISHED (see that file)
+#   check-embedded-quotes.sh what must not be BROKEN - a bare quote in an
+#                            embedded python body, which bash -n cannot see
+#
+# ALT_ALLOW_STATS only overrides the first. There is no override for the
+# second because it has no false positives to override: an unescaped quote
+# in a `python3 -c "..."` body is never intentional, and the failure it
+# causes is a silent partial run.
+ROOT="$(git rev-parse --show-toplevel)"
+rc=0
+[ "${ALT_ALLOW_STATS:-0}" = 1 ] || "$ROOT/tools/check-no-stats.sh" --staged || rc=1
+# Only the staged shell scripts, and read from the INDEX rather than the
+# working tree: committing a fixed file while the tree still has the break
+# (or the reverse) is exactly when this needs to be right.
+staged=$(git diff --cached --name-only --diff-filter=ACM -- '*.sh')
+if [ -n "$staged" ]; then
+	tmp=$(mktemp -d) || exit 1
+	trap 'rm -rf "$tmp"' EXIT
+	while IFS= read -r f; do
+		[ -z "$f" ] && continue
+		mkdir -p "$tmp/$(dirname "$f")"
+		git show ":$f" > "$tmp/$f" 2>/dev/null || continue
+		"$ROOT/tools/check-embedded-quotes.sh" "$tmp/$f" >/dev/null 2>&1 || {
+			"$ROOT/tools/check-embedded-quotes.sh" "$tmp/$f"
+			echo "   ^ that file is staged with a bare quote inside an embedded"
+			echo "     python body. python would receive it truncated there."
+			rc=1
+		}
+	done <<< "$staged"
+fi
+exit $rc
