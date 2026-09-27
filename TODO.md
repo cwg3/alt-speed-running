@@ -98,11 +98,36 @@ Known outstanding work, roughly in the order it would matter.
   refs/heads/main` against `git rev-parse HEAD` before publishing
   anything - see CLAUDE.md.
 
-- [ ] **Backups were run by hand and stopped happening.** The last one
+  **A FOURTH TIME, 2026-09-27, and different again.** v0.1.8 was built,
+  released and SHA-verified correctly, and then the jar was REBUILT locally
+  from later source without a version bump. Two different artifacts then
+  answered to 0.1.8: the one on the release, and the one in the mods folder.
+  Nothing was wrong at publish time, so no check at publish time could have
+  caught it - the divergence happened afterwards, in the build directory.
+  0.1.9 was cut for no reason other than to make the version name one jar
+  again. The habit that prevents it is bumping before rebuilding, not
+  verifying harder.
+
+- [x] **Backups were run by hand and stopped happening.** The last one
   predated the leaderboard, the ladder reset, the publish guard and the
   whole top-up pipeline. `tools/backup.sh` now does it in one command —
-  tables, replays, the gitignored `*.local.json` files and the pack. Run
-  it after anything that changes the pool or the schema.
+  and since 2026-09-27 it writes all three destinations rather than only
+  S3: `s3://alt-backups-<acct>/<stamp>/`, `~/alt-backups/alt-<stamp>/`, and
+  the thumb drive with `--drive <path>`, verifying that copy off the device
+  by unmounting and remounting before checking the manifest.
+
+  It also captures what it used to omit, which was the part that mattered:
+  `repo.bundle` (all branches and tags), `submodules/` - a git bundle does
+  NOT contain submodule content, and `tools/cubiomes` is what `seedtypes`
+  builds against - plus `seed-filter/output/` and `seed-filter/results/`.
+  Before that the repo lived in exactly two places and `seed-filter/output`
+  in one. Proven by restoring the repo and the submodule from the drive
+  alone, with no network, and compiling `seedtypes` from the result.
+
+  The locked `~/alt-vault/` copy stays manual on purpose: a script that
+  could write it could destroy it, which is the one thing it exists to
+  prevent. Run the backup after anything that changes the pool or the
+  schema.
 - [ ] **`backend/split-rules.local.json` is not in git.** It holds the
   anti-cheat thresholds and is read at `cdk synth` time. Losing it does
   not break a deploy - checking silently degrades to loose defaults and

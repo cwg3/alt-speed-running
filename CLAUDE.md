@@ -71,8 +71,20 @@ onto the MATCH FOUND title and onto the leaderboard.
   running script corrupts the run in progress.
 - **ERROR is not FAIL.** A crashed worker must never be read as a bad
   seed. Inconclusive rows stay held; that rule has saved the pool twice.
+  **Enforce it by ALLOWLISTING the verdict**, not by testing for a shape.
+  On 2026-09-27 three of the four stages in `overnight-rebuild.sh` were
+  getting this wrong while one got it right: `spawn` and `portalfilter`
+  asked `if r[1]=='PASS'`, which makes a crash indistinguishable from a
+  rejection, and `village` asked whether a column was numeric - which every
+  crash row satisfies, because a failure is written at the same width with
+  numeric zeroes and the marker on the end. A shape test only catches
+  crashes that look malformed, and these are written not to.
 - **Cloud CSV shapes differ per check** - `nether` is seed-first,
-  `route` is type-first. `run-check.sh`'s header says so in capitals.
+  `route` is type-first. Confirmed in the hooks that write them:
+  `NetherLocateHook` leads with the seed, `RouteCheckHook` with the type.
+  `run-check.sh`'s header documents the shape traps for `spawn`,
+  `portalfilter`, `ravine` and `village` - it does NOT cover this pair, so
+  read the hooks rather than looking for it there.
 - **`loadSeedPool.ts --only=<type>` DELETES that type's rows.** It reads
   like a filter and is not one. It discarded four verified drawable
   buried treasure seeds on 2026-09-25. Drawable rows now need `--yes`.
