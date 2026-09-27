@@ -18,11 +18,17 @@
 # the spec asks: is there a blacksmith with resources in it.
 #
 # Row format, matching LootVerifyHook:
-#   seed,ironIngots,hasIronPickaxe,hasIronArmor,chests,smithChests,diamonds
+#   seed,ironIngots,hasIronPickaxe,hasIronArmor,chests,smithChests,diamonds,smithX,smithZ
+# smithX,smithZ are where the smith's chest actually is, empty when
+# there is none. They are the position the pool loader uses: the jigsaw
+# pre-filter's own position is missing for seeds it wrongly calls
+# smithless, which left three verified villages unloadable.
 # A failed run writes the same width with a trailing ERROR, so a
 # failure can never be mistaken for a genuine zero - that mistake once
 # turned 28 crashed workers into a reported "35 of 40 seeds have no
-# blacksmith".
+# blacksmith". The sentinel stays LAST, and readers look for it at the
+# end of the row rather than at a fixed index, so appending a column
+# cannot turn a crash back into a zero.
 #
 # Worker claiming, the mkdir lock and --no-daemon all work the way
 # check-one-ravine.sh explains - see that file for why each is needed.
@@ -42,7 +48,7 @@ for attempt in $(seq 1 600); do
   done
   sleep 1
 done
-[ -n "$DIR" ] || { echo "$SEED,0,false,false,0,0,0,NOWORKER" > "$POOL/res_$SEED"; exit 0; }
+[ -n "$DIR" ] || { echo "$SEED,0,false,false,0,0,0,,,NOWORKER" > "$POOL/res_$SEED"; exit 0; }
 trap 'rmdir "$CLAIM" 2>/dev/null' EXIT
 
 # Unique port per worker. Without it every worker fights over
@@ -67,5 +73,5 @@ rm -f "$DIR/run/village.txt"
 if [ -s "$DIR/run/results.csv" ]; then
   tail -1 "$DIR/run/results.csv" > "$POOL/res_$SEED"
 else
-  echo "$SEED,0,false,false,0,0,0,ERROR" > "$POOL/res_$SEED"
+  echo "$SEED,0,false,false,0,0,0,,,ERROR" > "$POOL/res_$SEED"
 fi

@@ -5,7 +5,9 @@
 #
 # seeds-file: "<seed> <villageX> <villageZ>" per line
 # output:     mod/run/village-all.csv, one row per seed
-#             seed,ironIngots,hasIronPickaxe,hasIronArmor,chests,smithChests
+#             seed,ironIngots,hasIronPickaxe,hasIronArmor,chests,smithChests,diamonds,smithX,smithZ
+#             mod/run/village-qualified.txt, the seeds that pass
+#             mod/run/village-smith-pos.csv, seed,smithX,smithZ for the loader
 #
 # The filter's own rule, from the standard: a village seed must have a
 # blacksmith (weaponsmith, toolsmith or armorer) with enough to
@@ -55,24 +57,37 @@ cat "$POOL"/res_* 2>/dev/null > "$OUT"
 echo
 echo "done: $(wc -l < "$OUT" | tr -d ' ') rows -> $OUT"
 
-python3 - "$OUT" "$MOD/run/village-qualified.txt" <<'PY'
+python3 - "$OUT" "$MOD/run/village-qualified.txt" "$MOD/run/village-smith-pos.csv" <<'PY'
 import csv, sys
-rows = [r for r in csv.reader(open(sys.argv[1])) if len(r) >= 7]
+
+# A failed run writes ERROR/NOWORKER as the row's LAST column
+# (check-one-village.sh), and a cloud shard that produced no CSV writes
+# "<seed>,ERROR,no-csv" - three columns (cloud/run-checks.sh).
+#
+# Counting either as a genuine zero once turned 28 crashed workers into a
+# reported "35 of 40 villages have no blacksmith" - a wrong and alarming
+# number that only a manual re-run caught. The narrow cloud row had the
+# opposite failure: a `len(r) >= 7` filter DROPPED it, so a crashed shard
+# looked like a seed that was never submitted rather than one that failed.
+#
+# So look for the sentinel ANYWHERE in the row rather than at a fixed
+# index. smithX,smithZ were appended to this format on 2026-09-27 and a
+# fixed index would have quietly stopped matching.
+SENTINELS = ('ERROR', 'NOWORKER')
+rows = [r for r in csv.reader(open(sys.argv[1])) if r]
 if not rows:
     sys.exit('no rows')
+
+bad = [r for r in rows if any(c in SENTINELS for c in r)]
+clean = [r for r in rows if not any(c in SENTINELS for c in r)]
+ok = [r for r in clean if len(r) >= 7]
+malformed = [r for r in clean if len(r) < 7]
 
 def num(v):
     try:
         return int(v)
     except ValueError:
         return 0
-
-# A failed run writes a trailing ERROR/NOWORKER in the last column.
-# Counting those as genuine zeroes once turned 28 crashed workers into
-# a reported "35 of 40 villages have no blacksmith" - a wrong and
-# alarming number that only a manual re-run caught.
-bad = [r for r in rows if len(r) > 7 and r[7] in ('ERROR', 'NOWORKER')]
-ok = [r for r in rows if not (len(r) > 7 and r[7] in ('ERROR', 'NOWORKER'))]
 
 # The iron golem supplies this much on top of whatever is in chests.
 GOLEM_IRON = 4
@@ -100,12 +115,30 @@ full = [r for r in smith if qualifies(r)]
 diamond_only = [r for r in smith
                 if num(r[1]) + GOLEM_IRON < 7 and qualifies(r)]
 
+# Where the smith chest is, for rows carrying the position. Pre-2026-09-27
+# runs are seven columns wide and have none; they are still valid results,
+# they just cannot supply a position.
+def smith_pos(r):
+    if len(r) >= 9 and r[7] != '' and r[8] != '':
+        return (r[7], r[8])
+    return None
+
+positioned = [r for r in smith if smith_pos(r)]
+
 print(f'{len(ok)} completed, {len(bad)} FAILED TO RUN')
 if bad:
     print('  (failures are not results - re-run them before drawing conclusions)')
+if malformed:
+    print(f'  !! {len(malformed)} rows too short to read and carrying no error '
+          'marker - treat as unchecked, not as zeroes')
 print(f'{len(smith)}/{len(ok)} have a real smith chest')
 print(f'{len(full)}/{len(ok)} meet the resource threshold too')
 print(f'  of those, {len(diamond_only)} qualify only via the 4 iron + 3 diamonds branch')
+print(f'{len(positioned)}/{len(smith)} carry a smith position')
+if len(positioned) < len(smith):
+    print('  (the rest are pre-2026-09-27 rows without the column - re-run them '
+          'if you need to LOAD them, since a null smith position sends the '
+          'guaranteed iron to an ordinary house chest)')
 
 # The qualifying seeds, one per line, for the pool build to draw from.
 #
@@ -120,4 +153,21 @@ if qualified:
             f.write(r[0] + '\n')
     print(f'\nwrote {len(smith)} qualifying seeds (smith chest present) -> {qualified}')
     print(f'  for reference, {len(full)} of them also meet the natural-resource threshold')
+
+# The smith positions, for the pool loader.
+#
+# This is the AUTHORITATIVE source: it comes from generating the village
+# and reading its real loot tables, where the loader's previous source
+# (smith.csv) derives the position from a jigsaw piece NAME. That filter
+# both over-reports by ~3x and under-reports - on 2026-09-27 three seeds
+# with a verified smith chest had no jigsaw position and so could not be
+# loaded at all.
+posfile = sys.argv[3] if len(sys.argv) > 3 else None
+if posfile:
+    with open(posfile, 'w') as f:
+        f.write('seed,smithX,smithZ\n')
+        for r in positioned:
+            x, z = smith_pos(r)
+            f.write(f'{r[0]},{x},{z}\n')
+    print(f'wrote {len(positioned)} smith positions -> {posfile}')
 PY

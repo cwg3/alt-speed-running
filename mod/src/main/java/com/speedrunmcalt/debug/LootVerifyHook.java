@@ -84,9 +84,18 @@ public class LootVerifyHook implements DedicatedServerModInitializer {
 			VillageLoot.Result r = VillageLoot.scan(world, village.xzBox());
 			SpeedrunMcAlt.LOGGER.info("[scan] {} {}", seed, r);
 			try (FileWriter out = new FileWriter("results.csv", true)) {
+				// smithX,smithZ are APPENDED, never inserted. Readers
+				// index this row positionally and a shifted column has
+				// twice silently discarded verified seeds here.
+				// Empty when there is no smith chest, matching
+				// SmithCheckHook's own convention for an absent
+				// position.
+				String smithAt = r.smithPos == null ? ","
+						: r.smithPos.getX() + "," + r.smithPos.getZ();
 				out.write(seed + "," + r.ironIngots + "," + r.hasIronPickaxe
 						+ "," + r.hasIronArmor + "," + r.chestsFound
-						+ "," + r.smithChests + "," + r.diamonds + "\n");
+						+ "," + r.smithChests + "," + r.diamonds
+						+ "," + smithAt + "\n");
 			} catch (Exception e) {
 				SpeedrunMcAlt.LOGGER.error("[scan] could not write results.csv", e);
 			}

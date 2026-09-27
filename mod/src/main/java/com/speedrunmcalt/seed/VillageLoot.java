@@ -89,15 +89,39 @@ public final class VillageLoot {
 		 * that branch be checked at all.
 		 */
 		public final int diamonds;
+		/**
+		 * Where the smith's chest actually is, or null if the sweep
+		 * found none.
+		 *
+		 * The pool loader needs this and used to take it from
+		 * SmithCheckHook, which derives it from the jigsaw piece NAME.
+		 * That filter is known to over-report by ~3x; it also
+		 * UNDER-reports, which is why this field exists. On 2026-09-27
+		 * three seeds whose villages demonstrably contain a smith chest
+		 * came back false from the jigsaw with no position, so they
+		 * could not be loaded at all - a row with a null smith position
+		 * sends the guaranteed iron to an ordinary house chest, the
+		 * exact bug check-one-village.sh was written to prevent.
+		 *
+		 * This sweep reads real loot tables, so when it says there is a
+		 * smith chest it also knows where. That makes it the
+		 * authoritative source for the position, not a second opinion.
+		 *
+		 * The first smith chest reached, when a village has more than
+		 * one; smithChests carries the count. Either serves the loot
+		 * top-up equally.
+		 */
+		public final BlockPos smithPos;
 
 		Result(int ironIngots, boolean hasIronPickaxe, boolean hasIronArmor,
-				int chestsFound, int smithChests, int diamonds) {
+				int chestsFound, int smithChests, int diamonds, BlockPos smithPos) {
 			this.ironIngots = ironIngots;
 			this.hasIronPickaxe = hasIronPickaxe;
 			this.hasIronArmor = hasIronArmor;
 			this.chestsFound = chestsFound;
 			this.smithChests = smithChests;
 			this.diamonds = diamonds;
+			this.smithPos = smithPos;
 		}
 
 		@Override
@@ -107,7 +131,10 @@ public final class VillageLoot {
 					+ " armor=" + hasIronArmor
 					+ " chests=" + chestsFound
 					+ " smithChests=" + smithChests
-					+ " diamonds=" + diamonds;
+					+ " diamonds=" + diamonds
+					+ " smithAt=" + (smithPos == null
+							? "none"
+							: smithPos.getX() + "," + smithPos.getZ());
 		}
 	}
 
@@ -123,6 +150,7 @@ public final class VillageLoot {
 		int chests = 0;
 		int smithChests = 0;
 		int diamonds = 0;
+		BlockPos smithPos = null;
 
 		// Container discovery is delegated rather than done here, and the
 		// reason is the whole point of this fix.
@@ -155,6 +183,9 @@ public final class VillageLoot {
 					|| tableName.contains("toolsmith")
 					|| tableName.contains("armorer")) {
 				smithChests++;
+				if (smithPos == null) {
+					smithPos = pos.toImmutable();
+				}
 			}
 			for (ItemStack stack : rollLoot(world,
 					(LootableContainerBlockEntity) entity, pos)) {
@@ -169,7 +200,8 @@ public final class VillageLoot {
 				}
 			}
 		}
-		return new Result(ironIngots, pickaxe, armor, chests, smithChests, diamonds);
+		return new Result(ironIngots, pickaxe, armor, chests, smithChests, diamonds,
+				smithPos);
 	}
 
 	private static boolean isIronArmor(ItemStack stack) {

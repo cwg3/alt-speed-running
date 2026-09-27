@@ -198,9 +198,45 @@ async function main() {
 				smithPos.set(parts[0], { x: Number(parts[4]), z: Number(parts[5]) });
 			}
 		}
-		console.log(`Loaded ${smithPos.size} blacksmith positions`);
+		console.log(`Loaded ${smithPos.size} blacksmith positions (jigsaw)`);
 	} else {
-		console.warn('No mod/run/smith.csv - village rows will carry no smith position');
+		console.warn('No mod/run/smith.csv - falling back to the village check for positions');
+	}
+
+	// village-smith-pos.csv OVERRIDES smith.csv, and is read second so it wins.
+	//
+	// smith.csv comes from the jigsaw pre-filter, which matches a piece NAME.
+	// That filter is wrong in both directions: it over-reports by about 3x,
+	// and on 2026-09-27 it under-reported three seeds whose villages
+	// demonstrably contain a smith chest - reporting false with no position,
+	// so those seeds could not be loaded at all. A village row with a null
+	// smith position sends the guaranteed iron to an ordinary house chest,
+	// which is the bug the whole village check exists to prevent.
+	//
+	// This file comes from the village check, which GENERATES the village and
+	// reads its real loot tables. When it reports a smith chest it also knows
+	// where, so it is authoritative for the position rather than a second
+	// opinion.
+	const genPosCsv = path.join(__dirname, '..', '..', 'mod', 'run', 'village-smith-pos.csv');
+	if (fs.existsSync(genPosCsv)) {
+		let n = 0;
+		let overrode = 0;
+		for (const line of fs.readFileSync(genPosCsv, 'utf-8').split('\n')) {
+			const parts = line.trim().split(',');
+			if (parts[0] === 'seed' || parts.length < 3) {
+				continue;
+			}
+			if (parts[1] === '' || parts[2] === '') {
+				continue;
+			}
+			if (smithPos.has(parts[0])) {
+				overrode++;
+			}
+			smithPos.set(parts[0], { x: Number(parts[1]), z: Number(parts[2]) });
+			n++;
+		}
+		console.log(`Loaded ${n} blacksmith positions (generated world)`
+			+ `${overrode ? `, ${overrode} overriding the jigsaw's` : ''}`);
 	}
 
 	const rows: Record<string, unknown>[] = [];
@@ -248,6 +284,18 @@ async function main() {
 		counts[t] = (counts[t] ?? 0) + 1;
 	}
 	console.log(`Prepared ${rows.length} seed pairs:`, counts);
+
+	// A village row with no smith position is loadable but not useful: the
+	// loot top-up has nowhere to put the guaranteed iron, so it lands in an
+	// ordinary house chest and the player is sent to a village that appears
+	// to have nothing. Two seeds shipped that way before the village check
+	// existed. Say so rather than loading it quietly.
+	const noSmith = rows.filter((r) => r.seedType === 'village' && r.smithX === null);
+	if (noSmith.length > 0) {
+		console.warn(`  !! ${noSmith.length} village row(s) carry NO smith position - `
+			+ 'the guaranteed iron will not land in a blacksmith. Re-run the village '
+			+ 'check to produce mod/run/village-smith-pos.csv for them.');
+	}
 
 	const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 	if (only) {
