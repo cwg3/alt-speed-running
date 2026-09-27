@@ -84,6 +84,14 @@ rm -f run/smith.csv run/ravine.csv \
       run/smithbatch.txt run/ravine.txt run/loot.txt run/lava.txt \
       run/portal.txt run/rpverify.txt run/rpverify.csv run/rppredict.txt \
       run/rppredict.csv run/village.txt run/diag.txt run/results.csv
+# The village check's own outputs, which this list missed until 2026-09-27.
+# village-qualified.txt is the dangerous one: the join below EXITS if it is
+# absent, but silently USES it if it is stale, so a leftover from a
+# three-seed re-run would quietly filter a fresh village pool down to those
+# three. Being missing is loud; being wrong is not, which is the whole
+# reason every harness input gets cleared here rather than trusted.
+rm -f run/village-all.csv run/village-qualified.txt \
+      run/village-smith-pos.csv run/village-candidates.txt
 
 echo
 echo "=== jigsaw: blacksmith pre-filter (no chunks) ==="
