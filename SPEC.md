@@ -244,10 +244,17 @@ time villages were selected, the rule was applied by hand on smith
 presence alone — which silently ignored the resource threshold
 entirely, and would have ignored the diamond branch too.
 
-**The live pool predates this.** Its 29 villages were chosen on "has a
-real smith chest", so every one is verified playable, but none was
-checked against either resource threshold. Re-verifying them is about
-seven minutes of world generation and has not been done.
+**This is checked but not filtered on.** `verify-villages.sh` computes
+both branches and reports them; what it writes as QUALIFYING is smith
+presence alone, because the iron is a guarantee `LootTopUp` provides
+rather than a property the seed has to supply. Filtering on the
+threshold as well discarded most of a verified-good sample for a
+condition that is true by the time anyone plays the seed.
+
+An earlier version of this paragraph said the live pool predated the
+thresholds and quoted how many villages were in it. Both halves went
+stale — the pool has been rebuilt since, and the numbers do not belong in
+this repo (see the pool-composition note further down).
 
 This replaces an exclusion of taiga and snowy villages on the grounds
 that they were the low-resource variants. That was the wrong
@@ -1071,10 +1078,10 @@ and a match does not ship a seed - it ships a pair, a world built from
 one seed whose nether is redirected to another, plus a coordinate
 telling the player where to go. Every earlier harness generated
 single-seed worlds, which cannot reproduce a two-seed bug by
-construction. The first run over the live pool found 4 of 19 pairs out
-of spec, and three of those were shipping a bastion coordinate with
-nothing at it - 452, 522 and 828 blocks from the nearest real bastion,
-zero containers at two of them. That is precisely the failure players
+construction. The first run over the live pool found several pairs out of
+spec, most of them shipping a bastion coordinate with nothing at it - 452,
+522 and 828 blocks from the nearest real bastion, zero containers at two
+of them. That is precisely the failure players
 had been reporting as "the bastion wasn't at the coords you gave me",
 and no seed-level check could see it.
 
@@ -1434,10 +1441,11 @@ done, which made the log evidence of what was attempted rather than what
 happened. It now logs ACCEPTED or REFUSED, after the answer.
 
 **Nothing records which checks a pool row passed.** This entry used to
-say the pool's 29 villages predated the iron and diamond thresholds and
-wanted seven minutes of re-verification. The count is long stale — the
-pool has been rebuilt several times since — and `verify-villages.sh` does
-implement both thresholds now.
+say how many villages in the pool predated the iron and diamond
+thresholds, and wanted a re-verification run. That count was stale before
+it was read twice — the pool is rebuilt regularly — and a pool count does
+not belong in this repo at all; `verify-villages.sh` does implement both
+thresholds now.
 
 What cannot be answered is whether any PARTICULAR row went through them.
 A pool row carries its seed, its structure and its coordinates, and

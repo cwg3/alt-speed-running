@@ -70,34 +70,52 @@ scan() {
 
 	# Pool COMPOSITION - how many of each type are drawable or quarantined.
 	#
-	# This is the same leak as a yield wearing different clothes. A yield
-	# says what a type costs to produce; a per-type depth says which type
-	# the producing has failed to keep up with, which is the map of where
-	# the ladder is thin stated outright rather than inferred. SPEC.md
-	# carried exactly that table from 2026-09-25 to 2026-09-27 and this
-	# guard passed it, because --staged only scans ADDED lines and the
-	# table was added before the guard existed. Being unable to catch what
-	# is already committed is the right trade; being unable to catch the
-	# next one was not.
+	# This is the same leak as a yield wearing different clothes. A yield says
+	# what a type costs to produce; a per-type depth says which type the
+	# producing has failed to keep up with, which is the map of where the
+	# ladder is thin stated outright rather than inferred. SPEC.md carried
+	# exactly that table from 2026-09-25 to 2026-09-27 and this guard passed
+	# it, because --staged only scans ADDED lines and the table predated the
+	# guard. Being unable to catch what is already committed is the right
+	# trade; being unable to catch the next one was not.
+	#
+	# The vocabulary alone was not enough: SPEC.md also said "Its 29 villages
+	# were chosen on..." and matched none of these words, because counting a
+	# type needs no pool noun - the type name is the noun.
+	#
+	# But the type names cannot simply be ADDED to the vocabulary. Tried that:
+	# it flagged fifteen files, all of them the specification itself -
+	# "| Village | <= 7 chunks |", "Desert temple | 7 iron",
+	# "SHIPWRECK(7, INGOT_EQUIVALENT...)". In this repo a type name sitting
+	# near a number is usually a GUARANTEE, and a guard that fires on the spec
+	# it protects gets overridden by reflex.
+	#
+	# What distinguishes a count is that the number comes FIRST and the type is
+	# PLURAL: "29 villages", never "Village | 7 chunks". The digit must also
+	# not follow a dot, or "since 1.14 villages are assembled by jigsaw" reads
+	# as a count. Together those cut the false positives to three, all named
+	# below.
+	#
+	# Known benign matches, so an override is a decision and not a reflex:
+	# MatchHistoryScreen.java uses `drawable` as a local for how many rows fit
+	# on screen; topup.sh has f-strings like `{pool_n:>4} drawable` where the
+	# digit is a field width - that script PRINTS the number and contains none;
+	# check-one-pair.sh quotes the historical "35 of 40 villages" incident,
+	# which is the lesson being recorded, not today's pool. None is a leak.
+	local PLURALS='(villages|desert temples|ruined portals|shipwrecks|buried treasures|seed pairs)'
 	local depth KW2='(drawable|quarantined|pool depth|in the pool)'
 	depth=$(printf '%s\n' "$text" \
-		| grep -inE "([0-9][^.]{0,8}$KW2|$KW2[^.]{0,8}[0-9])" || true)
+		| grep -inE "([0-9][^.]{0,8}$KW2|$KW2[^.]{0,8}[0-9]|(^|[^0-9.])[0-9]+ +$PLURALS|[0-9]+ of [0-9]+ +[a-z]*$PLURALS)" || true)
 	if [ -n "$depth" ]; then
 		echo "!! $label: looks like pool composition (a per-type depth is a yield)"
 		printf '%s\n' "$depth" | head -5 | sed 's/^/     /'
 		hits=$((hits + 1))
 	fi
 
-	# Known benign matches, so the override is a decision and not a reflex:
-	# MatchHistoryScreen.java uses `drawable` as a local for how many rows
-	# fit on screen, and topup.sh has f-strings like `{pool_n:>4} drawable`
-	# where the digit is a field width, not a figure - that file PRODUCES
-	# the number at runtime and contains none. Neither is a leak.
-	#
 	# And the table form, which carries no vocabulary at all: a row whose
 	# first cell is a seed type and whose other cells are bare counts.
-	# "| village | 43 | 9 |" says everything the sentence above would have
-	# and matches none of the words that would catch it.
+	# "| village | 43 | 9 |" says everything the sentence would have and
+	# matches none of the words that would catch it.
 	local TYPES='(village|desert[ _-]?temple|ruined[ _-]?portal|shipwreck|buried[ _-]?treasure)'
 	local tbl
 	tbl=$(printf '%s\n' "$text" \
