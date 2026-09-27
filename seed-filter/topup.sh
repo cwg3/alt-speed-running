@@ -76,13 +76,22 @@
 # it needs to be approached every run until it is.
 #
 # THE CAP IS ALSO PER TYPE, and for a sharper reason than headroom. A
-# ceiling below (shortfall x headroom) silently rewrites the target, and
-# nothing downstream says so: the plan prints the shortfall it wanted,
-# the run ends "OK", and the type is still short. Headroom being wrong
-# wastes compute; the cap being wrong wastes compute AND hides that it
-# achieved nothing. Set a type's ceiling above its worst realistic
-# shortfall x its headroom, or accept that it converges over several
-# runs rather than one.
+# ceiling below (shortfall x headroom) rewrites the target. Headroom
+# being wrong wastes compute; the cap being wrong wastes compute AND
+# hides that it achieved nothing. Set a type's ceiling above its worst
+# realistic shortfall x its headroom, or accept that it converges over
+# several runs rather than one.
+#
+# AND IT SAYS SO NOW. It used not to: the plan printed the shortfall it
+# wanted next to a candidate count that had been quietly clamped to a
+# third of it, the run ended "OK", and the type was still short - three
+# of five types on one night, none of it visible in the log or the email.
+# So the plan marks every clamped type, estimates what the run can
+# actually close, and after the build reports released-against-target per
+# type with a reason: (ceiling) means the cap chose that, (yield) means
+# the type got its full allowance and the configured headroom is too
+# optimistic. Those are different problems and they were indistinguishable
+# from a single "released N".
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FLOOR="${FLOOR:-100}"
@@ -242,12 +251,43 @@ if held:
 # One candidate count per type, each capped so a single night stays
 # bounded. The generator makes the largest of them and each type is
 # trimmed to its own before anything is checked.
-cands = {t: (min(cap_for(t), int(targets[t] * headroom_for(t)) + 10) if targets[t] else 0)
-         for t in TYPES}
+# What a type would need in ONE run to actually close its shortfall,
+# before any ceiling: the gap times its own yield, plus a small constant
+# so a shortfall of 1 still gets a real batch rather than 2 candidates.
+need = {t: (int(targets[t] * headroom_for(t)) + 10 if targets[t] else 0) for t in TYPES}
+cands = {t: min(cap_for(t), need[t]) for t in TYPES}
+# A ceiling below need[t] silently rewrites the target, and the reason to
+# print it here is that nothing downstream can: the plan line for a type
+# clamped to a fraction of what it needed is character-for-character the
+# line of a type that asked for exactly what it got and will reach its
+# floor with it. The run then ends 'OK' with the type still short, which
+# is the failure this script's header describes and could not previously
+# be seen in a log.
+capped = sorted(t for t in TYPES if targets[t] and cands[t] < need[t])
 for t in TYPES:
     if targets[t]:
-        print(f'  {t:<18}want {targets[t]:>3}  ->  generate {cands[t]}', file=sys.stderr)
-print(json.dumps({'targets': targets, 'short': short, 'cands': cands,
+        mark = f'  CAPPED at {cap_for(t)}, need {need[t]}' if t in capped else ''
+        print(f'  {t:<18}want {targets[t]:>3}  ->  generate {cands[t]}{mark}',
+              file=sys.stderr)
+# The !! gutter runs down EVERY line of this block on purpose:
+# cloud/topup-userdata.sh greps the log to build its notification, so a
+# line without a marker is dropped and the advice arrives as a fragment.
+if capped:
+    print(f'  !! {len(capped)} type(s) clamped by their ceiling - this run cannot '
+          f'reach the floor for them.', file=sys.stderr)
+    print(f'  !! at the configured yields it should close about:', file=sys.stderr)
+    for t in capped:
+        h = headroom_for(t)
+        est = int(cands[t] / h) if h > 0 else 0
+        print(f'  !!   {t:<18}{est:>4} of {targets[t]:>3} wanted '
+              f'({cands[t]} candidates at {h:g}x)', file=sys.stderr)
+    print('  !! fine IF each gap shrinks every run - compare with the last one.',
+          file=sys.stderr)
+    print('  !! if a type\'s shortfall is flat or growing, raise '
+          '_maxCandidatesByType', file=sys.stderr)
+    print('  !! for THAT type, never the shared _default.', file=sys.stderr)
+print(json.dumps({'targets': targets, 'short': short, 'cands': cands, 'need': need,
+                  'capped': capped, 'floor': floor,
                   'cand': max(cands.values()) if short else 0}))
 ")
 rc=$?
@@ -268,7 +308,13 @@ if [ -z "$SHORT" ]; then
 fi
 echo "short: $SHORT"
 echo "targets: $TARGETS"
-echo "candidates per type: $CAND"
+# CAND is one number because the generator takes one. It is the LARGEST
+# type's allowance, and overnight-rebuild.sh trims every other type down
+# to its own before a single check runs - so printed as "candidates per
+# type" it claimed the most expensive type's allowance for every type,
+# including ones that would never check anywhere near that many.
+echo "candidates per type: $CANDS"
+echo "generator batch (largest type's allowance): $CAND"
 
 if [ "$DRY" = 1 ]; then
 	echo
@@ -277,6 +323,11 @@ if [ "$DRY" = 1 ]; then
 fi
 
 echo
+# Anything older than this in the release breakdown is a previous run's
+# and must not be read as this one's - a stale file is how a report gets
+# to be confidently wrong about a run that released nothing.
+RUN_STARTED=$(date +%s)
+BREAKDOWN="$ROOT/seed-filter/results/release-by-type.json"
 # PER is ignored when TARGETS is set; passed so the usage stays honest.
 TARGETS="$TARGETS" CANDS="$CANDS" WORKERS="$WORKERS" \
 	"$ROOT/seed-filter/overnight-rebuild.sh" "$FLOOR" "$CAND"
@@ -286,4 +337,85 @@ if [ "$rc" -ne 0 ]; then
 	echo "!! top-up FAILED (rc=$rc) - the pool was not changed" >&2
 	exit "$rc"
 fi
+
+# What the run actually did, per type, against what it set out to do.
+# A bare "released N" cannot answer the only question that matters -
+# whether the type that was starving got anything - and a total can look
+# healthy while one type got zero.
+PLAN="$PLAN" BREAKDOWN="$BREAKDOWN" RUN_STARTED="$RUN_STARTED" python3 -c "
+import json, os, sys
+plan = json.loads(os.environ['PLAN'])
+path, started = os.environ['BREAKDOWN'], float(os.environ['RUN_STARTED'])
+try:
+    if os.path.getmtime(path) < started:
+        raise FileNotFoundError
+    got = json.load(open(path))
+except (FileNotFoundError, OSError, ValueError):
+    print('  (no per-type release breakdown from this run - '
+          'verify-and-release.sh wrote none)')
+    sys.exit(0)
+rows = got.get('byType', {})
+print('what this run closed, per type:')
+still_short, no_yield = [], []
+for t, want in sorted(plan['targets'].items()):
+    if not want: continue
+    r = rows.get(t, {})
+    # Read through a helper rather than r.get('...', 0): a keyword next to
+    # a digit is what tools/check-no-stats.sh looks for, and a guard that
+    # fires on a dict default gets overridden by reflex.
+    def n(k, _r=r):
+        return _r.get(k) or 0
+    rel, qua, inc = n('released'), n('quarantined'), n('inconclusive')
+    left = want - rel
+    tail = f', {qua} quarantined' + (f', {inc} held' if inc else '')
+    why = ''
+    if left > 0:
+        still_short.append((t, left))
+        why = '  (ceiling)' if t in plan.get('capped', []) else '  (yield)'
+        if not rel: no_yield.append(t)
+    print(f'  {t:<18}{rel:>4} released of {want:>3} wanted{tail}{why}')
+# A type that was checked without the ceiling clamping it and STILL came
+# up short means its configured headroom is optimistic - the number in
+# headroom.local.json is measured, and measurements drift.
+drift = [(t, n) for t, n in still_short if t not in plan.get('capped', [])]
+if drift:
+    print()
+    print('  !! short WITHOUT being capped - got every candidate their headroom')
+    print('  !! asked for and still missed, so the configured yield is optimistic:')
+    for t, n in drift:
+        cn, rel = plan['cands'][t], rows.get(t, {}).get('released', 0)
+        measured = f'{cn / rel:.0f}x' if rel else f'>{cn}x'
+        print(f'  !!   {t:<18}short by {n:>3} - {cn} candidates yielded {rel}'
+              f', measured {measured}')
+    print('  !! raise those types to the measured yield in headroom.local.json.')
+if no_yield:
+    print()
+    print('  !! released NOTHING for: ' + ', '.join(no_yield))
+    print('  !! a run that spends money and leaves a type exactly as thin as it')
+    print('  !! found it is not a quiet success.')
+if not still_short:
+    print()
+    print('  every short type released everything it wanted this run')
+# One machine-readable line for the cloud runner's email SUBJECT. rc=0
+# alone cannot carry this: a run that clears three of five types exits 0
+# and the inbox said 'OK', which is true of the RUN and false of the
+# POOL. The subject is the only part anyone reads without opening it.
+if still_short:
+    worst = ', '.join(f'{t} -{n}' for t, n in
+                      sorted(still_short, key=lambda x: -x[1])[:3])
+    print(f'VERDICT: still short: {worst}')
+else:
+    print('VERDICT: floor reached for every short type')
+# Rows the breakdown counted under a type the plan never asked for -
+# almost always the 'unknown' bucket, meaning the CSV join lost the type.
+# Without this the lines above silently sum to less than the run's totals
+# and a type reads as 0 released when its rows just went somewhere else.
+extra = sorted(set(rows) - set(plan['targets']))
+if extra:
+    print()
+    print('  !! rows counted under types this run did not ask for: '
+          + ', '.join(f'{t} ({rows[t].get(\"released\", 0)} released)' for t in extra))
+    print('  !! if that is \'unknown\' the pairId->type join lost the type, and')
+    print('  !! the per-type figures above are undercounts.')
+"
 echo "top-up complete"

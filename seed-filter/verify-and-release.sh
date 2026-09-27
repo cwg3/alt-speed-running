@@ -269,7 +269,7 @@ fi
 echo
 echo "=== releasing what passed ==="
 python3 - "$ROOT" "$TABLE" "$REGION" <<'PY'
-import csv, subprocess, sys, json
+import collections, csv, os, subprocess, sys, json, time
 root, table, region = sys.argv[1], sys.argv[2], sys.argv[3]
 
 def verdicts(path, pid_col, verdict_col, detail_cols):
@@ -290,6 +290,36 @@ def verdicts(path, pid_col, verdict_col, detail_cols):
 # routes-all.csv: pairId,type,seed,lava,chests,verdict,detail,extra
 nether = verdicts(f'{root}/mod/run/pairs-all.csv', 0, 9, [7, 8, 12, 13])
 routes = verdicts(f'{root}/mod/run/routes-all.csv', 0, 5, [6, 7])
+
+
+# Column 1 of both CSVs is the seed type, put there by the join above
+# from the held table. It is read defensively because the two shapes are
+# NOT identical and a seed id in that slot would otherwise become a
+# plausible-looking type name: a run of digits is a seed, not a type.
+def types_by_pid(*paths):
+    out = {}
+    for path in paths:
+        try:
+            rows = list(csv.reader(open(path)))
+        except FileNotFoundError:
+            continue
+        for r in rows[1:]:
+            if len(r) > 1 and r[0] and r[1] and not r[1].lstrip('-').isdigit():
+                out.setdefault(r[0], r[1])
+    return out
+
+
+kinds = types_by_pid(f'{root}/mod/run/pairs-all.csv', f'{root}/mod/run/routes-all.csv')
+# A type that cannot be named still has to be counted somewhere, or the
+# breakdown quietly sums to less than the totals it sits under.
+def kind(pid):
+    return kinds.get(pid) or 'unknown'
+
+# fromkeys rather than a literal of ': 0' pairs, for the same reason the
+# columns below are formatted apart from their labels: tools/check-no-stats.sh
+# reads a pool keyword next to a digit as a leaked depth.
+OUTCOMES = ('released', 'quarantined', 'inconclusive', 'failed')
+by_type = collections.defaultdict(lambda: dict.fromkeys(OUTCOMES, 0))
 
 released = rejected = 0
 failed = []
@@ -313,13 +343,14 @@ for pid in set(nether) | set(routes):
     rv, rd = routes.get(pid, ('MISSING', 'route produced no row'))
     if nv in UNANSWERED or rv in UNANSWERED:
         inconclusive.append(pid)
+        by_type[kind(pid)]['inconclusive'] += 1
         continue
     ok = nv == 'PASS' and rv == 'PASS'
     if ok:
         expr = 'SET #u = :f REMOVE heldUnverified'
         vals = {':f': {'BOOL': False}}
         names = {'#u': 'used'}
-        released += 1
+        outcome = 'released'
     else:
         reason = []
         if nv != 'PASS':
@@ -333,7 +364,7 @@ for pid in set(nether) | set(routes):
         expr = 'SET poolReject = :t, poolRejectReason = :r REMOVE heldUnverified'
         vals = {':t': {'BOOL': True}, ':r': {'S': ' | '.join(reason)[:900]}}
         names = None
-        rejected += 1
+        outcome = 'quarantined'
     cmd = [
         'aws', 'dynamodb', 'update-item', '--region', region, '--table-name', table,
         '--key', json.dumps({'seedPairId': {'S': pid}}),
@@ -343,15 +374,56 @@ for pid in set(nether) | set(routes):
     if names:
         cmd += ['--expression-attribute-names', json.dumps(names)]
     r = subprocess.run(cmd, capture_output=True, text=True)
+    # Never let a failed write be counted as a release. The counters used
+    # to be bumped above, next to the expression that was about to be
+    # sent, so a row whose update was REFUSED was still reported as
+    # released - the totals and the pool disagreed and only the trailing
+    # WARNING said so.
     if r.returncode != 0:
-        # Never let a failed write be counted as a release.
         print(f'  FAILED {pid}: {r.stderr.strip()[:200]}')
         failed.append(pid)
+        by_type[kind(pid)]['failed'] += 1
+        continue
+    if outcome == 'released':
+        released += 1
+    else:
+        rejected += 1
+    by_type[kind(pid)][outcome] += 1
 
 print(f'released {released}, quarantined {rejected}, inconclusive {len(inconclusive)}')
+# Per type, because the total cannot answer the question the top-up is
+# asking: whether the type that was starving got anything. One total
+# looks the same whether it is spread evenly across the types or whether
+# the expensive one got nothing at all.
+for t, c in sorted(by_type.items()):
+    extra = ''.join([
+        f', {c["inconclusive"]} held' if c['inconclusive'] else '',
+        f', {c["failed"]} WRITE FAILED' if c['failed'] else '',
+    ])
+    rel, qua = c['released'], c['quarantined']
+    rcol, qcol = f'{rel:>4}', f'{qua:>3}'
+    print(f'  {t:<18}{rcol} released, {qcol} quarantined{extra}')
 if inconclusive:
     print(f'  {len(inconclusive)} rows stayed HELD - the harness did not answer for them.')
     print('  Fix the harness and re-run; nothing was thrown away.')
 if failed:
     print(f'WARNING: {len(failed)} writes FAILED - those rows are still held: {failed}')
+
+# For topup.sh to report released-against-target per type. results/ is
+# gitignored, which is where this belongs: per-type yields are a map of
+# which openings are expensive, and that stays out of the repo.
+out = {
+    'at': time.time(),
+    'released': released, 'quarantined': rejected,
+    'inconclusive': len(inconclusive), 'failed': len(failed),
+    'byType': dict(by_type),
+}
+try:
+    os.makedirs(f'{root}/seed-filter/results', exist_ok=True)
+    with open(f'{root}/seed-filter/results/release-by-type.json', 'w') as fh:
+        json.dump(out, fh, indent=2)
+except OSError as e:
+    # Reporting is not the job; releasing is. A read-only disk must not
+    # undo a release that already succeeded.
+    print(f'  (could not write the per-type breakdown: {e})')
 PY

@@ -50,12 +50,21 @@ push_log() { kill "$PUSHER" 2>/dev/null || true; aws s3 cp "$LOG" "$S3LOG" --qui
 # must never happen is this SCRIPT containing them, which is why the
 # numbers are grepped out of the log at runtime and no threshold or
 # count is written here. See CLAUDE.md.
+#
+# THE FILTER IS WHAT THE EMAIL IS. A warning topup.sh prints and this
+# drops did not happen as far as anyone reading the inbox knows - the
+# '!!' used to be anchored at ^, so the clamp warnings, which are
+# indented under the type they belong to, were silently cut. Anything
+# meant for the notification carries a '!!' gutter on EVERY line, and
+# the tail is generous enough to hold the plan AND the per-type outcome
+# of a five-type run; too small a tail drops the plan off the top and
+# leaves an email that reports results with nothing to compare them to.
 notify() {
 	aws sns publish --region "${REGION:-us-west-2}" --topic-arn "$TOPIC" \
 		--subject "$(printf 'alt top-up: %.80s' "$STATUS")" \
 		--message "$(printf '%s\n\nlog: %s\n\n%s\n' "$STATUS" "$S3LOG" \
-			"$(grep -E 'drawable|SHORT by|released |generate [0-9]+|^!!' \
-				"$LOG" 2>/dev/null | tail -25)")" \
+			"$(grep -E 'drawable|SHORT by|released |generate [0-9]+|!!|wanted|per.type' \
+				"$LOG" 2>/dev/null | tail -60)")" \
 		>/dev/null 2>&1 \
 		|| echo "  note: SNS publish failed - the verdict is only in S3"
 }
@@ -140,7 +149,13 @@ cd backend && npm ci --omit=dev --silent 2>&1 | tail -2; cd ..
 RC=$?
 if [ "$RC" -eq 0 ]; then
   echo "=== top-up OK $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
-  STATUS="OK"
+  # rc=0 means the RUN finished, not that the pool reached its floor, and
+  # for months the subject said only "OK" either way - so a night that
+  # left the thinnest type exactly as thin looked like a night that
+  # finished the job. topup.sh prints the pool's own verdict; if it is
+  # absent (nothing was short, or an older topup.sh) plain OK is right.
+  VERDICT=$(grep -m1 '^VERDICT: ' "$LOG" 2>/dev/null | sed 's/^VERDICT: //')
+  STATUS="OK${VERDICT:+ - $VERDICT}"
 else
   STATUS="FAILED rc=$RC"
   # `rc=$?` straight after the call reported 0 on a failed build once,
