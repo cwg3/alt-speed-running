@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto';
 import { resolveSessionToken } from './lib/auth';
 import { claimSeedPair, isSyntheticPlayer, recordSeedsSeen } from './lib/seedPool';
 import { PACE_TIERS, paceFinishMs, scheduleForTier, tierById } from './lib/paceSchedule';
+import { clearMatchPointer } from './lib/matchCompletion';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -103,12 +104,36 @@ export const handler = async (
 		return json(403, { error: 'not allowed to play' });
 	}
 	if (player.Item.currentMatchId) {
-		// Not an error worth a 500. The client polls and may well have a
-		// match already; telling it which one is more useful than a stack.
-		return json(409, {
-			error: 'already in a match',
-			matchId: player.Item.currentMatchId,
-		});
+		// A POINTER IS NOT A MATCH. Ask the match row whether it is still
+		// running rather than trusting the pointer's existence.
+		//
+		// Refusing on the pointer alone made this a dead end with no way
+		// out from inside the game: voiding a paced match on a bad seed
+		// left the pointer behind, and every Race a Pace after that came
+		// back "already in a match" - naming a match that had already
+		// finished. badSeed clears it now, and this is the second lock on
+		// the same door, because any future path that ends a match
+		// without clearing would brick the feature in exactly the same
+		// way. queueJoin has checked the status like this all along,
+		// which is why Find Match still worked and made the bug look
+		// like it was only in Race a Pace.
+		const current = await ddb.send(new GetCommand({
+			TableName: MATCHES_TABLE_NAME,
+			Key: { matchId: String(player.Item.currentMatchId) },
+			ProjectionExpression: '#s',
+			ExpressionAttributeNames: { '#s': 'status' },
+		}));
+		if (current.Item?.status === 'pending') {
+			// Not an error worth a 500. The client polls and may well have
+			// a match already; telling it which one is more useful than a
+			// stack.
+			return json(409, {
+				error: 'already in a match',
+				matchId: player.Item.currentMatchId,
+			});
+		}
+		await clearMatchPointer(
+			PLAYERS_TABLE_NAME, [uuid], String(player.Item.currentMatchId));
 	}
 
 	// A PACE IS THE FALLBACK, NEVER THE DEFAULT.

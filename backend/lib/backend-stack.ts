@@ -380,11 +380,15 @@ export class BackendStack extends cdk.Stack {
 				MATCHES_TABLE_NAME: matchesTable.tableName,
 				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
 				SEED_POOL_TABLE_NAME: seedPoolTable.tableName,
+				PLAYERS_TABLE_NAME: playersTable.tableName,
 			},
 		});
 		sessionsTable.grantReadData(badSeedFn);
 		matchesTable.grantReadWriteData(badSeedFn);
 		seedPoolTable.grantReadWriteData(badSeedFn);
+		// Write: a voided match has to release both players' currentMatchId,
+		// the same as a completed one does.
+		playersTable.grantReadWriteData(badSeedFn);
 
 		api.addRoutes({
 			path: '/matches/bad-seed',

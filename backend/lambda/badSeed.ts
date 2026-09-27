@@ -3,13 +3,14 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { resolveSessionToken } from './lib/auth';
 import { isSyntheticPlayer } from './lib/seedPool';
-import { MatchPlayer } from './lib/matchCompletion';
+import { clearMatchPointer, MatchPlayer } from './lib/matchCompletion';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 const SESSIONS_TABLE_NAME = process.env.SESSIONS_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
 const SEED_POOL_TABLE_NAME = process.env.SEED_POOL_TABLE_NAME!;
+const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
 
 /**
  * Votes that a match's seed is unplayable. Takes BOTH players.
@@ -153,6 +154,12 @@ export const handler = async (
 			}
 			throw err;
 		}
+		// A VOIDED MATCH IS AN ENDED MATCH. Without this the player keeps
+		// pointing at it, and pacedMatch - the very feature they were
+		// using - answers "already in a match" on every attempt after.
+		await clearMatchPointer(
+			PLAYERS_TABLE_NAME, [uuid, opponent.uuid], matchId);
+
 		return {
 			statusCode: 200,
 			headers: { 'content-type': 'application/json' },
@@ -213,6 +220,10 @@ export const handler = async (
 	// "test vote from PaceBot" and threw away what the player said,
 	// because only the completing caller's reason was kept.
 	await quarantineSeed(matchId, existing);
+
+	// Same as the paced branch: the match is over, so neither player
+	// should still be holding it.
+	await clearMatchPointer(PLAYERS_TABLE_NAME, [uuid, opponent.uuid], matchId);
 
 	return {
 		statusCode: 200,

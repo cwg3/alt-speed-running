@@ -316,13 +316,7 @@ export async function applyMatchCompletion(
 
 	// Clear the pointer so neither player is handed this finished match
 	// again on their next queue poll.
-	for (const player of [winner, loser]) {
-		await ddb.send(new UpdateCommand({
-			TableName: playersTableName,
-			Key: { uuid: player.uuid },
-			UpdateExpression: 'REMOVE currentMatchId',
-		}));
-	}
+	await clearMatchPointer(playersTableName, [winner.uuid, loser.uuid], matchId);
 
 	// Review runs against each player's own history. Purely advisory -
 	// it records a flag for human review and never alters the result.
@@ -349,4 +343,53 @@ export async function applyMatchCompletion(
 		winner: { uuid: winner.uuid, ratingDelta: winnerDelta, seasonPointsAwarded: seasonPoints },
 		loser: { uuid: loser.uuid, ratingDelta: loserDelta },
 	};
+}
+
+/**
+ * Drops players' currentMatchId once a match is over, however it ended.
+ *
+ * EVERY PATH THAT ENDS A MATCH HAS TO CALL THIS. A match row going to
+ * 'completed' or 'voided' while the pointer still names it leaves the
+ * player holding a ticket to a match that is finished, and nothing ever
+ * takes it off them.
+ *
+ * It is not a cosmetic leak. pacedMatch refuses to start a race while
+ * the pointer is set, so a stale one makes Race a Pace return "already
+ * in a match" forever - which is exactly what voiding a paced match on
+ * a bad seed used to do, because badSeed voided the match and cleared
+ * nothing. queueJoin happened to survive it by checking the match's
+ * status before believing the pointer, so Find Match self-healed and
+ * hid the bug.
+ *
+ * CONDITIONAL ON STILL POINTING AT THIS MATCH. A blind REMOVE races a
+ * player who has already started their next one - the pointer would be
+ * the new match's and deleting it would strand THAT one instead. The
+ * condition failing is the normal way this ends, not an error: it means
+ * somebody else already cleared it or moved it on.
+ *
+ * Synthetic players are passed in like anyone else. PaceBot has a real
+ * row in the players table and never carries a pointer, so the write is
+ * a no-op there; filtering them out would only add a way to get the
+ * list wrong.
+ */
+export async function clearMatchPointer(
+	playersTableName: string,
+	uuids: string[],
+	matchId: string,
+): Promise<void> {
+	for (const uuid of uuids) {
+		try {
+			await ddb.send(new UpdateCommand({
+				TableName: playersTableName,
+				Key: { uuid },
+				UpdateExpression: 'REMOVE currentMatchId',
+				ConditionExpression: 'currentMatchId = :m',
+				ExpressionAttributeValues: { ':m': matchId },
+			}));
+		} catch (err) {
+			if (!(err instanceof ConditionalCheckFailedException)) {
+				throw err;
+			}
+		}
+	}
 }
