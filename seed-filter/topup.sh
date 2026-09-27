@@ -146,10 +146,22 @@ HISTORY_FILE="$ROOT/seed-filter/results/topup-history.json"
 mkdir -p "$ROOT/seed-filter/results"
 ACCT="${ACCT:-$(aws sts get-caller-identity --query Account --output text 2>/dev/null)}"
 HISTORY_S3="s3://alt-seedwork-${ACCT}/state/topup-history.json"
+# A MISSING history and an UNREADABLE one are not the same thing, and the
+# first version of this printed the same benign line for both. That is the
+# failure this repo keeps rediscovering wearing one more hat: the check
+# would go quiet, report "starts next run" every run forever, and a
+# convergence check that never runs looks exactly like one that passes.
 if [ ! -f "$HISTORY_FILE" ]; then
-	aws s3 cp "$HISTORY_S3" "$HISTORY_FILE" --quiet 2>/dev/null \
-		&& echo "  run history fetched from S3" \
-		|| echo "  no run history on S3 yet - the convergence check starts next run"
+	if aws s3 cp "$HISTORY_S3" "$HISTORY_FILE" --quiet 2>/dev/null; then
+		echo "  run history fetched from S3"
+	elif aws s3api head-object --bucket "alt-seedwork-${ACCT}" \
+			--key state/topup-history.json >/dev/null 2>&1; then
+		echo "  !! run history EXISTS on S3 and could not be fetched - the" >&2
+		echo "  !! convergence check is blind this run. That is a broken" >&2
+		echo "  !! check, not a first run, and it will not fix itself." >&2
+	else
+		echo "  no run history on S3 yet - the convergence check starts next run"
+	fi
 fi
 
 # Demand. This is FATAL if it fails, and the difference from "no active
@@ -289,16 +301,29 @@ if held:
 # goalposts moving rather than supply falling. Saying which it was is the
 # whole point, so a floor change is reported as a floor change and the
 # regression verdict is withheld for that run.
-history = []
-try:
-    history = json.load(open(os.environ.get('HISTORY_FILE') or ''))['runs']
-except (OSError, ValueError, KeyError, TypeError):
-    pass
+# Same distinction on the read. A file that is present and does not parse
+# is a broken check; only an ABSENT file is a first run.
+history, hist_err = [], None
+_hp = os.environ.get('HISTORY_FILE') or ''
+if os.path.exists(_hp):
+    try:
+        history = json.load(open(_hp))['runs']
+        if not isinstance(history, list):
+            raise TypeError('runs is not a list')
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        history, hist_err = [], str(e)[:120]
 prev = next((r for r in reversed(history) if isinstance(r.get('supply'), dict)),
             None)
 stalled = []
 print(file=sys.stderr)
-if prev is None:
+if hist_err:
+    print('  !! the run history is present and unreadable, so this run cannot',
+          file=sys.stderr)
+    print(f'  !! tell whether any gap is closing: {hist_err}', file=sys.stderr)
+    print('  !! fix or delete it - a blind check that says nothing is the',
+          file=sys.stderr)
+    print('  !! failure it was written to catch.', file=sys.stderr)
+elif prev is None:
     print('  no previous run on record - nothing to compare this gap with yet',
           file=sys.stderr)
 else:
@@ -443,9 +468,15 @@ runs.append({'at': time.time(), 'floor': plan['floor'],
 # year of them.
 hist['runs'] = runs[-20:]
 json.dump(hist, open(path, 'w'), indent=2)
-" || echo "  note: could not record this run's reading locally"
+" || { echo "  !! could not record this run's reading - the NEXT run will" >&2
+	       echo "  !! have nothing to compare against and will say so as a" >&2
+	       echo "  !! first run rather than as this failure." >&2; }
+	# The runner is thrown away at the end of the run, so a reading that
+	# only ever existed on the instance did not survive being taken.
 	aws s3 cp "$HISTORY_FILE" "$HISTORY_S3" --quiet 2>/dev/null \
-		|| echo "  note: run history did not reach S3 - the next run cannot compare"
+		|| { echo "  !! this run's reading did not reach S3. The instance is" >&2
+		     echo "  !! discarded at shutdown, so the reading is lost and the" >&2
+		     echo "  !! next run cannot check convergence." >&2; }
 fi
 
 echo
@@ -603,5 +634,7 @@ if extra:
 # outcome attached, and the next run reads it from S3 rather than from
 # this instance, which will not exist.
 aws s3 cp "$HISTORY_FILE" "$HISTORY_S3" --quiet 2>/dev/null \
-	|| echo "  note: run history did not reach S3 - the next run cannot compare"
+	|| { echo "  !! the release outcome did not reach S3. The reading taken" >&2
+	     echo "  !! before the build may have, so the next run can still" >&2
+	     echo "  !! compare gaps - it just cannot cross-check them." >&2; }
 echo "top-up complete"
