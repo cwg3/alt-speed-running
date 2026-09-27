@@ -29,6 +29,16 @@ reaching for `ALT_ALLOW_STATS=1` - it is deliberately coarse, because a
 false positive costs one override and a false negative is public
 forever.
 
+**A hook only sees what is being written now.** Every rule in that file
+was added because something had already gone wrong, which means the thing
+that went wrong is the one thing the rule cannot see. Run
+`tools/check-no-stats.sh --history` after changing a rule or finishing a
+redaction pass; it audits every commit message on every ref. That is how
+raw seeds were found in eleven commit SUBJECTS from before the hook
+existed, on 2026-09-27 - the files had been redacted and the file history
+rewritten, and nobody had read the messages. Redacting a file is half the
+job; the other half is the message that accompanied it.
+
 Measurements worth keeping go in a gitignored `*.local.json` beside
 `backend/split-rules.local.json`, backed up to S3 under `secrets/`.
 

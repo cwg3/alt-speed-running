@@ -3,6 +3,7 @@
 #
 #   check-no-stats.sh --staged      scan what is about to be committed
 #   check-no-stats.sh --msg <file>  scan a commit message
+#   check-no-stats.sh --history     audit every commit message already pushed
 #
 # WHY A COMMIT MESSAGE IS SCANNED. On 2026-09-25 the measured throughput
 # of a verification batch was scrubbed out of SPEC.md and then typed
@@ -171,6 +172,50 @@ case "$MODE" in
 	[ -n "${2:-}" ] || { echo "check-no-stats.sh --msg needs a file" >&2; exit 2; }
 	# Comment lines are stripped before the message is stored.
 	scan "commit message" "$(grep -v '^#' "$2" || true)"
+	;;
+--history)
+	# AUDIT EVERYTHING ALREADY PUBLISHED. The hooks only ever see what is
+	# being written now, so every rule added to this file is blind to
+	# whatever preceded it - and the rules got added because something had
+	# already gone wrong, which means the thing that went wrong is exactly
+	# what they cannot see.
+	#
+	# That is not hypothetical. On 2026-09-27, fourteen raw seed values
+	# were found sitting in eleven commit SUBJECTS from 2026-09-19 to
+	# 2026-09-24 - "Play-confirmed: <type> <seed> / <seed>", both halves of
+	# a pair, on a public repo. The files had been redacted and the history
+	# of the files had been rewritten; nobody had read the messages. The
+	# commit-msg hook that stops this was installed 2026-09-25 and works.
+	# It simply arrived four days late, and nothing existed to look back.
+	#
+	# Run this after changing any rule here, and after any redaction pass.
+	echo "scanning every commit message on every ref..."
+	while IFS= read -r c; do
+		body=$(git log -1 --format='%B' "$c" 2>/dev/null || true)
+		[ -n "$body" ] || continue
+		before=$hits
+		scan "$(git log -1 --format='%h %ad %s' --date=short "$c" 2>/dev/null | cut -c1-72)" "$body"
+		[ "$hits" -ne "$before" ] && echo
+	done < <(git rev-list --all)
+	if [ "$hits" -eq 0 ]; then
+		echo "clean: no published commit message carries a seed, yield, throughput or pool depth"
+	else
+		cat >&2 <<'MSG'
+
+  These are ALREADY PUBLISHED. A hook cannot help now; the options are:
+
+    rotate   make the leaked thing worthless - quarantine the seeds so
+             knowing them buys nothing. Immediate, reversible, and it
+             does not depend on what GitHub does with old objects.
+    rewrite  git filter-repo --message-callback, then force-push. It
+             really removes them, but every descendant hash changes, so
+             tags and releases must be re-pointed or they end up on a
+             tree that no longer exists - see CLAUDE.md.
+
+  Rotating first is usually right: the history is only dangerous while
+  the thing it names is still live.
+MSG
+	fi
 	;;
 *) echo "usage: check-no-stats.sh [--staged|--msg <file>]" >&2; exit 2 ;;
 esac

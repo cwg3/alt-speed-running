@@ -4,6 +4,24 @@ Known outstanding work, roughly in the order it would matter.
 
 ## Operational
 
+- [ ] **Raw seeds are in eleven commit messages, and still are.** Found
+  2026-09-27 by `check-no-stats.sh --history`, all from before the
+  commit-msg hook existed. The affected pool rows are QUARANTINED, so
+  knowing them buys nothing today - that was the urgent half and it is
+  done. The messages themselves are still on GitHub.
+
+  Removing them means `git filter-repo --message-callback` and a
+  force-push, which changes every descendant hash. The tags and releases
+  must then be re-pointed or they end up describing a tree that no longer
+  exists, which is the failure this file already records three times. With
+  no forks and no stars the blast radius is small, but old objects stay
+  reachable by direct SHA until GitHub's GC runs, so a full scrub needs
+  their support.
+
+  Deliberately not done yet: rotating made it inert, and a rewrite done
+  carelessly breaks more than it fixes. Decide it on its own, not as a
+  reflex.
+
 - [ ] **`loadSeedPool.ts` should track which nether seeds are taken.**
   The pairing loop starts `netherIndex` at 0 every run and never consults
   the table, so any load that ADDS to an existing pool re-pairs nether
