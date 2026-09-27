@@ -68,6 +68,46 @@ scan() {
 		hits=$((hits + 1))
 	fi
 
+	# Pool COMPOSITION - how many of each type are drawable or quarantined.
+	#
+	# This is the same leak as a yield wearing different clothes. A yield
+	# says what a type costs to produce; a per-type depth says which type
+	# the producing has failed to keep up with, which is the map of where
+	# the ladder is thin stated outright rather than inferred. SPEC.md
+	# carried exactly that table from 2026-09-25 to 2026-09-27 and this
+	# guard passed it, because --staged only scans ADDED lines and the
+	# table was added before the guard existed. Being unable to catch what
+	# is already committed is the right trade; being unable to catch the
+	# next one was not.
+	local depth KW2='(drawable|quarantined|pool depth|in the pool)'
+	depth=$(printf '%s\n' "$text" \
+		| grep -inE "([0-9][^.]{0,8}$KW2|$KW2[^.]{0,8}[0-9])" || true)
+	if [ -n "$depth" ]; then
+		echo "!! $label: looks like pool composition (a per-type depth is a yield)"
+		printf '%s\n' "$depth" | head -5 | sed 's/^/     /'
+		hits=$((hits + 1))
+	fi
+
+	# Known benign matches, so the override is a decision and not a reflex:
+	# MatchHistoryScreen.java uses `drawable` as a local for how many rows
+	# fit on screen, and topup.sh has f-strings like `{pool_n:>4} drawable`
+	# where the digit is a field width, not a figure - that file PRODUCES
+	# the number at runtime and contains none. Neither is a leak.
+	#
+	# And the table form, which carries no vocabulary at all: a row whose
+	# first cell is a seed type and whose other cells are bare counts.
+	# "| village | 43 | 9 |" says everything the sentence above would have
+	# and matches none of the words that would catch it.
+	local TYPES='(village|desert[ _-]?temple|ruined[ _-]?portal|shipwreck|buried[ _-]?treasure)'
+	local tbl
+	tbl=$(printf '%s\n' "$text" \
+		| grep -inE "^\|[^|]*$TYPES[^|]*\|([^|]*\|)*[^|a-z]*[0-9]+[^|a-z]*\|" || true)
+	if [ -n "$tbl" ]; then
+		echo "?? $label: a table row pairing a seed type with counts - fine if those are not pool depths"
+		printf '%s\n' "$tbl" | head -5 | sed 's/^/     /'
+		hits=$((hits + 1))
+	fi
+
 	# A count of work next to a duration: "188 pairs ... 26 minutes".
 	if printf '%s\n' "$text" | grep -qiE '[0-9]+ (pairs|seeds|candidates)' \
 	   && printf '%s\n' "$text" | grep -qiE '[0-9]+ ?(min|mins|minutes|hours|hrs)\b'; then

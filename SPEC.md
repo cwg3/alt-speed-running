@@ -970,23 +970,25 @@ Two steps in the pipeline are not checks and are not named like them:
 **load held** puts candidates in the table with `used=true` so nothing
 is drawable, and **release** clears the flag on whatever passed.
 
-**284 drawable seeds**, rebuilt 2026-09-25, with 62 quarantined:
+**How many seeds of each type are in the pool is deliberately not
+published here.** A per-type depth says which type the pipeline has
+failed to keep up with, which is the map of where the ladder is thin
+stated outright rather than inferred - the same thing the filter yields
+are kept out of this repo to avoid. It lives in the backup bundles and in
+what the top-up reports to a private inbox. `tools/check-no-stats.sh`
+enforces this; a table of counts sat here from 2026-09-25 to 2026-09-27
+because the guard only ever scanned lines being ADDED, and by then it was
+already committed.
 
-| type | drawable | quarantined |
-|---|---|---|
-| desert temple | 100 | 28 |
-| buried treasure | 65 | 11 |
-| ruined portal | 49 | 4 |
-| village | 43 | 9 |
-| shipwreck | 27 | 10 |
-
-Shipwreck is now the thin type. Its spawns are the ones where a wooded
-biome can be technically near and practically unreachable - the only
-wood within range being the ship's own hull, which the `spawn` check
-refuses to count - so most candidates die there rather than at the
-ravine. Buried treasure was the starved type until 2026-09-25 and is no
-longer; its constraint is the two-magma-ravine rule, which is the
-expensive one to satisfy but not the one that empties a pool fastest.
+What can be said without publishing a number: the ocean types are the
+expensive ones, and they are expensive for different reasons. Shipwreck
+dies at the `spawn` check, where a wooded biome is technically near and
+practically unreachable because the only wood within range is the ship's
+own hull, which that check refuses to count. Buried treasure dies at the
+two-magma-ravine rule, which is the more expensive condition to satisfy
+but not the one that empties a pool fastest. Which of them is currently
+thinnest is a fact about today's pool, not about the pipeline, so it
+belongs with the numbers rather than here.
 
 **Topping up is automatic.** `seed-filter/topup.sh` compares each type
 against a floor and builds only the shortfall, so a run with nothing
