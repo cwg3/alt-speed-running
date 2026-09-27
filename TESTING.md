@@ -122,11 +122,30 @@ Record the overworld and nether seed together. They are paired at load
 time and a seed is only meaningful with its partner - "that seed was
 good" means nothing if the nether came from somewhere else.
 
+**Some of these have been withdrawn from the queue.** On 2026-09-27 a set
+of seed values turned out to have become publicly readable from this
+repository's own history, from before the publishing guard existed. Any
+pair with an exposed half is now quarantined: it stays in the table with
+that half ~~struck through~~ and marked WITHDRAWN, and it will not be dealt
+to anyone. The strikethrough is a marker, not a redaction — the reference
+is still there to read, because the point is to show what happened rather
+than to tidy it away. Quarantined rather than deleted: the world generation
+behind them is real work, and the decision reverses cleanly.
+
+A seed being withdrawn says nothing about the seed. Every one below was
+walked and worked. They are out because they are *known*, and a seed
+somebody can memorise before it is dealt is not a fair draw.
+
 | type | overworld | nether | notes |
 |------|-----------|--------|-------|
 | desert_temple | seed#3fcb | seed#8037 | temple at 64,64. Overworld and nether both clean; two deaths were pace, not layout. |
-| buried_treasure | seed#46f6 | seed#cae4 | treasure at -103,-151, bastion at 48,32 (bridge). First of the new ocean seeds to be walked - filtered last night, released this morning, never played until now. |
-| desert_temple | seed#5dbf | seed#7f92 | temple at 160,-240, bastion at -192,16 (bridge). Overworld and nether both walked clean; first seed drawn under the seen-seeds rule. |
-| ruined_portal | seed#54b2 | seed#4654 | portal at 80,208, bastion at 16,-96 (hoglin stable). Overworld and nether both clean; death was skill, not layout. |
+| buried_treasure | seed#46f6 | ~~seed#cae4~~ | **WITHDRAWN** (nether half exposed). treasure at -103,-151, bastion at 48,32 (bridge). First of the new ocean seeds to be walked - filtered last night, released this morning, never played until now. |
+| desert_temple | ~~seed#5dbf~~ | ~~seed#7f92~~ | **WITHDRAWN** (both halves exposed). temple at 160,-240, bastion at -192,16 (bridge). Overworld and nether both walked clean; first seed drawn under the seen-seeds rule. |
+| ruined_portal | ~~seed#54b2~~ | ~~seed#4654~~ | **WITHDRAWN** (both halves exposed). portal at 80,208, bastion at 16,-96 (hoglin stable). Overworld and nether both clean; death was skill, not layout. |
 | ruined_portal | seed#218e | - | portal at 64,224, bastion at -112,32 (bridge). Spawned near the bastion. |
 | ruined_portal | seed#9796 | - | the first play-confirmed seed. Survived being wiped by a `--only` load and restored from the match record. |
+
+One withdrawn pair is not in this table at all: a shipwreck whose nether
+half was exposed had never been play-confirmed, so it was never listed
+here. The table records what has been walked, not what is in the queue —
+the two are different lists and only the queue decides what gets dealt.
