@@ -253,10 +253,64 @@ echo "  results:    aws s3 cp s3://$BUCKET/$RUN/out/combined.csv ."
 echo "  kill now:   aws ec2 terminate-instances --instance-ids $IID"
 echo
 echo "waiting for results (the instance terminates itself when done)"
+
+# A FAILED describe-instances IS NOT A DEAD INSTANCE.
+#
+# This loop used to read `... 2>/dev/null || echo gone` and then treat
+# "gone" exactly like "terminated". An API call that fails says nothing
+# about the instance - and right after run-instances there is a window
+# where describe-instances has not caught up with the new id yet and
+# answers InvalidInstanceID.NotFound.
+#
+# That is what ended the 19:26 top-up on 2026-09-26. The village stage
+# launched at 00:46:35Z; 37 seconds later the run declared "instance
+# ended without writing results", called the check broken, refused to
+# load anything and shut the control host down. The instance it gave up
+# on was fine, and went on working for another hour with nothing left
+# alive to collect it. Four hours of spawn and portalfilter went in the
+# bin over one unlucky API call.
+#
+# So the wait now ends on facts only: a successful describe that says
+# 'terminated', or the done marker. Anything else is retried, and if the
+# API stays unreachable the run says THAT, because "I cannot see the
+# instance" and "the instance died" need different responses from
+# whoever reads the log.
+UNREACHABLE=0
+UNREACHABLE_MAX=10   # x30s = 5 minutes of silence before giving up
 while ! aws s3 ls "s3://$BUCKET/$RUN/out/done" >/dev/null 2>&1; do
-  state=$(aws ec2 describe-instances --instance-ids "$IID" \
-    --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo gone)
-  if [ "$state" = terminated ] || [ "$state" = gone ]; then
+  if state=$(aws ec2 describe-instances --instance-ids "$IID" \
+      --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null) \
+      && [ -n "$state" ] && [ "$state" != None ]; then
+    UNREACHABLE=0
+  else
+    # Not an answer about the instance. A throttle, a network blip, or
+    # an id the API has not propagated yet - all of which resolve by
+    # asking again. A terminated instance stays visible to
+    # describe-instances for about an hour, so a genuine termination
+    # arrives as the WORD 'terminated', never as a lookup failure.
+    state=unknown
+    UNREACHABLE=$((UNREACHABLE + 1))
+    if [ "$UNREACHABLE" -ge "$UNREACHABLE_MAX" ]; then
+      echo "cannot reach the EC2 API - $UNREACHABLE failed lookups in a row" \
+        "($((UNREACHABLE * 30))s)."
+      echo "  THIS IS NOT A VERDICT ON THE CHECK. The instance is probably still"
+      echo "  running and still billing. Look before re-running:"
+      echo "    aws ec2 describe-instances --instance-ids $IID \\"
+      echo "      --query 'Reservations[0].Instances[0].State.Name' --output text"
+      echo "    aws s3 ls s3://$BUCKET/$RUN/out/"
+      exit 1
+    fi
+    sleep 30
+    continue
+  fi
+  if [ "$state" = terminated ]; then
+    # It may have written the marker in the moment between the S3 check
+    # at the top of this loop and this one - the instance terminates
+    # itself the instant it finishes, so that window is real and the
+    # results are already in the bucket.
+    if aws s3 ls "s3://$BUCKET/$RUN/out/done" >/dev/null 2>&1; then
+      break
+    fi
     # Say WHICH failure this was. "No results" covers a crash, an OOM and
     # a watchdog deadline, and they need different fixes - the first two
     # are bugs, the third just means the batch was bigger than the timer.
