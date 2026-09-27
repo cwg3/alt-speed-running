@@ -121,7 +121,29 @@ run_check_or_die spawn /tmp/onr/spawn-in.txt "$WORKERS" /tmp/onr/spawn.csv
 python3 - "$ROOT" <<'PY'
 import json, csv, pathlib, sys
 root = sys.argv[1]
-ok = {r[0] for r in list(csv.reader(open('/tmp/onr/spawn.csv')))[1:] if r and r[1]=='PASS'}
+rows = [r for r in list(csv.reader(open('/tmp/onr/spawn.csv')))[1:] if r]
+
+# ALLOWLIST the verdict. Asking only "is it PASS" makes every other value
+# - including the ERROR SpawnResourceHook writes when it throws, and the
+# three-column "<seed>,ERROR,no-csv" a cloud shard writes when it produces
+# nothing - indistinguishable from a seed that was checked and rejected.
+# A crashed worker is not a spawn without wood. ocean-rebuild.sh has
+# guarded this CSV correctly since it was written; this stage did not, and
+# it is the one that runs unattended every twelve hours.
+bad = [r for r in rows if len(r) < 2 or r[1] not in ('PASS', 'FAIL')]
+if bad:
+    kinds = {}
+    for r in bad:
+        kinds[r[1] if len(r) > 1 else '<no verdict column>'] = \
+            kinds.get(r[1] if len(r) > 1 else '<no verdict column>', 0) + 1
+    print(f'  ABORT: {len(bad)} of {len(rows)} spawn checks did not return a verdict')
+    for k, n in sorted(kinds.items()):
+        print(f'    {k}: {n}')
+    print('  These are crashes, not failures. Do not let them count as')
+    print('  spawns without wood - fix the cause and re-run.')
+    sys.exit(1)
+
+ok = {r[0] for r in rows if r[1] == 'PASS'}
 d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
 for t in list(d):
     before = len(d[t])
@@ -141,8 +163,24 @@ PY
 if [ -s /tmp/onr/rp-in.txt ]; then
   run_check_or_die portalfilter /tmp/onr/rp-in.txt "$WORKERS" /tmp/onr/rp.csv
   python3 - <<'PY'
-import json, csv
-ok = {r[0] for r in list(csv.reader(open('/tmp/onr/rp.csv')))[1:] if r and r[1]=='PASS'}
+import json, csv, sys
+rows = [r for r in list(csv.reader(open('/tmp/onr/rp.csv')))[1:] if r]
+
+# Allowlist the verdict - see the spawn stage above for why testing only
+# for PASS turns a crash into a rejected seed.
+bad = [r for r in rows if len(r) < 2 or r[1] not in ('PASS', 'FAIL')]
+if bad:
+    kinds = {}
+    for r in bad:
+        k = r[1] if len(r) > 1 else '<no verdict column>'
+        kinds[k] = kinds.get(k, 0) + 1
+    print(f'  ABORT: {len(bad)} of {len(rows)} portalfilter checks did not return a verdict')
+    for k, n in sorted(kinds.items()):
+        print(f'    {k}: {n}')
+    print('  These are crashes, not failures. Fix the cause and re-run.')
+    sys.exit(1)
+
+ok = {r[0] for r in rows if r[1] == 'PASS'}
 d = json.load(open('/tmp/onr/output/overworld_by_type.json'))
 before = len(d.get('ruined_portal', []))
 d['ruined_portal'] = [v for v in d.get('ruined_portal', []) if str(v['seed']) in ok]
@@ -174,15 +212,42 @@ if [ -s /tmp/onr/village-in.txt ]; then
   run_check_or_die village /tmp/onr/village-in.txt "$WORKERS" /tmp/onr/village.csv
   python3 - <<'PY'
 import json, csv, sys
-# seed,ironIngots,hasIronPickaxe,hasIronArmor,chests,smithChests,diamonds
-rows = [r for r in csv.reader(open('/tmp/onr/village.csv')) if len(r) > 5]
-# A crashed worker is not a village without a smith. This is the guard
-# the ravine check went without, which turned 388 servers that never
-# bound a port into 388 seeds "with no ravine".
-bad = [r for r in rows if not r[1].lstrip('-').isdigit()]
+# seed,ironIngots,hasIronPickaxe,hasIronArmor,chests,smithChests,diamonds,smithX,smithZ
+# A failed run appends ERROR or NOWORKER as the LAST column at the same
+# width; a cloud shard that produced nothing writes three columns.
+rows = [r for r in csv.reader(open('/tmp/onr/village.csv')) if r]
+
+# A crashed worker is not a village without a smith. This is the guard the
+# ravine check went without, which turned 388 servers that never bound a
+# port into 388 seeds "with no ravine".
+#
+# It did not work. The old test asked whether column 1 was a number, and
+# every crash row satisfies that: check-one-village.sh writes numeric
+# ZEROES across the row precisely so a failure is the same width as a
+# result, with the marker on the end. So ERROR and NOWORKER rows walked
+# through the guard and were counted as villages with no smith chest -
+# the exact bug the comment above describes, reproduced by the code meant
+# to prevent it.
+#
+# The narrow cloud row had the opposite problem: a `len(r) > 5` filter
+# dropped it before the guard could see it, so a crashed shard looked like
+# a seed that was never submitted rather than one that failed.
+#
+# Look for the marker ANYWHERE in the row, and require a width that can
+# actually carry a verdict. Matching a value rather than a shape is what
+# the ravine and spawn stages do.
+SENTINELS = ('ERROR', 'NOWORKER', 'MISSING')
+bad = [r for r in rows if len(r) < 7 or any(c in SENTINELS for c in r)]
 if bad:
-    print(f'  ABORT: {len(bad)} of {len(rows)} village checks returned no verdict')
-    print('  These are crashes, not failures. Fix the cause and re-run.')
+    print(f'  ABORT: {len(bad)} of {len(rows)} village checks did not return a verdict')
+    kinds = {}
+    for r in bad:
+        k = next((c for c in r if c in SENTINELS), f'{len(r)} columns')
+        kinds[k] = kinds.get(k, 0) + 1
+    for k, n in sorted(kinds.items()):
+        print(f'    {k}: {n}')
+    print('  These are crashes, not failures. Do not let them count as')
+    print('  villages without a smith - fix the cause and re-run.')
     sys.exit(1)
 # smithChests only. The 3-iron half of the SPEC line is a GUARANTEE
 # the mod provides, not a property to filter on: LootTopUp.VILLAGE is
