@@ -59,12 +59,19 @@ push_log() { kill "$PUSHER" 2>/dev/null || true; aws s3 cp "$LOG" "$S3LOG" --qui
 # the tail is generous enough to hold the plan AND the per-type outcome
 # of a five-type run; too small a tail drops the plan off the top and
 # leaves an email that reports results with nothing to compare them to.
+#
+# The run-over-run comparison had to be added here explicitly: its lines
+# read "short by <n> then" in lower case and this pattern matches the
+# plan's "SHORT by" in upper, so the whole comparison was matched only by
+# its '!!' warning lines. The email would have carried "NOT converging"
+# with none of the figures it was drawn from - a verdict with its evidence
+# cut off, which is the same failure as the clamp warnings anchored at ^.
 notify() {
 	aws sns publish --region "${REGION:-us-west-2}" --topic-arn "$TOPIC" \
 		--subject "$(printf 'alt top-up: %.80s' "$STATUS")" \
 		--message "$(printf '%s\n\nlog: %s\n\n%s\n' "$STATUS" "$S3LOG" \
-			"$(grep -E 'drawable|SHORT by|released |generate [0-9]+|!!|wanted|per.type' \
-				"$LOG" 2>/dev/null | tail -60)")" \
+			"$(grep -E 'drawable|SHORT by|released |generate [0-9]+|!!|wanted|per.type|short by [0-9]+ then|at the same floor|at the floor now|the floor moved|NOT CLOSING|^VERDICT:' \
+				"$LOG" 2>/dev/null | tail -70)")" \
 		>/dev/null 2>&1 \
 		|| echo "  note: SNS publish failed - the verdict is only in S3"
 }

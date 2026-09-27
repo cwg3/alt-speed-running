@@ -127,6 +127,31 @@ if [ ! -f "$HEADROOM_FILE" ]; then
 		|| echo "  no headroom file - falling back to a flat ${HEADROOM}x for every type"
 fi
 
+# Run history, same local-then-S3 shape as headroom and for the same
+# reason: the runner clones from git and starts with neither.
+#
+# WHY THIS FILE EXISTS. The cap deliberately does not close the floor in
+# one run - the header's words are that the floor "needs to be approached
+# every run until it is". That is an invariant, and nothing checked it.
+# The clamp warning said "fine IF each gap shrinks every run - compare
+# with the last one" and left the comparing to whoever opened two logs,
+# so a clamped type whose gap was FLAT would report exactly like one
+# closing steadily. Without a previous reading this script cannot tell
+# the difference, and one run in isolation never can.
+#
+# It is not in git for the same reason headroom is not: a per-type gap is
+# a per-type depth, which is a yield wearing different clothes. results/
+# is already gitignored.
+HISTORY_FILE="$ROOT/seed-filter/results/topup-history.json"
+mkdir -p "$ROOT/seed-filter/results"
+ACCT="${ACCT:-$(aws sts get-caller-identity --query Account --output text 2>/dev/null)}"
+HISTORY_S3="s3://alt-seedwork-${ACCT}/state/topup-history.json"
+if [ ! -f "$HISTORY_FILE" ]; then
+	aws s3 cp "$HISTORY_S3" "$HISTORY_FILE" --quiet 2>/dev/null \
+		&& echo "  run history fetched from S3" \
+		|| echo "  no run history on S3 yet - the convergence check starts next run"
+fi
+
 # Demand. This is FATAL if it fails, and the difference from "no active
 # players" matters: zero players is a real answer meaning nothing is
 # draining, while an unreadable table is no answer at all. Treating the
@@ -154,6 +179,7 @@ PLAN=$(aws dynamodb scan --region "$REGION" --table-name "$TABLE" \
          --output json 2>/dev/null \
   | FLOOR="$FLOOR" HEADROOM="$HEADROOM" HEADROOM_FILE="$HEADROOM_FILE" \
     PLAYERS_JSON="$PLAYERS_JSON" ACTIVE_DAYS="$ACTIVE_DAYS" \
+    HISTORY_FILE="$HISTORY_FILE" \
     MAX_CANDIDATES="${MAX_CANDIDATES:-}" python3 -c "
 import json, os, sys, collections, time
 floor = int(os.environ['FLOOR']); flat = float(os.environ['HEADROOM'])
@@ -226,7 +252,10 @@ else:
     print(f'  no player active in {int(active_days)}d - '
           'measuring pool depth only', file=sys.stderr)
 
-targets, short = {}, []
+# supply is kept per type and not just the gap it implies: the gap is
+# relative to a floor that moves, and a reading taken at one floor has to
+# stay readable after the floor changes.
+targets, short, supply_by = {}, [], {}
 for t in TYPES:
     pool_n = len(drawable[t])
     if active:
@@ -238,6 +267,7 @@ for t in TYPES:
         detail = f'{pool_n:>4} drawable'
     gap = max(0, floor - supply)
     targets[t] = gap
+    supply_by[t] = supply
     print(f'  {t:<18}{detail}  floor {floor}  '
           + (f'SHORT by {gap}' if gap else 'ok'), file=sys.stderr)
     if gap: short.append(t)
@@ -247,6 +277,84 @@ for t in TYPES:
 held = sum(1 for i in items if i.get('heldUnverified',{}).get('BOOL'))
 if held:
     print(f'  NOTE {held} rows are held mid-verification', file=sys.stderr)
+
+# IS THE GAP ACTUALLY CLOSING. The cap makes a short type normal for a
+# few runs; it does not make a type that never closes normal, and those
+# two look identical in one log. So compare with the last run.
+#
+# Only at an UNCHANGED floor. A floor raise moves every gap at once and
+# comparing across it says nothing about whether the pipeline is keeping
+# up - which is the trap this check was written after walking into: the
+# floor doubled between two runs, every gap grew, and the growth was the
+# goalposts moving rather than supply falling. Saying which it was is the
+# whole point, so a floor change is reported as a floor change and the
+# regression verdict is withheld for that run.
+history = []
+try:
+    history = json.load(open(os.environ.get('HISTORY_FILE') or ''))['runs']
+except (OSError, ValueError, KeyError, TypeError):
+    pass
+prev = next((r for r in reversed(history) if isinstance(r.get('supply'), dict)),
+            None)
+stalled = []
+print(file=sys.stderr)
+if prev is None:
+    print('  no previous run on record - nothing to compare this gap with yet',
+          file=sys.stderr)
+else:
+    pfloor = int(prev.get('floor') or 0)
+    ago = (time.time() - float(prev.get('at') or 0)) / 3600.0
+    psup = prev['supply']
+    if pfloor != floor:
+        print(f'  the floor moved from {pfloor} to {floor} since the last run '
+              f'{ago:.0f}h ago,', file=sys.stderr)
+        print('  so its gaps are not comparable - this run becomes the '
+              'baseline instead.', file=sys.stderr)
+        # Supply still is comparable, and it is the honest half of the
+        # story on a floor raise: it separates a bigger goal from a
+        # shrinking pool.
+        fell = sorted(t for t in TYPES
+                      if t in psup and supply_by[t] < int(psup[t]))
+        if fell:
+            print('  !! supply FELL for: ' + ', '.join(fell)
+                  + ' - the floor is not the only reason', file=sys.stderr)
+            print('  !! those types are short. Nothing consumes seeds, so a '
+                  'drop means rows', file=sys.stderr)
+            print('  !! left the drawable set: quarantined, withdrawn, or '
+                  'marked used.', file=sys.stderr)
+    else:
+        print(f'  against the last run {ago:.0f}h ago, at the same floor:',
+              file=sys.stderr)
+        for t in TYPES:
+            if t not in psup:
+                continue
+            was, now = max(0, floor - int(psup[t])), targets[t]
+            if not now:
+                print(f'    {t:<18}at the floor now', file=sys.stderr)
+            elif was > now:
+                closed = was - now
+                runs = -(-now // closed)
+                print(f'    {t:<18}short by {was} then, {now} now - '
+                      f'about {runs} more run(s) at that rate', file=sys.stderr)
+            else:
+                stalled.append((t, was, now))
+                print(f'    {t:<18}short by {was} then, {now} now - '
+                      f'NOT CLOSING', file=sys.stderr)
+        # The gutter runs down every line because the notification greps
+        # for it and drops anything unmarked.
+        if stalled:
+            print('  !! a gap that is flat or growing at an UNCHANGED floor is '
+                  'the failure', file=sys.stderr)
+            print('  !! the cap is allowed to look like and is not: this type '
+                  'is not on its', file=sys.stderr)
+            print('  !! way to the floor, it is parked short of it. For each '
+                  'one, either its', file=sys.stderr)
+            print('  !! ceiling in _maxCandidatesByType is below what one run '
+                  'needs, or its', file=sys.stderr)
+            print('  !! configured yield is too optimistic - the per-type '
+                  'report after the', file=sys.stderr)
+            print('  !! build says which, as (ceiling) or (yield).',
+                  file=sys.stderr)
 
 # One candidate count per type, each capped so a single night stays
 # bounded. The generator makes the largest of them and each type is
@@ -281,13 +389,18 @@ if capped:
         est = int(cands[t] / h) if h > 0 else 0
         print(f'  !!   {t:<18}{est:>4} of {targets[t]:>3} wanted '
               f'({cands[t]} candidates at {h:g}x)', file=sys.stderr)
-    print('  !! fine IF each gap shrinks every run - compare with the last one.',
-          file=sys.stderr)
-    print('  !! if a type\'s shortfall is flat or growing, raise '
-          '_maxCandidatesByType', file=sys.stderr)
-    print('  !! for THAT type, never the shared _default.', file=sys.stderr)
+    # This used to say \"compare with the last one\" and leave it there,
+    # which is advice and not a check. The block above does the comparing
+    # now, so this points at it rather than asking for it again.
+    print('  !! fine IF each gap shrinks every run - the comparison with the '
+          'last run is', file=sys.stderr)
+    print('  !! above, and says NOT CLOSING when it does not. If a type is '
+          'parked, raise', file=sys.stderr)
+    print('  !! _maxCandidatesByType for THAT type, never the shared '
+          '_default.', file=sys.stderr)
 print(json.dumps({'targets': targets, 'short': short, 'cands': cands, 'need': need,
-                  'capped': capped, 'floor': floor,
+                  'capped': capped, 'floor': floor, 'supply': supply_by,
+                  'stalled': [t for t, _, _ in stalled],
                   'cand': max(cands.values()) if short else 0}))
 ")
 rc=$?
@@ -300,6 +413,40 @@ SHORT=$(printf '%s' "$PLAN" | python3 -c "import json,sys; print(' '.join(json.l
 CAND=$(printf '%s' "$PLAN"  | python3 -c "import json,sys; print(json.load(sys.stdin)['cand'])")
 TARGETS=$(printf '%s' "$PLAN" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['targets']))")
 CANDS=$(printf '%s' "$PLAN" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['cands']))")
+
+# Recorded BEFORE the build, and on the nothing-short path too. Both
+# matter. Before, because a run that dies in the checks still took a
+# valid reading of the pool and the next run's comparison needs the
+# READING, not the outcome - a crashed night that loses its reading makes
+# the run after it compare against the night before and call two runs'
+# progress one. And on the nothing-short path, because "at the floor" is
+# the reading that proves a later gap is new.
+#
+# A dry run records nothing: it is a rehearsal, and a baseline it wrote
+# would make the next real run compare against a run that never built.
+if [ "$DRY" = 0 ]; then
+	PLAN="$PLAN" HISTORY_FILE="$HISTORY_FILE" python3 -c "
+import json, os, time
+plan = json.loads(os.environ['PLAN'])
+path = os.environ['HISTORY_FILE']
+try:
+    hist = json.load(open(path))
+except (OSError, ValueError):
+    hist = {}
+runs = hist.get('runs') or []
+if not isinstance(runs, list): runs = []
+runs.append({'at': time.time(), 'floor': plan['floor'],
+             'supply': plan['supply'], 'gap': plan['targets'],
+             'capped': plan['capped'], 'released': None})
+# Trimmed, because this is a convergence check and not an archive: the
+# comparison reads the LAST entry and the trend needs a handful, not a
+# year of them.
+hist['runs'] = runs[-20:]
+json.dump(hist, open(path, 'w'), indent=2)
+" || echo "  note: could not record this run's reading locally"
+	aws s3 cp "$HISTORY_FILE" "$HISTORY_S3" --quiet 2>/dev/null \
+		|| echo "  note: run history did not reach S3 - the next run cannot compare"
+fi
 
 echo
 if [ -z "$SHORT" ]; then
@@ -342,7 +489,8 @@ fi
 # A bare "released N" cannot answer the only question that matters -
 # whether the type that was starving got anything - and a total can look
 # healthy while one type got zero.
-PLAN="$PLAN" BREAKDOWN="$BREAKDOWN" RUN_STARTED="$RUN_STARTED" python3 -c "
+PLAN="$PLAN" BREAKDOWN="$BREAKDOWN" RUN_STARTED="$RUN_STARTED" \
+	HISTORY_FILE="$HISTORY_FILE" python3 -c "
 import json, os, sys
 plan = json.loads(os.environ['PLAN'])
 path, started = os.environ['BREAKDOWN'], float(os.environ['RUN_STARTED'])
@@ -351,8 +499,31 @@ try:
         raise FileNotFoundError
     got = json.load(open(path))
 except (FileNotFoundError, OSError, ValueError):
+    got = None
+
+# What this run actually released, written back onto the reading it took
+# before the build. Kept separate from the reading because they answer
+# different questions - the reading is what the pool HAD, this is what the
+# run PUT IN - and because a run can legitimately have one without the
+# other: a build that dies has a reading and no release.
+def record_released(rel_by_type):
+    path = os.environ.get('HISTORY_FILE') or ''
+    try:
+        hist = json.load(open(path))
+        runs = hist['runs']
+        if not runs: return
+    except (OSError, ValueError, KeyError, TypeError):
+        return
+    runs[-1]['released'] = rel_by_type
+    try:
+        json.dump(hist, open(path, 'w'), indent=2)
+    except OSError:
+        pass
+
+if got is None:
     print('  (no per-type release breakdown from this run - '
           'verify-and-release.sh wrote none)')
+    record_released({})
     sys.exit(0)
 rows = got.get('byType', {})
 print('what this run closed, per type:')
@@ -400,12 +571,22 @@ if not still_short:
 # alone cannot carry this: a run that clears three of five types exits 0
 # and the inbox said 'OK', which is true of the RUN and false of the
 # POOL. The subject is the only part anyone reads without opening it.
+record_released({t: (rows.get(t, {}).get('released') or 0)
+                 for t in plan['targets'] if plan['targets'][t]})
+# A type that was ALREADY not closing before this run is the more serious
+# of the two facts and goes first, because the subject line is truncated
+# and whatever is first is the part that gets read. "still short" after
+# one run is expected and says nothing on its own; "not converging" is
+# the thing that never fixes itself.
+parts = []
+stalled = [t for t in plan.get('stalled') or [] if t in plan['targets']]
+if stalled:
+    parts.append('NOT CONVERGING: ' + ', '.join(stalled))
 if still_short:
-    worst = ', '.join(f'{t} -{n}' for t, n in
-                      sorted(still_short, key=lambda x: -x[1])[:3])
-    print(f'VERDICT: still short: {worst}')
-else:
-    print('VERDICT: floor reached for every short type')
+    parts.append('still short: ' + ', '.join(
+        f'{t} -{n}' for t, n in sorted(still_short, key=lambda x: -x[1])[:3]))
+print('VERDICT: ' + ('; '.join(parts) if parts
+                     else 'floor reached for every short type'))
 # Rows the breakdown counted under a type the plan never asked for -
 # almost always the 'unknown' bucket, meaning the CSV join lost the type.
 # Without this the lines above silently sum to less than the run's totals
@@ -418,4 +599,9 @@ if extra:
     print('  !! if that is \'unknown\' the pairId->type join lost the type, and')
     print('  !! the per-type figures above are undercounts.')
 "
+# The reading went up before the build; this is the same file with the
+# outcome attached, and the next run reads it from S3 rather than from
+# this instance, which will not exist.
+aws s3 cp "$HISTORY_FILE" "$HISTORY_S3" --quiet 2>/dev/null \
+	|| echo "  note: run history did not reach S3 - the next run cannot compare"
 echo "top-up complete"
