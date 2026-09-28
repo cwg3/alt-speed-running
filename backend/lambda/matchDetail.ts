@@ -53,6 +53,40 @@ export const handler = async (
 		};
 	}
 
+	// The draw proof.
+	//
+	// The commitment is visible from the moment the match exists, so
+	// each player can record it independently rather than taking the
+	// server's word later. What OPENS it is withheld while the match is
+	// pending: a commitment that ships with its own nonce commits to
+	// nothing, and a spectator endpoint reading this mid-race would be
+	// handing out the world.
+	//
+	// The candidate list inside m.draw is deliberately NOT served here.
+	// It is a per-type pool depth, which is the map of where the ladder
+	// is thin - it stays on the row for the season audit and goes no
+	// further.
+	const finished = m.status !== 'pending';
+	const draw = {
+		seasonId: m.draw?.seasonId ?? null,
+		scheme: m.draw?.scheme ?? null,
+		// 'unverifiable' means the match was drawn with no season secret
+		// configured, and says so rather than looking like a pass.
+		mode: m.draw?.mode ?? null,
+		commitment: m.drawCommitment ?? null,
+		// The pre-image, once it can do no harm. Anyone holding the
+		// commitment from earlier can now recompute it and check it did
+		// not move.
+		reveal: finished && m.drawCommitment
+			? {
+				nonce: m.drawNonce ?? null,
+				seedPairId: m.seedPairId ?? null,
+				overworldSeed: m.overworldSeed ?? null,
+				netherSeed: m.netherSeed ?? null,
+			}
+			: null,
+	};
+
 	const splits: Record<string, Record<string, number>> = m.splits ?? {};
 
 	// One row per split IN ROUTE ORDER, not in whatever order they were
@@ -102,6 +136,7 @@ export const handler = async (
 			// about it. A uuid absent from the map reported nothing.
 			mods: m.mods ?? {},
 			results: m.results ?? {},
+			draw,
 			rows,
 		}),
 	};

@@ -51,3 +51,9 @@ pack/*.jar
 seed-filter/output/
 seed-filter/output-backup/
 seed-filter/results/
+
+# The season secret. Every draw is derived from it, so a player holding
+# it could compute the world before it is dealt. SHA256 of it is
+# published in SEASONS.md at season open and the secret itself at season
+# close - see backend/lambda/lib/drawProof.ts.
+backend/season.local.json

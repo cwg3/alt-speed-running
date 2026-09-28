@@ -11,6 +11,7 @@ import {
 import { randomUUID } from 'crypto';
 import { resolveSessionToken } from './lib/auth';
 import { claimSeedPair, recordSeedsSeen } from './lib/seedPool';
+import { sealDraw } from './lib/drawProof';
 import { illegalMods } from './lib/modRules';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
@@ -125,6 +126,12 @@ export const handler = async (
 					bastionZ: existing.Item.bastionZ ?? 0,
 					smithX: existing.Item.smithX ?? null,
 					smithZ: existing.Item.smithZ ?? null,
+					// Same three-places rule as the seed fields above:
+					// a player who rejoins must be able to record the
+					// commitment to their own match, or the proof is
+					// only available to whoever did not disconnect.
+					seasonId: existing.Item.draw?.seasonId ?? null,
+					drawCommitment: existing.Item.drawCommitment ?? null,
 					// Rejoining a match whose run has already begun. The
 					// client uses this to skip the ten-second seed-reveal
 					// countdown: it is planning time before a race, and
@@ -323,6 +330,14 @@ export const handler = async (
 	}
 	const seedPair = claim.pair;
 
+	// Commit to the world before anybody can play it.
+	//
+	// Written with the match and published in the same response, so
+	// both players hold a commitment to their own seed from the moment
+	// the match exists. The nonce that opens it is withheld until the
+	// match is over - see lib/drawProof.ts.
+	const sealed = sealDraw(claim.draw.seasonId, matchId, seedPair);
+
 	// Before the match exists, not after. If this fails the match is
 	// never created, so a player cannot end up having seen a seed that
 	// was never recorded - which would hand it back to them later.
@@ -357,6 +372,16 @@ export const handler = async (
 			// never saw.
 			worldSetupVersion: myWorldSetup,
 			seedPairId: seedPair.seedPairId,
+			// How this seed was chosen, in enough detail to replay the
+			// choice once the season secret is published. NEVER SERVED:
+			// the candidate list inside it is a per-type pool depth,
+			// which is the map of where the ladder is thin.
+			draw: claim.draw,
+			drawCommitment: sealed.commitment,
+			// Withheld until the match is over, then published with the
+			// seed it commits to. A commitment nobody can open is not a
+			// proof of anything.
+			drawNonce: sealed.nonce,
 			overworldSeed: seedPair.overworldSeed,
 			netherSeed: seedPair.netherSeed,
 			seedType: seedPair.seedType,
@@ -441,6 +466,8 @@ export const handler = async (
 			bastionZ: seedPair.bastionZ,
 			smithX: seedPair.smithX ?? null,
 			smithZ: seedPair.smithZ ?? null,
+			seasonId: claim.draw.seasonId,
+			drawCommitment: sealed.commitment,
 		}),
 	};
 };

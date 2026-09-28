@@ -6,6 +6,7 @@ import {
 import { randomUUID } from 'crypto';
 import { resolveSessionToken } from './lib/auth';
 import { claimSeedPair, isSyntheticPlayer, recordSeedsSeen } from './lib/seedPool';
+import { sealDraw } from './lib/drawProof';
 import { PACE_TIERS, paceFinishMs, scheduleForTier, tierById } from './lib/paceSchedule';
 import { clearMatchPointer } from './lib/matchCompletion';
 
@@ -177,6 +178,12 @@ export const handler = async (
 	}
 	const pair = claim.pair;
 
+	// A pace is unrated, but it spends a real seed out of a player's
+	// lifetime budget, so it gets the same commitment as a ranked draw.
+	// An exception here would be one place where the operator still
+	// chooses the world, which is the whole thing this removes.
+	const sealed = sealDraw(claim.draw.seasonId, matchId, pair);
+
 	// Before the match exists, not after - the same order and the same
 	// reason as the ranked path. If this fails the match is never created,
 	// so a player cannot end up having played a seed that was never
@@ -216,6 +223,10 @@ export const handler = async (
 			paceFinishMs: paceFinishMs(schedule),
 			worldSetupVersion: Number(player.Item.worldSetupVersion ?? 1),
 			seedPairId: pair.seedPairId,
+			// See queueJoin: recorded, never served.
+			draw: claim.draw,
+			drawCommitment: sealed.commitment,
+			drawNonce: sealed.nonce,
 			overworldSeed: pair.overworldSeed,
 			netherSeed: pair.netherSeed,
 			seedType: pair.seedType,
@@ -274,5 +285,7 @@ export const handler = async (
 		bastionZ: pair.bastionZ,
 		smithX: pair.smithX ?? null,
 		smithZ: pair.smithZ ?? null,
+		seasonId: claim.draw.seasonId,
+		drawCommitment: sealed.commitment,
 	});
 };

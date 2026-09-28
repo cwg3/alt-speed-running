@@ -1,7 +1,14 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { BatchGetCommand, DynamoDBDocumentClient, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
-import { randomInt } from 'node:crypto';
+import {
+	DRAW_SCHEME,
+	type DrawRecord,
+	candidateKey,
+	deriveDrawOrder,
+	pickerFor,
+	seasonFromEnv,
+} from './drawProof';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -46,7 +53,7 @@ export interface SeedPair {
 export type ClaimFailure = 'pool_empty' | 'all_seen';
 
 export type ClaimResult =
-	| { ok: true; pair: SeedPair }
+	| { ok: true; pair: SeedPair; draw: DrawRecord }
 	| { ok: false; reason: ClaimFailure };
 
 /**
@@ -189,15 +196,6 @@ async function claimInternal(
 		startKey = page.LastEvaluatedKey;
 	} while (startKey && items.length < CANDIDATE_CAP);
 
-	// Fisher-Yates, from crypto rather than Math.random. Which seed
-	// comes next is competitively meaningful - a predictable rotation
-	// would let a player know the world before it is dealt - so the
-	// draw should not be reconstructible from watching earlier ones.
-	for (let i = items.length - 1; i > 0; i--) {
-		const j = randomInt(i + 1);
-		[items[i], items[j]] = [items[j], items[i]];
-	}
-
 	// "No seeds at all" and "none this pair has not already played" are
 	// different problems with different fixes - refill the pool, or
 	// widen it for a heavy player - and they must not look alike to
@@ -213,48 +211,43 @@ async function claimInternal(
 
 	// Draw a TYPE first, then a seed inside it.
 	//
-	// The shuffle above is uniform over SEEDS, which makes a type's
-	// share of the draw its share of the pool. That is not a property
-	// anyone wants and it drifts every time the pool is rebuilt:
-	// filling a shipwreck shortage took shipwreck from 6 of 49 to 27
-	// of 70, so it went from the rarest opening at 12% to 39% of every
-	// draw, and a player got it three matches running.
+	// A uniform draw over SEEDS makes a type's share of the draw its
+	// share of the pool. That is not a property anyone wants and it
+	// drifts every time the pool is rebuilt: filling one shortage took
+	// that type from the rarest opening to the commonest, and a player
+	// got it three matches running.
 	//
-	// Picking the type first makes variety independent of depth. A
-	// type with four seeds and a type with thirty are equally likely
-	// until the four are used up, which is the whole point of having
-	// five types.
+	// Picking the type first makes variety independent of depth. A type
+	// with four seeds and a type with thirty are equally likely until
+	// the four are used up, which is the whole point of having five
+	// types. Only types with something unseen for THIS pair are in the
+	// draw, so a thin type degrades by dropping out rather than by
+	// returning nothing and stalling the queue - which is how a bias
+	// pinned to one type once deadlocked matchmaking for four minutes.
 	//
-	// Only types that still have something unseen for THIS pair are
-	// candidates, so a thin type degrades by dropping out of the draw
-	// rather than by returning nothing and stalling the queue - which
-	// is how a bias pinned to village once deadlocked matchmaking for
-	// four minutes.
-	const byType = new Map<string, typeof candidates>();
-	for (const i of candidates) {
-		const t = String(i.seedType ?? 'village');
-		const list = byType.get(t);
-		if (list) {
-			list.push(i);
-		} else {
-			byType.set(t, [i]);
-		}
-	}
-	const types = Array.from(byType.keys());
-	// Same crypto source as the shuffle: which type comes next is as
-	// competitively meaningful as which seed, and a predictable
-	// rotation would tell a player the opening before it is dealt.
-	for (let i = types.length - 1; i > 0; i--) {
-		const j = randomInt(i + 1);
-		[types[i], types[j]] = [types[j], types[i]];
-	}
-	// Types in random order, seeds already shuffled within each. The
-	// flattened list stays a full fallback order, so if every seed of
-	// the first type fails to claim the draw walks on instead of
-	// giving up.
-	const ordered = types.flatMap((t) => byType.get(t) ?? []);
+	// THE ORDER IS DERIVED, NOT ROLLED. It used to be Fisher-Yates from
+	// crypto randomness, which is unpredictable - the right property
+	// against a player watching the rotation, and no property at all
+	// against the operator, who builds the pool and knows every world
+	// in it before any of them is dealt. Randomness nobody can check is
+	// indistinguishable from a choice. So the order now comes from
+	// HMAC(season secret, matchId): still unpredictable to a player,
+	// who does not have the secret, and reproducible by anyone once the
+	// secret is published at season close. See lib/drawProof.ts for
+	// what that does and does not prove.
+	const season = seasonFromEnv();
+	const { pick, mode } = pickerFor(season, matchId);
+	const drawCandidates = candidates.map((i) => ({
+		seedPairId: String(i.seedPairId),
+		seedType: String(i.seedType ?? 'village'),
+	}));
+	const byKey = new Map(candidates.map((i, n) => [
+		candidateKey(drawCandidates[n]), i,
+	]));
+	const order = deriveDrawOrder(drawCandidates, pick);
+	const ordered = order.map((key) => byKey.get(key)!);
 
-	for (const item of ordered) {
+	for (const [index, item] of ordered.entries()) {
 		try {
 			// No conditional claim any more. Two concurrent matches
 			// drawing the same seed is now legal - it is only unfair if
@@ -267,7 +260,38 @@ async function claimInternal(
 					'SET lastAssignedMatchId = :matchId ADD timesPlayed :one',
 				ExpressionAttributeValues: { ':matchId': matchId, ':one': 1 },
 			}));
-			return { ok: true, pair: {
+			return { ok: true, draw: {
+				scheme: DRAW_SCHEME,
+				seasonId: season.seasonId,
+				mode,
+				// The input the draw ran over, canonical and sorted, so
+				// it can be replayed later. It depends on both players'
+				// seen-seed history, which has moved on by the time
+				// anyone audits, so it cannot be reconstructed - only
+				// recorded. Ids, never seeds.
+				//
+				// THIS GROWS WITH THE POOL, and it rides on a DynamoDB
+				// item with a hard 400KB ceiling. At roughly forty bytes
+				// an entry the row is comfortable at today's size and
+				// would not be if the pool reached the high thousands -
+				// and the failure would land on a player as a match that
+				// could not be created, after their seed was already
+				// recorded as seen. CANDIDATE_CAP does not bound this:
+				// the scan stops CHECKING after the cap but keeps the
+				// whole page it was reading, and a page can be a lot of
+				// small rows.
+				//
+				// The fix when it comes is to write the list to the
+				// replay bucket under the match id and keep only its
+				// hash here; the audit reads it from there. Not built
+				// now because it is a second store to keep in step, and
+				// an unused one is its own kind of rot.
+				candidates: order.slice().sort(),
+				// Where the dealt seed sat in the derived order. 0
+				// unless a claim failed and the draw walked on, which
+				// an audit should be able to see rather than guess at.
+				index,
+			}, pair: {
 				seedPairId: item.seedPairId,
 				overworldSeed: item.overworldSeed,
 				netherSeed: item.netherSeed,

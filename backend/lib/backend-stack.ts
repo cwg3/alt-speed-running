@@ -55,6 +55,40 @@ export class BackendStack extends cdk.Stack {
 				'split-rules.local.json not found - split checking will use loose defaults');
 		}
 
+		// The season secret, from a file that is NOT in this repository.
+		//
+		// Every draw takes its randomness from HMAC(secret, matchId), so
+		// the server does not choose which world a match gets - the
+		// arithmetic does. SHA256(secret) is published in SEASONS.md at
+		// season open; the secret itself is published at season close,
+		// at which point anyone can replay every draw of the season with
+		// scripts/verifyDraws.ts and check the server dealt what the
+		// arithmetic demanded.
+		//
+		// It is an env var rather than a Secrets Manager lookup on
+		// purpose. It is not hidden from the operator - the operator
+		// generated it - it is hidden from PLAYERS, who would otherwise
+		// be able to compute the next world. That is the same threat
+		// model as the split thresholds beside it.
+		//
+		// Absent, the draw falls back to crypto randomness and stamps
+		// every match it makes 'unverifiable'. A missing file must not
+		// stop the ladder, and it must not quietly look like a season
+		// that passes its own audit either.
+		const seasonPath = path.join(__dirname, '..', 'season.local.json');
+		const season: { seasonId?: string; secret?: string } = fs.existsSync(seasonPath)
+			? JSON.parse(fs.readFileSync(seasonPath, 'utf8'))
+			: {};
+		if (!season.secret) {
+			cdk.Annotations.of(this).addWarning(
+				'season.local.json not found - draws will be unverifiable. '
+				+ 'Run: npx tsx scripts/newSeason.ts');
+		}
+		const seasonEnv = {
+			SEASON_ID: season.seasonId ?? 'unset',
+			SEASON_SECRET: season.secret ?? '',
+		};
+
 		const playersTable = new Table(this, 'PlayersTable', {
 			partitionKey: { name: 'uuid', type: AttributeType.STRING },
 			billingMode: BillingMode.PAY_PER_REQUEST,
@@ -186,6 +220,7 @@ export class BackendStack extends cdk.Stack {
 				MATCHES_TABLE_NAME: matchesTable.tableName,
 				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
 				SEED_POOL_TABLE_NAME: seedPoolTable.tableName,
+				...seasonEnv,
 				// TEMPORARY: restricts which seed types are drawn.
 				//
 				// Empty means draw evenly across all five, which is what
@@ -329,6 +364,9 @@ export class BackendStack extends cdk.Stack {
 				QUEUE_TABLE_NAME: queueTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
 				SEED_POOL_TABLE_NAME: seedPoolTable.tableName,
+				// A pace spends a real seed, so it draws under the same
+				// committed season secret as a ranked match.
+				...seasonEnv,
 				// Deliberately NOT given SEED_TYPE_BIAS. Practice draws
 				// from what the player has already seen, so narrowing by
 				// type would narrow an already small set to nothing.
