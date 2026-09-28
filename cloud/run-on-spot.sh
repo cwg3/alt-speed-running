@@ -46,6 +46,22 @@ HEAP="${HEAP:-2G}"
 # instance type. On-demand for a free-tier type is covered by the
 # monthly free hours; SPOT=0 switches to it.
 SPOT="${SPOT:-1}"
+# SPOT CAPACITY IS NOT A CHECK FAILURE. A reclaimed instance uploads
+# nothing, so the run reads exactly like a crash, and the stages already
+# paid for upstream - a whole generation stage, in the 15:00 run on
+# 2026-09-28 - go in the bin over a capacity shortage that a second ask
+# usually clears. So: ask again. Only for a capacity or price
+# termination; a watchdog deadline or a crash reproduces, and relaunching
+# into it just spends the money twice.
+LAUNCH_ATTEMPTS="${LAUNCH_ATTEMPTS:-3}"
+RELAUNCH_WAIT="${RELAUNCH_WAIT:-120}"
+# The LAST attempt pays on-demand. Retrying spot into a region that has
+# just run out tends to find it still out, and the run is already bounded
+# by the watchdog, so the worst case is MAX_MINUTES of one instance -
+# single-digit dollars against a top-up that otherwise fails every
+# twelve hours until capacity returns. ONDEMAND_FALLBACK=0 turns it off
+# and keeps every attempt on spot.
+ONDEMAND_FALLBACK="${ONDEMAND_FALLBACK:-1}"
 
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 BUCKET="alt-seedwork-$ACCOUNT"
@@ -172,6 +188,22 @@ echo "  watchdog $MAX_MINUTES min (longest shard is $per seeds)"
 # local disk. It now uploads what finished, the log, and a marker, and
 # the wait loop below reads that marker.
 #
+# AND THE CALLER NOW GETS THOSE SHARDS. Uploading them was only ever half
+# the fix: the wait loop read the marker, printed where the partials
+# were, and exited 1, so they stayed forensics and the caller still saw
+# nothing. On 2026-09-28 a portalfilter batch had every shard but one
+# finished and uploaded, while that one sat on a single seed until the
+# timer ran out. Nearly every verdict existed, in S3, and the top-up threw
+# all of them away and reported that the check had produced no rows.
+#
+# A missing verdict is SAFE HERE, which is what makes harvesting them
+# sound rather than merely convenient. Every consumer of these CSVs
+# builds a set of the seeds that said PASS and keeps only those
+# (overnight-rebuild.sh), so a seed with no row is a seed that does not
+# enter the pool - identical in effect to a FAIL, and in the direction
+# that cannot contaminate anything. The rule that a check producing NO
+# rows has not run still holds, and still stops the build.
+#
 # --- user data --------------------------------------------------------
 # THIS HEREDOC IS UNQUOTED, so $VAR, $( ) and backticks are expanded HERE,
 # on this machine, at build time - not on the instance. A COMMENT IN THIS
@@ -192,7 +224,7 @@ set -x
   sleep $((MAX_MINUTES * 60))
   echo "WATCHDOG: $MAX_MINUTES minutes elapsed, giving up"
   aws s3 cp /work/ s3://$BUCKET/$RUN/out/ --recursive \
-    --exclude '*' --include 'out-*.csv' || true
+    --exclude '*' --include 'out-*.csv' --include 'gen-*.json' || true
   echo "watchdog fired after $MAX_MINUTES minutes" > /work/watchdog
   aws s3 cp /work/watchdog s3://$BUCKET/$RUN/out/watchdog || true
   aws s3 cp /var/log/seedwork.log s3://$BUCKET/$RUN/out/seedwork.log || true
@@ -228,106 +260,176 @@ AMI=$(aws ssm get-parameter --region "$REGION" \
   --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 \
   --query Parameter.Value --output text)
 
-if [ "$SPOT" = 1 ]; then
-  MARKET=(--instance-market-options '{"MarketType":"spot"}')
-  echo "launching $ITYPE spot (ami $AMI)"
-else
-  MARKET=()
-  echo "launching $ITYPE on-demand (ami $AMI) - free-tier hours"
-fi
-IID=$(aws ec2 run-instances --region "$REGION" \
-  --image-id "$AMI" --instance-type "$ITYPE" --count 1 \
-  ${MARKET[@]+"${MARKET[@]}"} \
-  --iam-instance-profile "Name=$ROLE" \
-  --instance-initiated-shutdown-behavior terminate \
-  --metadata-options 'HttpTokens=required,HttpEndpoint=enabled' \
-  --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":40,"VolumeType":"gp3","DeleteOnTermination":true}}]' \
-  --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=alt-seedwork-$RUN},{Key=run,Value=$RUN}]" \
-  --user-data "$USERDATA" \
-  --query 'Instances[0].InstanceId' --output text)
+# WAS THIS INSTANCE RECLAIMED? Asked of the SPOT REQUEST, not the
+# instance: describe-instances reports a reclaimed box as plainly
+# 'terminated', with a StateReason that says Server.SpotInstanceTermination
+# only sometimes and not at all once the record ages. The spot request
+# keeps the real answer in Status.Code, and keeps it after the instance
+# is gone.
+spot_status() {
+  aws ec2 describe-spot-instance-requests --region "$REGION" \
+    --filters "Name=instance-id,Values=$1" \
+    --query 'SpotInstanceRequests[0].Status.Code' --output text 2>/dev/null || true
+}
 
-echo "instance $IID"
-echo
-echo "  watch:      aws ec2 describe-instances --instance-ids $IID --query 'Reservations[0].Instances[0].State.Name' --output text"
-echo "  results:    aws s3 cp s3://$BUCKET/$RUN/out/combined.csv ."
-echo "  kill now:   aws ec2 terminate-instances --instance-ids $IID"
-echo
-echo "waiting for results (the instance terminates itself when done)"
-
-# A FAILED describe-instances IS NOT A DEAD INSTANCE.
-#
-# This loop used to read `... 2>/dev/null || echo gone` and then treat
-# "gone" exactly like "terminated". An API call that fails says nothing
-# about the instance - and right after run-instances there is a window
-# where describe-instances has not caught up with the new id yet and
-# answers InvalidInstanceID.NotFound.
-#
-# That is what ended the 19:26 top-up on 2026-09-26. The village stage
-# launched at 00:46:35Z; 37 seconds later the run declared "instance
-# ended without writing results", called the check broken, refused to
-# load anything and shut the control host down. The instance it gave up
-# on was fine, and went on working for another hour with nothing left
-# alive to collect it. Four hours of spawn and portalfilter went in the
-# bin over one unlucky API call.
-#
-# So the wait now ends on facts only: a successful describe that says
-# 'terminated', or the done marker. Anything else is retried, and if the
-# API stays unreachable the run says THAT, because "I cannot see the
-# instance" and "the instance died" need different responses from
-# whoever reads the log.
-UNREACHABLE=0
-UNREACHABLE_MAX=10   # x30s = 5 minutes of silence before giving up
-while ! aws s3 ls "s3://$BUCKET/$RUN/out/done" >/dev/null 2>&1; do
-  if state=$(aws ec2 describe-instances --instance-ids "$IID" \
-      --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null) \
-      && [ -n "$state" ] && [ "$state" != None ]; then
-    UNREACHABLE=0
+# One launch, one wait. Returns:
+#   0  the done marker is in the bucket - the batch finished
+#   3  terminated by SPOT CAPACITY or price - nothing ran, worth re-asking
+#   4  terminated some other way - a watchdog deadline or a crash, whose
+#      partial output is in the bucket and gets harvested below
+# Anything unreachable still exits the script outright, for the reason
+# the loop's own comment gives.
+launch_and_wait() {
+  local use_spot="$1" MARKET=()
+  if [ "$use_spot" = 1 ]; then
+    MARKET=(--instance-market-options '{"MarketType":"spot"}')
+    echo "launching $ITYPE spot (ami $AMI)"
   else
-    # Not an answer about the instance. A throttle, a network blip, or
-    # an id the API has not propagated yet - all of which resolve by
-    # asking again. A terminated instance stays visible to
-    # describe-instances for about an hour, so a genuine termination
-    # arrives as the WORD 'terminated', never as a lookup failure.
-    state=unknown
-    UNREACHABLE=$((UNREACHABLE + 1))
-    if [ "$UNREACHABLE" -ge "$UNREACHABLE_MAX" ]; then
-      echo "cannot reach the EC2 API - $UNREACHABLE failed lookups in a row" \
-        "($((UNREACHABLE * 30))s)."
-      echo "  THIS IS NOT A VERDICT ON THE CHECK. The instance is probably still"
-      echo "  running and still billing. Look before re-running:"
-      echo "    aws ec2 describe-instances --instance-ids $IID \\"
-      echo "      --query 'Reservations[0].Instances[0].State.Name' --output text"
-      echo "    aws s3 ls s3://$BUCKET/$RUN/out/"
-      exit 1
+    echo "launching $ITYPE ON-DEMAND (ami $AMI)"
+  fi
+  IID=$(aws ec2 run-instances --region "$REGION" \
+    --image-id "$AMI" --instance-type "$ITYPE" --count 1 \
+    ${MARKET[@]+"${MARKET[@]}"} \
+    --iam-instance-profile "Name=$ROLE" \
+    --instance-initiated-shutdown-behavior terminate \
+    --metadata-options 'HttpTokens=required,HttpEndpoint=enabled' \
+    --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":40,"VolumeType":"gp3","DeleteOnTermination":true}}]' \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=alt-seedwork-$RUN},{Key=run,Value=$RUN}]" \
+    --user-data "$USERDATA" \
+    --query 'Instances[0].InstanceId' --output text)
+
+  echo "instance $IID"
+  echo
+  echo "  watch:      aws ec2 describe-instances --instance-ids $IID --query 'Reservations[0].Instances[0].State.Name' --output text"
+  echo "  results:    aws s3 cp s3://$BUCKET/$RUN/out/combined.csv ."
+  echo "  kill now:   aws ec2 terminate-instances --instance-ids $IID"
+  echo
+  echo "waiting for results (the instance terminates itself when done)"
+
+  # A FAILED describe-instances IS NOT A DEAD INSTANCE.
+  #
+  # This loop used to read `... 2>/dev/null || echo gone` and then treat
+  # "gone" exactly like "terminated". An API call that fails says nothing
+  # about the instance - and right after run-instances there is a window
+  # where describe-instances has not caught up with the new id yet and
+  # answers InvalidInstanceID.NotFound.
+  #
+  # That is what ended the 19:26 top-up on 2026-09-26. The village stage
+  # launched at 00:46:35Z; 37 seconds later the run declared "instance
+  # ended without writing results", called the check broken, refused to
+  # load anything and shut the control host down. The instance it gave up
+  # on was fine, and went on working for another hour with nothing left
+  # alive to collect it. Four hours of spawn and portalfilter went in the
+  # bin over one unlucky API call.
+  #
+  # So the wait ends on facts only: a successful describe that says
+  # 'terminated', or the done marker. Anything else is retried, and if the
+  # API stays unreachable the run says THAT, because "I cannot see the
+  # instance" and "the instance died" need different responses from
+  # whoever reads the log.
+  local UNREACHABLE=0
+  local UNREACHABLE_MAX=10   # x30s = 5 minutes of silence before giving up
+  local state
+  while ! aws s3 ls "s3://$BUCKET/$RUN/out/done" >/dev/null 2>&1; do
+    if state=$(aws ec2 describe-instances --instance-ids "$IID" \
+        --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null) \
+        && [ -n "$state" ] && [ "$state" != None ]; then
+      UNREACHABLE=0
+    else
+      # Not an answer about the instance. A throttle, a network blip, or
+      # an id the API has not propagated yet - all of which resolve by
+      # asking again. A terminated instance stays visible to
+      # describe-instances for about an hour, so a genuine termination
+      # arrives as the WORD 'terminated', never as a lookup failure.
+      state=unknown
+      UNREACHABLE=$((UNREACHABLE + 1))
+      if [ "$UNREACHABLE" -ge "$UNREACHABLE_MAX" ]; then
+        echo "cannot reach the EC2 API - $UNREACHABLE failed lookups in a row" \
+          "($((UNREACHABLE * 30))s)."
+        echo "  THIS IS NOT A VERDICT ON THE CHECK. The instance is probably still"
+        echo "  running and still billing. Look before re-running:"
+        echo "    aws ec2 describe-instances --instance-ids $IID \\"
+        echo "      --query 'Reservations[0].Instances[0].State.Name' --output text"
+        echo "    aws s3 ls s3://$BUCKET/$RUN/out/"
+        exit 1
+      fi
+      sleep 30
+      continue
+    fi
+    if [ "$state" = terminated ]; then
+      # It may have written the marker in the moment between the S3 check
+      # at the top of this loop and this one - the instance terminates
+      # itself the instant it finishes, so that window is real and the
+      # results are already in the bucket.
+      if aws s3 ls "s3://$BUCKET/$RUN/out/done" >/dev/null 2>&1; then
+        return 0
+      fi
+      # Say WHICH failure this was. "No results" covers a crash, an OOM, a
+      # watchdog deadline and a spot reclaim, and they need different
+      # responses - the first two are bugs, the third means the batch was
+      # bigger than the timer, and the fourth is not about this job at all.
+      local sstat
+      sstat=$(spot_status "$IID")
+      case "$sstat" in
+        *no-capacity*|*capacity-oversubscribed*|*terminated-by-price*|*capacity-not-available*)
+          echo "the SPOT REQUEST was reclaimed: $sstat"
+          echo "  Nothing ran. This is AWS capacity, not a broken check."
+          return 3 ;;
+      esac
+      if aws s3 cp "s3://$BUCKET/$RUN/out/watchdog" - 2>/dev/null; then
+        echo "the WATCHDOG stopped it - the batch needed longer than $MAX_MINUTES min."
+        echo "  whatever finished is in s3://$BUCKET/$RUN/out/ and is harvested below."
+        echo "  if this keeps happening, raise MINUTES_PER_SEED or shard smaller."
+      else
+        echo "instance ended without writing results and without hitting the watchdog"
+        [ -n "$sstat" ] && [ "$sstat" != None ] && echo "  spot request status: $sstat"
+      fi
+      aws s3 cp "s3://$BUCKET/$RUN/out/seedwork.log" - 2>/dev/null | tail -30 \
+        || aws ec2 get-console-output --instance-id "$IID" --output text 2>/dev/null | tail -30 \
+        || true
+      return 4
     fi
     sleep 30
-    continue
+  done
+  return 0
+}
+
+attempt=1
+while : ; do
+  use_spot="$SPOT"
+  # The last attempt buys capacity instead of bidding for it.
+  if [ "$SPOT" = 1 ] && [ "$ONDEMAND_FALLBACK" = 1 ] \
+     && [ "$attempt" -eq "$LAUNCH_ATTEMPTS" ] && [ "$LAUNCH_ATTEMPTS" -gt 1 ]; then
+    use_spot=0
+    echo "  last attempt - paying on-demand rather than losing the run"
+    echo "  (bounded by the $MAX_MINUTES min watchdog; ONDEMAND_FALLBACK=0 to refuse)"
   fi
-  if [ "$state" = terminated ]; then
-    # It may have written the marker in the moment between the S3 check
-    # at the top of this loop and this one - the instance terminates
-    # itself the instant it finishes, so that window is real and the
-    # results are already in the bucket.
-    if aws s3 ls "s3://$BUCKET/$RUN/out/done" >/dev/null 2>&1; then
-      break
-    fi
-    # Say WHICH failure this was. "No results" covers a crash, an OOM and
-    # a watchdog deadline, and they need different fixes - the first two
-    # are bugs, the third just means the batch was bigger than the timer.
-    if aws s3 cp "s3://$BUCKET/$RUN/out/watchdog" - 2>/dev/null; then
-      echo "the WATCHDOG stopped it - the batch needed longer than $MAX_MINUTES min."
-      echo "  partial shards, if any, are in s3://$BUCKET/$RUN/out/"
-      echo "  re-run with a bigger MINUTES_PER_SEED or fewer seeds per shard."
-    else
-      echo "instance ended without writing results and without hitting the watchdog"
-    fi
-    aws s3 cp "s3://$BUCKET/$RUN/out/seedwork.log" - 2>/dev/null | tail -30 \
-      || aws ec2 get-console-output --instance-id "$IID" --output text 2>/dev/null | tail -30 \
-      || true
-    exit 1
+  [ "$attempt" -gt 1 ] && echo "=== launch attempt $attempt of $LAUNCH_ATTEMPTS ==="
+  rc=0; launch_and_wait "$use_spot" || rc=$?
+  [ "$rc" != 3 ] && break
+  if [ "$attempt" -ge "$LAUNCH_ATTEMPTS" ]; then
+    echo "out of launch attempts - spot capacity never came back."
+    break
   fi
-  sleep 30
+  # A reclaimed attempt uploaded nothing, but clear out/ anyway: harvesting
+  # below globs whatever is there, and a half-written shard from a previous
+  # attempt would be counted alongside the same shard from this one.
+  aws s3 rm "s3://$BUCKET/$RUN/out/" --recursive --quiet 2>/dev/null || true
+  echo "waiting ${RELAUNCH_WAIT}s before asking for capacity again"
+  sleep "$RELAUNCH_WAIT"
+  attempt=$((attempt + 1))
 done
+
+# HARVEST. rc 0 is a finished batch; rc 4 is a batch that stopped early
+# and left some of its shards behind. Both are collected the same way -
+# the difference is only in how much is there, and that is counted and
+# said out loud rather than assumed. rc 3 means no instance ever ran.
+if [ "${rc:-0}" = 3 ]; then
+	echo "nothing was produced - no instance completed a batch." >&2
+	exit 1
+fi
+PARTIAL=0
+[ "${rc:-0}" = 4 ] && PARTIAL=1
 
 RESDIR="$(cd "$(dirname "$0")/.." && pwd)/seed-filter/results"
 mkdir -p "$RESDIR"
@@ -335,6 +437,11 @@ if [ "$CHECK" = generate ]; then
 	dest="$RESDIR/$RUN"
 	mkdir -p "$dest"
 	aws s3 cp "s3://$BUCKET/$RUN/out/" "$dest/" --recursive --exclude '*' --include 'gen-*.json' --quiet
+	if [ -z "$(ls "$dest"/gen-*.json 2>/dev/null)" ]; then
+		echo "no generator shards in s3://$BUCKET/$RUN/out/ - nothing to merge." >&2
+		exit 1
+	fi
+	[ "$PARTIAL" = 1 ] && echo "  PARTIAL: merging the $(ls "$dest"/gen-*-overworld.json 2>/dev/null | wc -l | tr -d ' ') shard(s) that finished, of $shards"
 	echo "=== $(ls "$dest" | grep -c overworld) shards -> $dest ==="
 	python3 - "$dest" <<'PYEOF'
 import json, sys, glob, os
@@ -357,7 +464,54 @@ print('  nether seeds     %d' % len(nether))
 PYEOF
 else
 	OUT="$RESDIR/$RUN.csv"
-	aws s3 cp "s3://$BUCKET/$RUN/out/combined.csv" "$OUT" --quiet
-	echo "=== $(wc -l < "$OUT" | tr -d ' ') rows -> $OUT ==="
+	# combined.csv only exists on the clean path - the instance writes it
+	# after the last container exits. When the batch stopped early there is
+	# no combined.csv and the per-shard CSVs are the whole result, so build
+	# it here from whatever shards arrived. Same file either way, so no
+	# caller has to know which path it came down.
+	# Counting rows in a file that may be empty or absent. grep -c exits 1
+	# on no match, which under set -e is a dead script rather than a zero.
+	_rows() { local c; c=$(grep -cve '^[[:space:]]*$' "$1" 2>/dev/null) || c=0; echo "${c:-0}"; }
+	shdir="$TMP/harvest"; mkdir -p "$shdir"
+	if ! aws s3 cp "s3://$BUCKET/$RUN/out/combined.csv" "$OUT" --quiet 2>/dev/null; then
+		aws s3 cp "s3://$BUCKET/$RUN/out/" "$shdir/" --recursive \
+			--exclude '*' --include 'out-shard-*.csv' --quiet 2>/dev/null || true
+		cat "$shdir"/out-shard-*.csv > "$OUT" 2>/dev/null || : > "$OUT"
+	fi
+	got=$(_rows "$OUT")
+	if [ "$got" -eq 0 ]; then
+		# The original rule, unchanged: no rows at all means the check did
+		# not run, and the caller must not build a pool on it.
+		echo "=== 0 rows: the '$CHECK' check produced nothing ===" >&2
+		exit 1
+	fi
+	if [ "$PARTIAL" = 1 ] || [ "$got" -lt "$n" ]; then
+		# Name the shards that came up short. A total says a seed was
+		# missed; WHICH shard says where to look, and a shard that returned
+		# nothing at all is a different animal from one that stopped a
+		# couple of seeds from the end.
+		echo "=== PARTIAL: $got of $n seeds got a verdict ==="
+		echo "  the rest were never judged, so they simply do not enter the pool."
+		# The per-shard CSVs may not be local yet - combined.csv existing but
+		# short is the one way to get here without having downloaded them.
+		if [ -z "$(ls "$shdir" 2>/dev/null)" ]; then
+			aws s3 cp "s3://$BUCKET/$RUN/out/" "$shdir/" --recursive \
+				--exclude '*' --include 'out-shard-*.csv' --quiet 2>/dev/null || true
+		fi
+		# Only break it down per shard if the per-shard CSVs are actually
+		# here. Without them every shard reads as "0 of 10" next to a line
+		# saying most of them got a verdict, and a report that contradicts
+		# itself is worse than one that admits what it could not fetch.
+		if [ -n "$(ls "$shdir" 2>/dev/null)" ]; then
+			for f in "$TMP"/shard-*; do
+				sn=$(basename "$f"); want=$(_rows "$f"); have=$(_rows "$shdir/out-$sn.csv")
+				if [ "$have" -lt "$want" ]; then echo "    $sn: $have of $want"; fi
+			done
+		else
+			echo "    (per-shard CSVs not in the bucket - cannot say which shards)"
+		fi
+		echo "  full output, including any worker log: s3://$BUCKET/$RUN/out/"
+	fi
+	echo "=== $got rows -> $OUT ==="
 	awk -F, '{print $2}' "$OUT" | sort | uniq -c | sort -rn | head
 fi

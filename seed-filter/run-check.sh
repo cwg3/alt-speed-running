@@ -57,12 +57,26 @@ run_check() {
 		echo "  -> $check on AWS ($workers workers)"
 		# The type must be PASSED. Leaving it to the default is what broke
 		# every cloud check in the first unattended pool build.
+		# THE EXIT CODE IS THE ANSWER, not the contents of the results
+		# directory. This read `run-on-spot.sh ... || true` and then took
+		# the NEWEST results/<check>-*.csv, which is this run's file only
+		# when this run wrote one. A failed check falls through to the
+		# previous run's CSV and the build proceeds on it: same check
+		# name, plausible row count, seeds from a different batch
+		# entirely. The cloud runner never caught it because its disk is
+		# empty every time; every local run has been one failure away
+		# from it.
+		local rc=0
 		"$_RC_ROOT/cloud/run-on-spot.sh" "$check" "$input" "$workers" \
-			"${ITYPE:-m7g.4xlarge}" || true
+			"${ITYPE:-m7g.4xlarge}" || rc=$?
+		if [ "$rc" != 0 ]; then
+			echo "  !! $check produced no results (rc=$rc) - leaving $dest untouched" >&2
+			return 1
+		fi
 		local csv
 		csv=$(ls -t "$_RC_ROOT/seed-filter/results/$check"-*.csv 2>/dev/null | head -1)
 		if [ -z "$csv" ]; then
-			echo "  !! $check produced no results - leaving $dest untouched" >&2
+			echo "  !! $check exited 0 but wrote no CSV - leaving $dest untouched" >&2
 			return 1
 		fi
 		if [ -n "$header" ]; then
