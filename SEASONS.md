@@ -75,7 +75,7 @@ passing.
 
 | season | opened | SHA256(secret) | state |
 |---|---|---|---|
-| _none open yet_ | | | |
+| s1 | 2026-09-28 | `7bce1ada6fee496de55e8ba860204f6915c6b1ba9f9262dcfba643fa50f993cd` | open |
 
 Open one with `npx tsx backend/scripts/newSeason.ts <season-id>`, paste
 the row it prints, **push it**, and only then deploy. Deploying first
