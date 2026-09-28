@@ -126,6 +126,31 @@ public class SeedRevealScreen extends Screen {
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText("the race begins at zero"), cx, y + 64, DIM);
 
+		// The server's commitment to this world, where a camera can see it.
+		//
+		// Both players are shown it before either can play, so a copy of
+		// it exists outside the server from the moment the match is made
+		// - in a screenshot, in a VOD, in whatever a viewer clipped.
+		// Half this community streams, which makes this line the
+		// cheapest independent timestamp available to it.
+		//
+		// Eight characters, not sixty-four: the full value is already in
+		// the log for anyone verifying properly, and this has to be
+		// readable off a stream at a glance without crowding the
+		// countdown it sits under. DIM, and left alone by the eye unless
+		// somebody is looking for it - it is evidence, not information
+		// the player needs in order to run.
+		//
+		// Nothing is drawn when the backend sent no commitment. An empty
+		// label would read as a guarantee that happens to be blank.
+		com.speedrunmcalt.net.DrawProof proof = MatchState.draw;
+		if (com.speedrunmcalt.net.DrawProof.isPresent(proof)) {
+			String season = proof.seasonId == null ? "" : proof.seasonId + " ";
+			drawCenteredText(matrices, this.textRenderer,
+					new LiteralText("commitment " + season + proof.shortForm()),
+					cx, y + 80, DIM);
+		}
+
 		super.render(matrices, mouseX, mouseY, delta);
 	}
 

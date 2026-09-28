@@ -100,7 +100,8 @@ public final class BackendClient {
 				// Null unless this is a rejoin of a paced match, in which
 				// case the whole client labels it as a pace rather than
 				// announcing a person called "Pace 17:00".
-				optString(resp, "paceLabel", null));
+				optString(resp, "paceLabel", null),
+				drawProof(resp));
 	}
 
 	/**
@@ -133,7 +134,23 @@ public final class BackendClient {
 				optInt(resp, "smithX", 0),
 				optInt(resp, "smithZ", 0),
 				false,
-				optString(resp, "paceLabel", "pace"));
+				optString(resp, "paceLabel", "pace"),
+				drawProof(resp));
+	}
+
+	/**
+	 * The server's commitment to this match's world, if it sent one.
+	 *
+	 * Null on an older backend or a deploy with no season configured.
+	 * Absent is not an error here - the client simply shows and logs
+	 * nothing, rather than printing a blank where a guarantee should be.
+	 */
+	private static DrawProof drawProof(JsonObject resp) {
+		String commitment = optString(resp, "drawCommitment", null);
+		if (commitment == null || commitment.isEmpty()) {
+			return null;
+		}
+		return new DrawProof(optString(resp, "seasonId", null), commitment);
 	}
 
 	/** Tolerates a backend older than this client, and nulls in JSON. */

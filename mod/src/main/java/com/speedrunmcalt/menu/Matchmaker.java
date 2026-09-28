@@ -194,6 +194,35 @@ public final class Matchmaker {
 			MatchState.smithX = match.smithX;
 			MatchState.smithZ = match.smithZ;
 			MatchState.runAlreadyStarted = match.runAlreadyStarted;
+			MatchState.draw = match.draw;
+			// THE FULL COMMITMENT, IN THE PLAYER'S OWN LOG.
+			//
+			// This line is the point of the whole scheme on this side. A
+			// commitment only the server holds is one the server can
+			// rewrite; a copy in a local log file, written the moment
+			// the match was made, is not. Logs are already what people
+			// paste when a result is disputed, so this costs the player
+			// nothing and is there whether or not they ever think about
+			// it. The short form goes on screen; this is the one you can
+			// actually verify against.
+			//
+			// Covers BOTH paths - a pace and a real match arrive here
+			// through the same apply block - which is why it is not at
+			// either of the two log lines further down.
+			if (com.speedrunmcalt.net.DrawProof.isPresent(match.draw)) {
+				SpeedrunMcAlt.LOGGER.info(
+						"[speedrunmcalt] Draw commitment season={} matchId={} sha256={}"
+								+ " - keep this line; it is your copy, see SEASONS.md",
+						match.draw.seasonId, match.matchId, match.draw.commitment);
+			} else {
+				// Said out loud rather than passed over. A match with no
+				// commitment is not a match that passed a check, and the
+				// player should be able to find out which of their runs
+				// were unverifiable without asking us.
+				SpeedrunMcAlt.LOGGER.warn(
+						"[speedrunmcalt] No draw commitment for matchId={} - this match's"
+								+ " seed cannot be verified afterwards", match.matchId);
+			}
 			// Tidy up finished worlds before making another. The one we
 			// are about to enter is spared: a rejoin after a crash uses
 			// the SAME world and must find it intact.

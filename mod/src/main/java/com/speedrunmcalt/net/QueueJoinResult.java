@@ -49,6 +49,12 @@ public final class QueueJoinResult {
 	 * rather than a separate boolean that could disagree with it.
 	 */
 	public final String paceLabel;
+	/**
+	 * What the server committed to when it dealt this world, or null if
+	 * it sent nothing. See DrawProof - the client's job is to keep a
+	 * copy the server cannot reach.
+	 */
+	public final DrawProof draw;
 	/** True when the opponent is a pace rather than a person. */
 	public boolean isPace() {
 		return paceLabel != null;
@@ -58,8 +64,9 @@ public final class QueueJoinResult {
 			long overworldSeed, long netherSeed, String seedType,
 			int structureX, int structureZ, String bastionType,
 			int bastionX, int bastionZ, int smithX, int smithZ,
-			boolean runAlreadyStarted, String paceLabel) {
+			boolean runAlreadyStarted, String paceLabel, DrawProof draw) {
 		this.paceLabel = paceLabel;
+		this.draw = draw;
 		this.matched = matched;
 		this.matchId = matchId;
 		this.opponentUsername = opponentUsername;
@@ -78,7 +85,7 @@ public final class QueueJoinResult {
 
 	public static QueueJoinResult waiting() {
 		return new QueueJoinResult(false, null, null, 0, 0, null, 0, 0, null, 0, 0, 0, 0,
-				false, null);
+				false, null, null);
 	}
 
 	public static QueueJoinResult matched(String matchId, String opponentUsername,
@@ -88,7 +95,7 @@ public final class QueueJoinResult {
 			boolean runAlreadyStarted) {
 		return matched(matchId, opponentUsername, overworldSeed, netherSeed, seedType,
 				structureX, structureZ, bastionType, bastionX, bastionZ, smithX, smithZ,
-				runAlreadyStarted, null);
+				runAlreadyStarted, null, null);
 	}
 
 	/**
@@ -98,14 +105,19 @@ public final class QueueJoinResult {
 	 * because that signature is already long enough that a caller
 	 * miscounting positions is a real risk, and every existing caller
 	 * means "not a pace".
+	 *
+	 * The draw proof is a TYPE rather than two more strings for the same
+	 * reason: at this length the compiler is the only thing that can
+	 * still catch a caller counting wrong, and it cannot do that for a
+	 * String that lands where another String was meant.
 	 */
 	public static QueueJoinResult matched(String matchId, String opponentUsername,
 			long overworldSeed, long netherSeed, String seedType,
 			int structureX, int structureZ, String bastionType,
 			int bastionX, int bastionZ, int smithX, int smithZ,
-			boolean runAlreadyStarted, String paceLabel) {
+			boolean runAlreadyStarted, String paceLabel, DrawProof draw) {
 		return new QueueJoinResult(true, matchId, opponentUsername, overworldSeed, netherSeed,
 				seedType, structureX, structureZ, bastionType, bastionX, bastionZ,
-				smithX, smithZ, runAlreadyStarted, paceLabel);
+				smithX, smithZ, runAlreadyStarted, paceLabel, draw);
 	}
 }

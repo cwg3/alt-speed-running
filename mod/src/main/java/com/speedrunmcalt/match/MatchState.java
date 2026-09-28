@@ -155,6 +155,15 @@ public final class MatchState {
 	 */
 	public static volatile int portalObsidianNeeded = 0;
 
+	/**
+	 * What the server committed to when it dealt this world, or null.
+	 *
+	 * Shown on the pre-race screen and written to the log at match
+	 * start, so the player ends up holding a copy of it independently
+	 * of the server. See net/DrawProof and SEASONS.md.
+	 */
+	public static volatile com.speedrunmcalt.net.DrawProof draw = null;
+
 	// Identify the active match to the backend when reporting splits.
 	// Null when no match is in progress, which is what
 	// SplitReporter checks before attempting any network call.
@@ -233,6 +242,7 @@ public final class MatchState {
 		pearlsThisWindow = 0;
 		matchId = null;
 		sessionToken = null;
+		draw = null;
 		seedType = null;
 		structureX = 0;
 		structureZ = 0;
