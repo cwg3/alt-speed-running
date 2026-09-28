@@ -123,9 +123,6 @@ public class SeedRevealScreen extends Screen {
 		long seconds = (remaining + 999) / 1000;
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText(String.valueOf(seconds)), cx, y + 44, COUNT);
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("the race begins at zero"), cx, y + 64, DIM);
-
 		// The server's commitment to this world, where a camera can see it.
 		//
 		// Both players are shown it before either can play, so a copy of
@@ -146,10 +143,29 @@ public class SeedRevealScreen extends Screen {
 		com.speedrunmcalt.net.DrawProof proof = MatchState.draw;
 		if (com.speedrunmcalt.net.DrawProof.isPresent(proof)) {
 			String season = proof.seasonId == null ? "" : proof.seasonId + " ";
-			drawCenteredText(matrices, this.textRenderer,
-					new LiteralText("commitment " + season + proof.shortForm()),
-					cx, y + 80, DIM);
+			String line = "commitment " + season + proof.shortForm();
+			// HALF SIZE, AND ABOVE THE CLOSING LINE. At full size and
+			// underneath it, it sat in the same weight and colour as
+			// "the race begins at zero" and read as a second instruction
+			// - the last thing the eye landed on before a race, which is
+			// the opposite of what it is for. Half size makes it a
+			// footnote, which is its actual rank: evidence that has to be
+			// present and legible, not something the player must act on.
+			//
+			// Scaling the matrix means the draw call works in DOUBLED
+			// coordinates, so the centring maths has to double too -
+			// drawCenteredText would centre on the unscaled cx and land
+			// the line a quarter of the screen to the left.
+			matrices.push();
+			matrices.scale(0.5f, 0.5f, 1.0f);
+			this.textRenderer.draw(matrices, line,
+					cx * 2 - this.textRenderer.getWidth(line) / 2.0f,
+					(y + 57) * 2.0f, DIM);
+			matrices.pop();
 		}
+
+		drawCenteredText(matrices, this.textRenderer,
+				new LiteralText("the race begins at zero"), cx, y + 64, DIM);
 
 		super.render(matrices, mouseX, mouseY, delta);
 	}
