@@ -8,6 +8,12 @@ kills the dragon first wins. Ratings move, seasons reset.
 **Status: pre-alpha.** It works end to end, but it has had very little
 real play. Expect rough edges.
 
+**The ladder cannot choose which world it deals you, and you can check
+that yourself** — every draw is derived from a season key whose hash is
+published before the season's first match. [The Sealed Draw](https://claude.ai/artifact/Hb1E2HESiLDSebpZ26wX5d)
+explains how it works and what it does not prove; [SEASONS.md](SEASONS.md)
+is the reference.
+
 ---
 
 ## Get started
