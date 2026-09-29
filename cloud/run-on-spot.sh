@@ -266,10 +266,30 @@ AMI=$(aws ssm get-parameter --region "$REGION" \
 # only sometimes and not at all once the record ages. The spot request
 # keeps the real answer in Status.Code, and keeps it after the instance
 # is gone.
+#
+# A LOOKUP FAILURE IS NOT A STATUS. This used to end in `|| true`, so an
+# AccessDenied - the runner policy granted ec2:DescribeInstances and not
+# ec2:DescribeSpotInstanceRequests - came back as the empty string,
+# matched none of the reclaim codes below, and a reclaim was reported as
+# a crashed check. That is what ended the 15:00 top-up on 2026-09-29: the
+# spot request said instance-terminated-no-capacity the whole time,
+# nobody could read it, and the relaunch written for exactly that case
+# never fired. So: a status on stdout and rc 0, or nothing, the reason on
+# stderr, and rc 1 for "I could not ask".
 spot_status() {
-  aws ec2 describe-spot-instance-requests --region "$REGION" \
+  local out err rc=0
+  err=$(mktemp)
+  out=$(aws ec2 describe-spot-instance-requests --region "$REGION" \
     --filters "Name=instance-id,Values=$1" \
-    --query 'SpotInstanceRequests[0].Status.Code' --output text 2>/dev/null || true
+    --query 'SpotInstanceRequests[0].Status.Code' --output text 2>"$err") || rc=1
+  if [ "$rc" = 0 ]; then
+    printf '%s' "$out"
+  else
+    echo "  could not read the spot request for $1:" >&2
+    sed 's/^/    /' "$err" >&2
+  fi
+  rm -f "$err"
+  return "$rc"
 }
 
 # One launch, one wait. Returns:
@@ -368,14 +388,23 @@ launch_and_wait() {
       # watchdog deadline and a spot reclaim, and they need different
       # responses - the first two are bugs, the third means the batch was
       # bigger than the timer, and the fourth is not about this job at all.
-      local sstat
-      sstat=$(spot_status "$IID")
+      local sstat="" sstat_rc=0
+      sstat=$(spot_status "$IID") || sstat_rc=$?
       case "$sstat" in
-        *no-capacity*|*capacity-oversubscribed*|*terminated-by-price*|*capacity-not-available*)
+        *no-capacity*|*capacity-oversubscribed*|*terminated-by-price*|\
+        *capacity-not-available*|*terminated-by-service*|*marked-for-termination*)
           echo "the SPOT REQUEST was reclaimed: $sstat"
           echo "  Nothing ran. This is AWS capacity, not a broken check."
           return 3 ;;
       esac
+      if [ "$sstat_rc" != 0 ] && [ "$use_spot" = 1 ]; then
+        # Not "this was not a reclaim" - "nobody asked". Say so where the
+        # verdict is read, because everything below this line describes a
+        # broken check and this instance may simply have been taken away.
+        echo "  !! the reclaim check DID NOT RUN, so a capacity termination cannot"
+        echo "  !! be ruled out and the relaunch is not firing. Grant the runner"
+        echo "  !! role ec2:DescribeSpotInstanceRequests, then re-run."
+      fi
       if aws s3 cp "s3://$BUCKET/$RUN/out/watchdog" - 2>/dev/null; then
         echo "the WATCHDOG stopped it - the batch needed longer than $MAX_MINUTES min."
         echo "  whatever finished is in s3://$BUCKET/$RUN/out/ and is harvested below."
@@ -384,9 +413,15 @@ launch_and_wait() {
         echo "instance ended without writing results and without hitting the watchdog"
         [ -n "$sstat" ] && [ "$sstat" != None ] && echo "  spot request status: $sstat"
       fi
-      aws s3 cp "s3://$BUCKET/$RUN/out/seedwork.log" - 2>/dev/null | tail -30 \
-        || aws ec2 get-console-output --instance-id "$IID" --output text 2>/dev/null | tail -30 \
-        || true
+      # `cmd | tail || fallback` never reaches the fallback: the pipeline's
+      # status is tail's, and tail succeeds on empty input. Ask whether the
+      # log exists instead of inferring it from an exit code.
+      if aws s3 ls "s3://$BUCKET/$RUN/out/seedwork.log" >/dev/null 2>&1; then
+        aws s3 cp "s3://$BUCKET/$RUN/out/seedwork.log" - 2>/dev/null | tail -30
+      else
+        aws ec2 get-console-output --instance-id "$IID" --output text 2>/dev/null \
+          | tail -30 || true
+      fi
       return 4
     fi
     sleep 30

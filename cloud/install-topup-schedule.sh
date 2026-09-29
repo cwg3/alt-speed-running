@@ -87,6 +87,13 @@ fi
 # player's rating, record or seenSeeds, and keeping it apart from the
 # pool's read-write grant means widening one cannot silently widen the
 # other.
+#
+# ec2:DescribeSpotInstanceRequests is what run-on-spot.sh asks to tell a
+# reclaimed instance from a crashed check, and the two get opposite
+# responses - relaunch, or stop and fix the check. Without it the reclaim
+# check fails closed and every capacity termination is reported as a
+# broken check, which cost the 15:00 top-up on 2026-09-29. It is read-only
+# and the run is useless without it, so it lives beside the launch grant.
 RUNNER_POLICY=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
  {"Effect":"Allow","Action":["dynamodb:Scan","dynamodb:PutItem","dynamodb:UpdateItem",
@@ -100,7 +107,8 @@ RUNNER_POLICY=$(cat <<JSON
   "Resource":["arn:aws:s3:::alt-seedwork-${ACCT}","arn:aws:s3:::alt-seedwork-${ACCT}/*"]},
  {"Effect":"Allow","Action":["ec2:RunInstances","ec2:DescribeInstances",
    "ec2:DescribeInstanceTypes","ec2:DescribeImages","ec2:CreateTags",
-   "ec2:TerminateInstances"],"Resource":"*"},
+   "ec2:TerminateInstances","ec2:DescribeSpotInstanceRequests",
+   "ec2:GetConsoleOutput"],"Resource":"*"},
  {"Effect":"Allow","Action":"iam:PassRole","Resource":"arn:aws:iam::${ACCT}:role/alt-*"},
  {"Effect":"Allow","Action":["iam:GetRole","iam:GetInstanceProfile"],
   "Resource":["arn:aws:iam::${ACCT}:role/alt-*",
