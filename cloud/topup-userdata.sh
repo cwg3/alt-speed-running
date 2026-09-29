@@ -82,9 +82,12 @@ notify() {
 # itself running bills until someone notices.
 trap 'echo "=== shutting down $(date -u +%H:%M:%SZ) ==="; notify; push_log; shutdown -h now' EXIT
 
-# ONE RUNNER AT A TIME. The schedule fires every 12h and a catch-up run
-# on a raised floor can take most of that, so two orchestrators
+# ONE RUNNER AT A TIME. The schedule fires once a day and a catch-up run
+# on a raised floor can take hours of it, so two orchestrators
 # overlapping stopped being hypothetical the moment the floor went up.
+# The guard does not depend on the cadence - it asks whether another
+# runner is alive right now - so it survived the move from 12h to 24h
+# unchanged, and would survive a move back.
 # Two at once would both load HELD rows and both release them, double the
 # spend, and interleave their logs.
 #

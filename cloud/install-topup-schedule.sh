@@ -3,8 +3,10 @@
 #
 #   ./install-topup-schedule.sh [--dry-run|--remove]
 #
-#   AT=03:00,15:00  UTC times to run, comma separated. Cron has a single
+#   AT=03:00        UTC times to run, comma separated. Cron has a single
 #                   minute field, so every entry must share a minute.
+#                   One time a day is the default; it was 03:00,15:00
+#                   until 2026-09-29.
 #   FLOOR=100       drawable seeds each type should have
 #   ITYPE_RUNNER    orchestrator size (default t4g.small - it only waits)
 #   ALERT_EMAIL=    subscribe this address to the run-verdict topic. NOT
@@ -30,7 +32,7 @@
 # well inside the gap between two, so they cannot overlap.
 set -uo pipefail
 REGION="${REGION:-us-west-2}"
-AT="${AT:-03:00,15:00}"
+AT="${AT:-03:00}"
 FLOOR="${FLOOR:-100}"
 ROLE=alt-topup-runner
 TOPIC_NAME=alt-pool-topup-alerts

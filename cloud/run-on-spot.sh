@@ -59,7 +59,7 @@ RELAUNCH_WAIT="${RELAUNCH_WAIT:-120}"
 # just run out tends to find it still out, and the run is already bounded
 # by the watchdog, so the worst case is MAX_MINUTES of one instance -
 # single-digit dollars against a top-up that otherwise fails every
-# twelve hours until capacity returns. ONDEMAND_FALLBACK=0 turns it off
+# day until capacity returns. ONDEMAND_FALLBACK=0 turns it off
 # and keeps every attempt on spot.
 ONDEMAND_FALLBACK="${ONDEMAND_FALLBACK:-1}"
 
