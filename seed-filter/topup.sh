@@ -139,6 +139,14 @@ fi
 # closing steadily. Without a previous reading this script cannot tell
 # the difference, and one run in isolation never can.
 #
+# IT RECORDS WHAT EACH RUN RELEASED, not only what the pool held, and the
+# comparison needs both. Two readings with a flat gap between them mean
+# nothing until you know whether a build happened in between: on
+# 2026-09-30 the check called all five types NOT CONVERGING because the
+# previous run had died in the spawn check and added no seeds, which is
+# the one circumstance in which no gap can close. The release figures were
+# already in this file and the check was not reading them.
+#
 # It is not in git for the same reason headroom is not: a per-type gap is
 # a per-type depth, which is a yield wearing different clothes. results/
 # is already gitignored.
@@ -294,6 +302,38 @@ if held:
 # few runs; it does not make a type that never closes normal, and those
 # two look identical in one log. So compare with the last run.
 #
+# TWO READINGS ARE NOT ENOUGH ON THEIR OWN, which is the 2026-09-30
+# correction. This asked only whether the gap had shrunk since the
+# previous reading and called everything that had not NOT CONVERGING. That
+# night it named all five types and not one of them was parked: the run in
+# between had died in the spawn check and loaded nothing, so no seed
+# reached the pool between the two readings and no gap COULD have closed.
+# The run doing the complaining then released everything four of the five
+# types asked for. A verdict that fires hardest while the pipeline is
+# working is worse than no verdict, because the one night it means
+# something reads exactly like the four it does not.
+#
+# So the comparison now reads what the previous run RELEASED - recorded in
+# this file from the start and never once consulted. Three different
+# things produce a gap that has not shrunk and only the last is a failure:
+#
+#   nothing added   the previous run failed, or had nothing to build, so
+#                   released is null or empty. A flat or wider gap is the
+#                   arithmetic and says nothing about convergence.
+#   demand moved    the previous run released everything it wanted. The
+#                   gap now is seeds the worst-off player has SEEN since
+#                   that reading. Nothing consumes a seed, but being seen
+#                   removes it from that player's supply and supply is
+#                   what the floor measures. A bigger bank fixes this; a
+#                   bigger ceiling does not.
+#   parked          the previous run ran, under-delivered, and the gap did
+#                   not shrink. The failure this check exists for, and now
+#                   the only thing that says NOT CONVERGING.
+#
+# The third case is rarer than the check used to imply and the first two
+# are not near-misses of it - they have different fixes, and a top-up that
+# names the wrong one sends the next change to the wrong number.
+#
 # Only at an UNCHANGED floor. A floor raise moves every gap at once and
 # comparing across it says nothing about whether the pipeline is keeping
 # up - which is the trap this check was written after walking into: the
@@ -314,7 +354,7 @@ if os.path.exists(_hp):
         history, hist_err = [], str(e)[:120]
 prev = next((r for r in reversed(history) if isinstance(r.get('supply'), dict)),
             None)
-stalled = []
+stalled, drain_by = [], {}
 print(file=sys.stderr)
 if hist_err:
     print('  !! the run history is present and unreadable, so this run cannot',
@@ -330,6 +370,23 @@ else:
     pfloor = int(prev.get('floor') or 0)
     ago = (time.time() - float(prev.get('at') or 0)) / 3600.0
     psup = prev['supply']
+    pgap = prev.get('gap') or {}
+    # What the previous run PUT IN, per type. A dict is a run that got as
+    # far as reporting - including the all-zero dict of a run with nothing
+    # to build. Null is a run that never reached its report, so it died in
+    # the checks and added nothing. Either way no seed reached the pool
+    # between that reading and this one, and that is the whole difference
+    # between a gap that would not close and a gap nothing worked on.
+    # Entries from before 2026-09-30 write null for the nothing-to-build
+    # case too, which is why the message below reads their gap to say
+    # which it was rather than assuming a failure.
+    prel = prev.get('released')
+    # 'unknown' is the third state: it built, and verify-and-release.sh
+    # wrote no per-type breakdown, so what it added cannot be read off
+    # this file. Not comparable either, and not for the same reason.
+    pblind = 'no per-type breakdown was written' if prel == 'unknown' else None
+    if not isinstance(prel, dict):
+        prel = None
     if pfloor != floor:
         print(f'  the floor moved from {pfloor} to {floor} since the last run '
               f'{ago:.0f}h ago,', file=sys.stderr)
@@ -350,36 +407,107 @@ else:
     else:
         print(f'  against the last run {ago:.0f}h ago, at the same floor:',
               file=sys.stderr)
+        # Said once, at the top, because it is a fact about that RUN and
+        # not about any one type - and said before the per-type lines, so
+        # nobody reads five flat gaps and draws the old conclusion.
+        if prel is None:
+            if pblind:
+                print(f'  what that run added is UNKNOWN - {pblind} -',
+                      file=sys.stderr)
+                print('  so the gaps below cannot be read as progress or as '
+                      'its absence.', file=sys.stderr)
+            else:
+                worked = any(int(v or 0) for v in pgap.values())
+                print('  that run added NOTHING to the pool - '
+                      + ('it did not finish, so no release was recorded'
+                         if worked else 'it had nothing to build')
+                      + ',', file=sys.stderr)
+                print('  so no gap below could have closed. A flat or wider '
+                      'one is drain,', file=sys.stderr)
+                print('  not a stall, and this pair of readings cannot say '
+                      'whether anything', file=sys.stderr)
+                print('  is converging.', file=sys.stderr)
         for t in TYPES:
             if t not in psup:
                 continue
             was, now = max(0, floor - int(psup[t])), targets[t]
+            got = None if prel is None else int(prel.get(t) or 0)
+            # supply_now = supply_then + released - seen since. Nothing
+            # consumes a seed, so the remainder is the worst-off player
+            # having seen it, or a row leaving the drawable set for good:
+            # quarantined, withdrawn or marked used.
+            if got is not None:
+                drain_by[t] = int(psup[t]) + got - supply_by[t]
+            drew = f', {drain_by[t]} seen since' if drain_by.get(t, 0) > 0 else ''
             if not now:
-                print(f'    {t:<18}at the floor now', file=sys.stderr)
+                print(f'    {t:<18}at the floor now{drew}', file=sys.stderr)
+            elif got is None:
+                print(f'    {t:<18}short by {was} then, {now} now - '
+                      + ('what that run added is unknown' if pblind
+                         else 'nothing was added in between'),
+                      file=sys.stderr)
+            elif not was:
+                print(f'    {t:<18}at the floor then, short by {now} now - a '
+                      f'NEW gap{drew}', file=sys.stderr)
+            elif got >= was:
+                print(f'    {t:<18}short by {was} then, {now} now - that run '
+                      f'released all {got} it wanted{drew}', file=sys.stderr)
             elif was > now:
                 closed = was - now
                 runs = -(-now // closed)
                 print(f'    {t:<18}short by {was} then, {now} now - '
-                      f'about {runs} more run(s) at that rate', file=sys.stderr)
+                      f'about {runs} more run(s) at that rate{drew}',
+                      file=sys.stderr)
             else:
                 stalled.append((t, was, now))
-                print(f'    {t:<18}short by {was} then, {now} now - '
-                      f'NOT CLOSING', file=sys.stderr)
+                print(f'    {t:<18}short by {was} then, {now} now, and that '
+                      f'run released {got} of {was} - NOT CLOSING{drew}',
+                      file=sys.stderr)
         # The gutter runs down every line because the notification greps
         # for it and drops anything unmarked.
         if stalled:
-            print('  !! a gap that is flat or growing at an UNCHANGED floor is '
-                  'the failure', file=sys.stderr)
-            print('  !! the cap is allowed to look like and is not: this type '
-                  'is not on its', file=sys.stderr)
-            print('  !! way to the floor, it is parked short of it. For each '
-                  'one, either its', file=sys.stderr)
-            print('  !! ceiling in _maxCandidatesByType is below what one run '
-                  'needs, or its', file=sys.stderr)
-            print('  !! configured yield is too optimistic - the per-type '
-                  'report after the', file=sys.stderr)
-            print('  !! build says which, as (ceiling) or (yield).',
-                  file=sys.stderr)
+            print('  !! a gap that is flat or growing at an UNCHANGED floor, '
+                  'after a run that', file=sys.stderr)
+            print('  !! DID build and came up short, is the failure. The cap '
+                  'is allowed to look', file=sys.stderr)
+            print('  !! like it and is not: this type is not on its way to '
+                  'the floor, it is', file=sys.stderr)
+            print('  !! parked short of it. For each one, either its ceiling '
+                  'in', file=sys.stderr)
+            print('  !! _maxCandidatesByType is below what one run needs, or '
+                  'its configured', file=sys.stderr)
+            print('  !! yield is too optimistic - the per-type report after '
+                  'the build says', file=sys.stderr)
+            print('  !! which, as (ceiling) or (yield).', file=sys.stderr)
+        # THE OTHER WAY TO NEVER REACH THE FLOOR, and the one this fix
+        # could have buried: a type that delivers its whole target every
+        # single run and is short again by morning. Nothing is stalled and
+        # nothing is capped - the pipeline is keeping its promise and the
+        # promise is too small for how much the player plays. Explaining
+        # every fresh gap away as drain without ever saying that drain has
+        # outgrown a run would trade a noisy alarm for a silent one, which
+        # is this repo's oldest defect in a new coat.
+        outrun = []
+        for t in TYPES:
+            d, h = drain_by.get(t, 0), headroom_for(t)
+            per_run = int(cap_for(t) / h) if h > 0 else 0
+            if targets[t] and d > 0 and d >= per_run:
+                outrun.append((t, d, per_run))
+        if outrun:
+            print('  !! seen FASTER than one run can replace, so building '
+                  'alone will not', file=sys.stderr)
+            print(f'  !! reach the floor for these - over the last '
+                  f'{ago:.0f}h:', file=sys.stderr)
+            for t, d, per_run in outrun:
+                print(f'  !!   {t:<18}{d} seen, a full run at its ceiling '
+                      f'releases about {per_run}', file=sys.stderr)
+            print('  !! this is not a stall and a bigger ceiling is not the '
+                  'first answer: the', file=sys.stderr)
+            print('  !! floor is a per-player bank and it is being drawn '
+                  'down as fast as it', file=sys.stderr)
+            print('  !! fills. Raise FLOOR, and raise the ceiling to cover a '
+                  'run of drain on', file=sys.stderr)
+            print('  !! top of the gap.', file=sys.stderr)
 
 # One candidate count per type, each capped so a single night stays
 # bounded. The generator makes the largest of them and each type is
@@ -419,12 +547,18 @@ if capped:
     # now, so this points at it rather than asking for it again.
     print('  !! fine IF each gap shrinks every run - the comparison with the '
           'last run is', file=sys.stderr)
-    print('  !! above, and says NOT CLOSING when it does not. If a type is '
-          'parked, raise', file=sys.stderr)
-    print('  !! _maxCandidatesByType for THAT type, never the shared '
-          '_default.', file=sys.stderr)
+    print('  !! above, and says NOT CLOSING only when the last run BUILT and '
+          'still came', file=sys.stderr)
+    print('  !! up short. A run that died in the checks added nothing, so the '
+          'gap it left', file=sys.stderr)
+    print('  !! behind is not evidence either way and is reported as such. If '
+          'a type is', file=sys.stderr)
+    print('  !! genuinely parked, raise _maxCandidatesByType for THAT type, '
+          'never the', file=sys.stderr)
+    print('  !! shared _default.', file=sys.stderr)
 print(json.dumps({'targets': targets, 'short': short, 'cands': cands, 'need': need,
                   'capped': capped, 'floor': floor, 'supply': supply_by,
+                  'drain': drain_by,
                   'stalled': [t for t, _, _ in stalled],
                   'cand': max(cands.values()) if short else 0}))
 ")
@@ -460,9 +594,18 @@ except (OSError, ValueError):
     hist = {}
 runs = hist.get('runs') or []
 if not isinstance(runs, list): runs = []
+# released stays NULL here and is filled in after the build. On the
+# nothing-short path it is written as {} instead, and the difference is
+# the one the next run's comparison rests on: {} is a run that added
+# nothing because nothing was wanted, null is a run that added nothing
+# because it never got to the end. Both leave the gaps flat and only the
+# second is a reason to distrust the pipeline. Entries written before
+# 2026-09-30 carry null for both and the comparison falls back to reading
+# their recorded gap.
 runs.append({'at': time.time(), 'floor': plan['floor'],
              'supply': plan['supply'], 'gap': plan['targets'],
-             'capped': plan['capped'], 'released': None})
+             'capped': plan['capped'],
+             'released': None if plan['short'] else {}})
 # Trimmed, because this is a convergence check and not an archive: the
 # comparison reads the LAST entry and the trend needs a handful, not a
 # year of them.
@@ -554,7 +697,12 @@ def record_released(rel_by_type):
 if got is None:
     print('  (no per-type release breakdown from this run - '
           'verify-and-release.sh wrote none)')
-    record_released({})
+    # NOT {}. This run built and may well have released seeds; what it
+    # released per type is simply unknown. Recording {} would tell the next
+    # run it released zero of everything, and the next run would read a
+    # flat gap after a successful build and call the type NOT CONVERGING -
+    # the same false alarm as a missing release, through a second door.
+    record_released('unknown')
     sys.exit(0)
 rows = got.get('byType', {})
 print('what this run closed, per type:')
