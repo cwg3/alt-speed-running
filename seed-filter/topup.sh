@@ -412,21 +412,21 @@ else:
         # nobody reads five flat gaps and draws the old conclusion.
         if prel is None:
             if pblind:
-                print(f'  what that run added is UNKNOWN - {pblind} -',
+                print(f'  !! what the last run added is UNKNOWN - {pblind} -',
                       file=sys.stderr)
-                print('  so the gaps below cannot be read as progress or as '
-                      'its absence.', file=sys.stderr)
+                print('  !! so the gaps below cannot be read as progress or '
+                      'as its absence.', file=sys.stderr)
             else:
                 worked = any(int(v or 0) for v in pgap.values())
-                print('  that run added NOTHING to the pool - '
-                      + ('it did not finish, so no release was recorded'
-                         if worked else 'it had nothing to build')
-                      + ',', file=sys.stderr)
-                print('  so no gap below could have closed. A flat or wider '
-                      'one is drain,', file=sys.stderr)
-                print('  not a stall, and this pair of readings cannot say '
-                      'whether anything', file=sys.stderr)
-                print('  is converging.', file=sys.stderr)
+                print('  !! the last run added NOTHING to the pool - '
+                      + ('it did not finish, so no'
+                         if worked else 'it had nothing to build, so no')
+                      + ' release', file=sys.stderr)
+                print('  !! was recorded - and no gap below could have '
+                      'closed. A flat or wider', file=sys.stderr)
+                print('  !! one is drain, not a stall, and this pair of '
+                      'readings cannot say', file=sys.stderr)
+                print('  !! whether anything is converging.', file=sys.stderr)
         for t in TYPES:
             if t not in psup:
                 continue

@@ -66,11 +66,21 @@ push_log() { kill "$PUSHER" 2>/dev/null || true; aws s3 cp "$LOG" "$S3LOG" --qui
 # its '!!' warning lines. The email would have carried "NOT converging"
 # with none of the figures it was drawn from - a verdict with its evidence
 # cut off, which is the same failure as the clamp warnings anchored at ^.
+#
+# AND IT WAS MATCHED BY ITS WORDING, which is why it broke again the first
+# time that wording changed. On 2026-09-30 the comparison learned to say
+# "at the floor then, short by <n> now - a NEW gap"; no alternative here
+# matched it, so the email showed "SHORT by <n>" from the plan with the
+# one line explaining it cut off. Its per-type lines are now matched on
+# their SHAPE instead - four spaces, a type name, then either of the two
+# ways such a line can open - so rewording the tail cannot silently drop
+# them a third time. Anything that is prose rather than a per-type line
+# carries the '!!' gutter in topup.sh for the same reason.
 notify() {
 	aws sns publish --region "${REGION:-us-west-2}" --topic-arn "$TOPIC" \
 		--subject "$(printf 'alt top-up: %.80s' "$STATUS")" \
 		--message "$(printf '%s\n\nlog: %s\n\n%s\n' "$STATUS" "$S3LOG" \
-			"$(grep -E 'drawable|SHORT by|released |generate [0-9]+|!!|wanted|per.type|short by [0-9]+ then|at the same floor|at the floor now|the floor moved|NOT CLOSING|^VERDICT:' \
+			"$(grep -E 'drawable|SHORT by|released |generate [0-9]+|!!|wanted|per.type|^    [a-z_]+ +(at the floor|short by)|at the same floor|the floor moved|NOT CLOSING|^VERDICT:' \
 				"$LOG" 2>/dev/null | tail -70)")" \
 		>/dev/null 2>&1 \
 		|| echo "  note: SNS publish failed - the verdict is only in S3"
