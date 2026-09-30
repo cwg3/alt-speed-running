@@ -400,10 +400,15 @@ else:
         if fell:
             print('  !! supply FELL for: ' + ', '.join(fell)
                   + ' - the floor is not the only reason', file=sys.stderr)
-            print('  !! those types are short. Nothing consumes seeds, so a '
-                  'drop means rows', file=sys.stderr)
-            print('  !! left the drawable set: quarantined, withdrawn, or '
-                  'marked used.', file=sys.stderr)
+            print('  !! those types are short. Nothing consumes a seed, so '
+                  'either the player', file=sys.stderr)
+            print('  !! SAW them, or the rows LEFT the drawable set - '
+                  'quarantined, withdrawn', file=sys.stderr)
+            print('  !! or marked used. This said only the second for '
+                  'months; supply is per', file=sys.stderr)
+            print('  !! player, so being seen lowers it just as well, and '
+                  'the two have', file=sys.stderr)
+            print('  !! opposite fixes.', file=sys.stderr)
     else:
         print(f'  against the last run {ago:.0f}h ago, at the same floor:',
               file=sys.stderr)
@@ -432,13 +437,19 @@ else:
                 continue
             was, now = max(0, floor - int(psup[t])), targets[t]
             got = None if prel is None else int(prel.get(t) or 0)
-            # supply_now = supply_then + released - seen since. Nothing
-            # consumes a seed, so the remainder is the worst-off player
-            # having seen it, or a row leaving the drawable set for good:
-            # quarantined, withdrawn or marked used.
+            # supply_then + released - supply_now. TWO things make that
+            # positive and this file cannot tell them apart: the worst-off
+            # player SAW those seeds, or the rows LEFT the drawable set -
+            # quarantined, withdrawn or marked used. Supply is stored here
+            # as a count per type, not as the set of pair ids, so the
+            # residual is all there is and it carries no cause. It used to
+            # print as 'seen since', which named one of the two on no
+            # evidence and pointed the reader at FLOOR when the answer
+            # might have been in poolReject.
             if got is not None:
                 drain_by[t] = int(psup[t]) + got - supply_by[t]
-            drew = f', {drain_by[t]} seen since' if drain_by.get(t, 0) > 0 else ''
+            drew = (f', {drain_by[t]} left that supply'
+                    if drain_by.get(t, 0) > 0 else '')
             if not now:
                 print(f'    {t:<18}at the floor now{drew}', file=sys.stderr)
             elif got is None:
@@ -494,20 +505,26 @@ else:
             if targets[t] and d > 0 and d >= per_run:
                 outrun.append((t, d, per_run))
         if outrun:
-            print('  !! seen FASTER than one run can replace, so building '
-                  'alone will not', file=sys.stderr)
-            print(f'  !! reach the floor for these - over the last '
-                  f'{ago:.0f}h:', file=sys.stderr)
+            print('  !! supply is FALLING faster than one run can replace '
+                  'it, so building', file=sys.stderr)
+            print(f'  !! alone will not reach the floor for these - over the '
+                  f'last {ago:.0f}h:', file=sys.stderr)
             for t, d, per_run in outrun:
-                print(f'  !!   {t:<18}{d} seen, a full run at its ceiling '
-                      f'releases about {per_run}', file=sys.stderr)
-            print('  !! this is not a stall and a bigger ceiling is not the '
-                  'first answer: the', file=sys.stderr)
-            print('  !! floor is a per-player bank and it is being drawn '
-                  'down as fast as it', file=sys.stderr)
-            print('  !! fills. Raise FLOOR, and raise the ceiling to cover a '
-                  'run of drain on', file=sys.stderr)
-            print('  !! top of the gap.', file=sys.stderr)
+                print(f'  !!   {t:<18}{d} left that supply, a full run at its '
+                      f'ceiling releases about {per_run}', file=sys.stderr)
+            print('  !! this is not a stall. It is one of two things and the '
+                  'numbers above', file=sys.stderr)
+            print('  !! cannot say which, so read poolReject before changing '
+                  'anything: the', file=sys.stderr)
+            print('  !! player SAW those seeds, which is a floor problem - it '
+                  'is a per-player', file=sys.stderr)
+            print('  !! bank being drawn down as fast as it fills, and FLOOR '
+                  'is the knob. Or', file=sys.stderr)
+            print('  !! the ROWS LEFT the drawable set - quarantined, '
+                  'withdrawn or marked', file=sys.stderr)
+            print('  !! used - which is a pool problem, and raising the floor '
+                  'would only build', file=sys.stderr)
+            print('  !! more rows into the same leak.', file=sys.stderr)
 
 # One candidate count per type, each capped so a single night stays
 # bounded. The generator makes the largest of them and each type is
