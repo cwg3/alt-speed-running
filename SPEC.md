@@ -1358,6 +1358,14 @@ it as a pace target rather than dress it up as a rival - which the
 feature's own name already does - and a reason not to ship it wide
 before there is something to sample.
 
+In the meantime the tier schedule does carry noise after all (decided
+2026-10-01): each race the finish moves by up to a minute either way,
+the time between splits stretches or shrinks, and no split lands more
+than a minute from the tier's fixed shape. It is the invented variance
+described above, accepted because a pace that hit identical splits every
+race read as a recording within a few races. Sampling real runs still
+replaces it.
+
 Not solved by any of this: a sampled run came from a different seed, so
 its times are not strictly commensurable with a run on this one.
 Sampling within the same opening type narrows the gap; it does not close

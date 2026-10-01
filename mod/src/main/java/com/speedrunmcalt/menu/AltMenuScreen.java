@@ -101,13 +101,32 @@ public class AltMenuScreen extends Screen {
 		// against "running"'s seven, so the hyphen is well left of
 		// centre, and since the hyphen and "alt" are both phosphor
 		// green the eye lines those two up and sees the error.
+		//
+		// "speed-running" is drawn at 1.5x, the same scale as the other
+		// screens' titles, so the logo outranks the button labels below
+		// it. "alt" is 2x on top of that: it is the name, the subtitle
+		// is the description. The two scales mean the hyphen is measured
+		// in speed-running's space and carried over to alt's through
+		// screen coordinates.
+		float wordScale = 1.5f;
+		float altScale = 2.0f;
+		int scx = (int) (cx / wordScale);
 		String[] wordmark = { "speed", "-", "running" };
+		float hyphenX = Palette.segmentCenterX(this.textRenderer, scx, wordmark, 1) * wordScale;
+
+		matrices.push();
+		matrices.scale(altScale, altScale, 1.0f);
 		drawCenteredText(matrices, this.textRenderer, new LiteralText("alt"),
-				Palette.segmentCenterX(this.textRenderer, cx, wordmark, 1),
-				top, Palette.PHOSPHOR);
-		Palette.drawCenteredSegments(matrices, this.textRenderer, cx, top + 12,
+				(int) (hyphenX / altScale), (int) ((top - 12) / altScale), Palette.PHOSPHOR);
+		matrices.pop();
+
+		matrices.push();
+		matrices.scale(wordScale, wordScale, 1.0f);
+		Palette.drawCenteredSegments(matrices, this.textRenderer, scx,
+				(int) ((top + 10) / wordScale),
 				wordmark,
 				new int[] { Palette.PURPLE, Palette.PHOSPHOR, Palette.PURPLE });
+		matrices.pop();
 
 		String status;
 		String detail = null;

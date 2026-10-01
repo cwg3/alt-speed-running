@@ -1,5 +1,5 @@
 import {
-	PACE_TIERS, SPLIT_SHAPE, paceFinishMs, revealedSplits,
+	PACE_JITTER_MS, PACE_TIERS, SPLIT_SHAPE, paceFinishMs, revealedSplits,
 	scheduleForTier, scheduleFromRun, tierById,
 } from '../lambda/lib/paceSchedule';
 import { SPLIT_ORDER, validateSplit } from '../lambda/lib/splitRules';
@@ -84,17 +84,54 @@ describe('the split shape', () => {
 });
 
 describe('scheduleForTier', () => {
-	it('finishes at the tier time', () => {
+	// The extremes of the injected random source, plus a few in between.
+	// Math.random never returns 1, so the top is just under it.
+	const pinned = [0, 0.999999, 0.5, 0.25, 0.75];
+	const constant = (v: number) => () => v;
+	const alternating = () => { let i = 0; return () => (i++ % 2 ? 0.999999 : 0); };
+
+	const draws = (tier: typeof PACE_TIERS[number]) => [
+		...pinned.map((v) => scheduleForTier(tier, constant(v))),
+		scheduleForTier(tier, alternating()),
+		...Array.from({ length: 200 }, () => scheduleForTier(tier)),
+	];
+
+	it('finishes within a minute of the tier time', () => {
 		for (const t of PACE_TIERS) {
-			expect(paceFinishMs(scheduleForTier(t))).toBe(t.finishMs);
+			for (const s of draws(t)) {
+				expect(Math.abs(paceFinishMs(s) - t.finishMs)).toBeLessThanOrEqual(PACE_JITTER_MS);
+			}
 		}
 	});
 
-	it('is deterministic - a tier repeats until real runs can be sampled', () => {
-		// Asserted rather than tolerated: the repetition is a known cost
-		// of refusing to invent a variance, and if it ever stops being
-		// true that should be a deliberate change, not a drift.
-		expect(scheduleForTier(PACE_TIERS[1])).toEqual(scheduleForTier(PACE_TIERS[1]));
+	it('keeps every split within a minute of the fixed shape', () => {
+		for (const t of PACE_TIERS) {
+			for (const s of draws(t)) {
+				for (const [name, fraction] of SPLIT_SHAPE) {
+					expect(Math.abs(s[name]! - t.finishMs * fraction)).toBeLessThanOrEqual(PACE_JITTER_MS + 1);
+				}
+			}
+		}
+	});
+
+	it('keeps the splits in order for every draw', () => {
+		// 10:00 is the tight one: two splits there are under a minute
+		// apart, so a minute of jitter each way could cross them if the
+		// clamp did not preserve order.
+		for (const t of PACE_TIERS) {
+			for (const s of draws(t)) {
+				const times = SPLIT_SHAPE.map(([n]) => s[n]!);
+				for (let i = 1; i < times.length; i++) {
+					expect(times[i]).toBeGreaterThan(times[i - 1]);
+				}
+			}
+		}
+	});
+
+	it('differs from one race to the next', () => {
+		const a = scheduleForTier(PACE_TIERS[1]);
+		const b = scheduleForTier(PACE_TIERS[1]);
+		expect(a).not.toEqual(b);
 	});
 
 	it('gives every shaped split a time', () => {
@@ -138,7 +175,7 @@ describe('revealedSplits - the player must not read ahead', () => {
 	it('never reveals a later split than the elapsed time', () => {
 		// The property that matters: whatever the clock, nothing in the
 		// output is in the future.
-		for (const t of [0, 1, 60_000, 500_000, tier.finishMs - 1, tier.finishMs, 10 ** 9]) {
+		for (const t of [0, 1, 60_000, 500_000, paceFinishMs(sched) - 1, paceFinishMs(sched), 10 ** 9]) {
 			for (const v of Object.values(revealedSplits(sched, t))) {
 				expect(v!).toBeLessThanOrEqual(t);
 			}
@@ -146,7 +183,7 @@ describe('revealedSplits - the player must not read ahead', () => {
 	});
 
 	it('reveals everything once the pace has finished', () => {
-		expect(revealedSplits(sched, tier.finishMs)).toEqual(sched);
+		expect(revealedSplits(sched, paceFinishMs(sched))).toEqual(sched);
 	});
 
 	it('is empty for a nonsense clock rather than leaking the lot', () => {

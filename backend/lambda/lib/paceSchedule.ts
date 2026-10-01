@@ -79,20 +79,60 @@ export const SPLIT_SHAPE: ReadonlyArray<readonly [SplitName, number]> = [
 ];
 
 /**
+ * How far any one split of a pace may land from the tier's even shape,
+ * either way. Also bounds the finish, so a "17:00" pace finishes
+ * somewhere in 16:00-18:00.
+ */
+export const PACE_JITTER_MS = 60_000;
+
+/**
+ * How much each SEGMENT - the time between two splits - may stretch or
+ * shrink before the whole run is rescaled to its finish. Per segment
+ * rather than per split, so a slow nether is a slow nether and the
+ * splits after it inherit the delay, the way they would in a real run.
+ */
+const SEGMENT_JITTER = 0.2;
+
+/**
  * Split times, in ms from the player's run start, for a tier.
  *
- * DETERMINISTIC, and that is a decision rather than an oversight. Drawing
- * a fresh schedule per match needs a distribution, and choosing one would
- * be a second invented number on top of the pace curve this file already
- * refuses to guess. So until real runs can be sampled, a tier repeats -
- * which is a reason to present it as a pace target rather than dress it
- * up as a rival, and a reason not to ship this wide yet. See SPEC.
+ * Drawn fresh per match: the finish moves by up to PACE_JITTER_MS, each
+ * segment is stretched or shrunk, and every split is then held within
+ * PACE_JITTER_MS of where the tier's fixed shape would put it.
+ *
+ * This is the "noise around a target" stand-in SPEC calls the lazy
+ * way, and it is chosen knowing that: a pace that hit identical splits
+ * every race read as a recording after a few races. Sampling real runs
+ * through scheduleFromRun is still the replacement once runs exist.
+ *
+ * Order survives the clamp. Raw splits are strictly increasing and so
+ * are both bounds, and clamping an increasing sequence between two
+ * increasing bounds keeps it increasing - so the prerequisites in
+ * splitRules hold for every draw, not just the usual one.
+ *
+ * `rand` is injectable so the tests can pin the extremes.
  */
-export function scheduleForTier(tier: PaceTier): Schedule {
-	const out: Schedule = {};
-	for (const [name, fraction] of SPLIT_SHAPE) {
-		out[name] = Math.round(tier.finishMs * fraction);
+export function scheduleForTier(tier: PaceTier, rand: () => number = Math.random): Schedule {
+	const spread = (r: number) => r * 2 - 1; // [0,1) -> [-1,1)
+	const finish = tier.finishMs + spread(rand()) * PACE_JITTER_MS;
+
+	const segments: number[] = [];
+	let prev = 0;
+	for (const [, fraction] of SPLIT_SHAPE) {
+		segments.push((fraction - prev) * (1 + spread(rand()) * SEGMENT_JITTER));
+		prev = fraction;
 	}
+	const total = segments.reduce((a, b) => a + b, 0);
+
+	const out: Schedule = {};
+	let cumulative = 0;
+	SPLIT_SHAPE.forEach(([name, fraction], i) => {
+		cumulative += segments[i];
+		const base = tier.finishMs * fraction;
+		const drawn = finish * (cumulative / total);
+		const held = Math.min(base + PACE_JITTER_MS, Math.max(base - PACE_JITTER_MS, drawn));
+		out[name] = Math.round(held);
+	});
 	return out;
 }
 
