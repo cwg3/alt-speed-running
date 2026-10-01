@@ -41,7 +41,15 @@ WORKERS="${WORKERS:-16}"
 source "$ROOT/seed-filter/run-check.sh"
 LOG=/tmp/overnight.log
 exec > >(tee -a "$LOG") 2>&1
-echo "=== overnight rebuild started $(date) : $PER per type, $CAND candidates each ==="
+# With TARGETS set, PER is ignored and CAND is only the generator batch
+# (the largest type's allowance), so neither describes a type. Printing
+# "$PER per type, $CAND candidates each" claimed the floor as every
+# type's target and the biggest allowance as every type's check count.
+if [ -n "$TARGETS" ]; then
+  echo "=== overnight rebuild started $(date) : targets per type $TARGETS, candidates per type ${CANDS:-$CAND each} ==="
+else
+  echo "=== overnight rebuild started $(date) : $PER per type, $CAND candidates each ==="
+fi
 
 cd "$ROOT/seed-filter"
 # seedtypes is COMPILED and gitignored, so a fresh clone does not have it.
