@@ -6,6 +6,7 @@ import { emptyStats, foldRun, review, ReviewResult } from './runStats';
 // that care - who is excluded from seenSeeds, and who cannot move a
 // rating - must not be allowed to disagree about who the bots are.
 import { isSyntheticPlayer } from './seedPool';
+import { paceSplitsAtEnd, Schedule } from './paceSchedule';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -182,6 +183,47 @@ async function writeHistory(
 	}
 }
 
+/**
+ * Writes the pace's splits, as of `endedAtMs`, into the match row's
+ * `splits` map under the pace's uuid. A no-op for any match without a
+ * paceSchedule. Exported for scripts/backfillPaceSplits.ts.
+ */
+export async function recordPaceSplits(
+	matchesTableName: string,
+	matchId: string,
+	endedAtMs: number,
+): Promise<Schedule | null> {
+	const m = await ddb.send(new GetCommand({
+		TableName: matchesTableName,
+		Key: { matchId },
+		ProjectionExpression: 'paceSchedule, runStarts, players',
+	}));
+	const schedule = m.Item?.paceSchedule as Schedule | undefined;
+	if (!schedule) return null;
+	const players: MatchPlayer[] = m.Item?.players ?? [];
+	const pace = players.find((p) => isSyntheticPlayer(p.uuid));
+	const runner = players.find((p) => !isSyntheticPlayer(p.uuid));
+	if (!pace || !runner) return null;
+
+	const paceSplits = paceSplitsAtEnd(
+		schedule, (m.Item?.runStarts ?? {})[runner.uuid], endedAtMs);
+
+	await ddb.send(new UpdateCommand({
+		TableName: matchesTableName,
+		Key: { matchId },
+		UpdateExpression: 'SET splits = if_not_exists(splits, :empty)',
+		ExpressionAttributeValues: { ':empty': {} },
+	}));
+	await ddb.send(new UpdateCommand({
+		TableName: matchesTableName,
+		Key: { matchId },
+		UpdateExpression: 'SET splits.#pace = :s',
+		ExpressionAttributeNames: { '#pace': pace.uuid },
+		ExpressionAttributeValues: { ':s': paceSplits },
+	}));
+	return paceSplits;
+}
+
 export async function applyMatchCompletion(
 	matchesTableName: string,
 	playersTableName: string,
@@ -247,6 +289,22 @@ export async function applyMatchCompletion(
 	// padded with bot wins is the same falsehood in a different column.
 	// Half of this fix would read as done and would not be.
 	const exhibition = isSyntheticPlayer(winner.uuid) || isSyntheticPlayer(loser.uuid);
+
+	// A PACE'S SPLITS ARE WRITTEN DOWN HERE, because nothing else does.
+	// They are never reported - liveMatch computes them from
+	// paceSchedule - so without this the match row held only the
+	// player's side. Every way a paced match ends comes through this
+	// function, so this is the one place that covers all of them.
+	//
+	// The row only, never the `splits` argument: that feeds reviewPlayer,
+	// and a pace has no run history worth judging.
+	try {
+		await recordPaceSplits(matchesTableName, matchId, completedAt);
+	} catch (err) {
+		// The result stands without them; a missing column is not worth
+		// failing a completion over.
+		console.error(`[matchCompletion] pace splits not recorded for ${matchId}`, err);
+	}
 
 	// Elo uses the rating snapshot taken when the match was created (see
 	// queueJoin.ts) - not live-refetched, since ratings shouldn't

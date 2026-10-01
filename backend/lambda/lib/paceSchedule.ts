@@ -185,3 +185,25 @@ export function revealedSplits(schedule: Schedule, elapsedMs: number): Schedule 
 	}
 	return out;
 }
+
+/**
+ * The pace's splits as they stood when the match ENDED - what gets
+ * written onto the match row as the pace's own `splits` entry.
+ *
+ * Without this the pace's column on the match page was empty for every
+ * paced race: its run lives in paceSchedule, liveMatch reveals it on
+ * the fly, and nothing ever wrote it down where the player's splits go.
+ *
+ * Cut at the end, not the whole schedule. A player who beat the pace or
+ * forfeited at 12:00 did not watch it kill the dragon, and the record
+ * must not claim it did. Anchored to the player's run start, the same
+ * clock liveMatch uses; no run start means the pace never moved.
+ */
+export function paceSplitsAtEnd(
+	schedule: Schedule,
+	runStartMs: number | undefined,
+	endedAtMs: number,
+): Schedule {
+	if (typeof runStartMs !== 'number' || !Number.isFinite(runStartMs)) return {};
+	return revealedSplits(schedule, endedAtMs - runStartMs);
+}

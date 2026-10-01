@@ -1,5 +1,5 @@
 import {
-	PACE_JITTER_MS, PACE_TIERS, SPLIT_SHAPE, paceFinishMs, revealedSplits,
+	PACE_JITTER_MS, PACE_TIERS, SPLIT_SHAPE, paceFinishMs, paceSplitsAtEnd, revealedSplits,
 	scheduleForTier, scheduleFromRun, tierById,
 } from '../lambda/lib/paceSchedule';
 import { SPLIT_ORDER, validateSplit } from '../lambda/lib/splitRules';
@@ -191,5 +191,26 @@ describe('revealedSplits - the player must not read ahead', () => {
 		// safe failure is showing nothing, never showing everything.
 		expect(revealedSplits(sched, -1)).toEqual({});
 		expect(revealedSplits(sched, NaN)).toEqual({});
+	});
+});
+
+describe('paceSplitsAtEnd - what the match row records for the pace', () => {
+	const sched = scheduleForTier(PACE_TIERS[2]);
+	const start = 1_000_000;
+
+	it('records the whole run when the pace finished', () => {
+		expect(paceSplitsAtEnd(sched, start, start + paceFinishMs(sched))).toEqual(sched);
+	});
+
+	it('records only what had happened when the player ended it first', () => {
+		const end = start + sched.obtain_rod!;
+		const got = paceSplitsAtEnd(sched, start, end);
+		expect(got).toHaveProperty('obtain_rod');
+		expect(got).not.toHaveProperty('enter_stronghold');
+		expect(got).not.toHaveProperty('kill_dragon');
+	});
+
+	it('records nothing when the run never started', () => {
+		expect(paceSplitsAtEnd(sched, undefined, start + 10 ** 9)).toEqual({});
 	});
 });
