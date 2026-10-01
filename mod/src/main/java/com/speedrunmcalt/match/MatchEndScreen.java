@@ -132,27 +132,30 @@ public class MatchEndScreen extends Screen {
 		// reads as losing by a second, when the player may have been
 		// nowhere near the end. The pace's time is exact by construction,
 		// so the comparison looked precise as well as wrong.
+		//
+		// AGAINST A PACE, ONLY A FINISH TIME EARNS A LINE. "you did not
+		// finish / their time 30:00" restated the two lines around it -
+		// the target is named above and the verdict below - so a loss
+		// said the same 30:00 three times.
 		if (myTimeMs != null) {
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText("your time   " + MatchState.formatTime(myTimeMs)),
 					cx, y, ACCENT);
-		} else {
+			y += paceLabel != null ? 18 : 12;
+		} else if (paceLabel == null) {
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText("you did not finish"), cx, y, DIM);
+			y += 12;
 		}
-		y += 12;
 
-		// A PACE'S TIME IS NEVER UNKNOWN. It is the tier - that is what a
-		// pace IS - so "--:--" here was the screen forgetting the one
-		// opponent whose finish is fixed before the race starts. It fell
-		// back whenever the last poll had not landed the reveal, which is
-		// exactly when the match ended.
-		String theirs = paceLabel != null
-				? paceLabel
-				: opponentTimeMs == null ? "--:--" : MatchState.formatTime(opponentTimeMs);
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("their time  " + theirs), cx, y, DIM);
-		y += 18;
+		// A pace's time is the tier, already on the target line, so only
+		// a real opponent gets a "their time" line.
+		if (paceLabel == null) {
+			String theirs = opponentTimeMs == null ? "--:--" : MatchState.formatTime(opponentTimeMs);
+			drawCenteredText(matrices, this.textRenderer,
+					new LiteralText("their time  " + theirs), cx, y, DIM);
+			y += 18;
+		}
 
 		// AN EXHIBITION HAS NO RATING LINE.
 		//
