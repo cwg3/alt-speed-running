@@ -5,6 +5,7 @@ import { resolveSessionToken } from './lib/auth';
 import { paceFinishMs, revealedSplits, Schedule } from './lib/paceSchedule';
 import { isSyntheticPlayer } from './lib/seedPool';
 import { applyMatchCompletion, MatchPlayer } from './lib/matchCompletion';
+import { settleIfPaceDue } from './lib/paceSettle';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -126,14 +127,8 @@ export const handler = async (
 	// for an exhibition. What the player gets is an honest answer about
 	// whether they beat the time.
 	if (match.Item.status === 'pending' && isSyntheticPlayer(opponent.uuid)) {
-		const sched = match.Item.paceSchedule as Schedule | undefined;
-		const runStart = (match.Item.runStarts ?? {})[you.uuid];
-		if (sched && typeof runStart === 'number' && runStart > 0
-			&& now - runStart >= paceFinishMs(sched)) {
-			console.log(`match ${matchId}: pace ${opponent.username} finished - ${you.username} did not beat it`);
-			await applyMatchCompletion(
-				MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, matchId,
-				opponent, you, match.Item.splits ?? {}, MATCH_HISTORY_TABLE_NAME);
+		if (await settleIfPaceDue(MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME,
+			MATCH_HISTORY_TABLE_NAME, match.Item, now)) {
 			const after = await ddb.send(new GetCommand({
 				TableName: MATCHES_TABLE_NAME,
 				Key: { matchId },

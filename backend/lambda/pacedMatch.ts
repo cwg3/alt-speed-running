@@ -9,6 +9,7 @@ import { claimSeedPair, isSyntheticPlayer, recordSeedsSeen } from './lib/seedPoo
 import { sealDraw } from './lib/drawProof';
 import { PACE_TIERS, paceFinishMs, scheduleForTier, tierById } from './lib/paceSchedule';
 import { clearMatchPointer } from './lib/matchCompletion';
+import { settleIfPaceDue } from './lib/paceSettle';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -17,6 +18,7 @@ const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
 const QUEUE_TABLE_NAME = process.env.QUEUE_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
 const SEED_POOL_TABLE_NAME = process.env.SEED_POOL_TABLE_NAME!;
+const MATCH_HISTORY_TABLE_NAME = process.env.MATCH_HISTORY_TABLE_NAME!;
 
 /**
  * The uuid the pace races under.
@@ -121,10 +123,12 @@ export const handler = async (
 		const current = await ddb.send(new GetCommand({
 			TableName: MATCHES_TABLE_NAME,
 			Key: { matchId: String(player.Item.currentMatchId) },
-			ProjectionExpression: '#s',
-			ExpressionAttributeNames: { '#s': 'status' },
 		}));
-		if (current.Item?.status === 'pending') {
+		// A paced match whose pace has finished is over, whether or not
+		// anyone was polling when it did.
+		const settled = current.Item !== undefined && await settleIfPaceDue(
+			MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, MATCH_HISTORY_TABLE_NAME, current.Item);
+		if (!settled && current.Item?.status === 'pending') {
 			// Not an error worth a 500. The client polls and may well have
 			// a match already; telling it which one is more useful than a
 			// stack.

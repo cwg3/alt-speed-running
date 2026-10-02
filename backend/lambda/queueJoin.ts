@@ -13,6 +13,7 @@ import { resolveSessionToken } from './lib/auth';
 import { claimSeedPair, recordSeedsSeen } from './lib/seedPool';
 import { sealDraw } from './lib/drawProof';
 import { illegalMods } from './lib/modRules';
+import { settleIfPaceDue } from './lib/paceSettle';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -21,6 +22,7 @@ const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
 const QUEUE_TABLE_NAME = process.env.QUEUE_TABLE_NAME!;
 const MATCHES_TABLE_NAME = process.env.MATCHES_TABLE_NAME!;
 const SEED_POOL_TABLE_NAME = process.env.SEED_POOL_TABLE_NAME!;
+const MATCH_HISTORY_TABLE_NAME = process.env.MATCH_HISTORY_TABLE_NAME!;
 
 // Skill-range matchmaking: our own documented policy (not a copy of any
 // other platform's undisclosed formula). Range widens the longer a
@@ -105,7 +107,11 @@ export const handler = async (
 			TableName: MATCHES_TABLE_NAME,
 			Key: { matchId: existingMatchId },
 		}));
-		if (existing.Item && existing.Item.status === 'pending') {
+		// A paced match whose pace has finished is over: settle it rather
+		// than send the player back into a race that has already ended.
+		const settled = existing.Item !== undefined && await settleIfPaceDue(
+			MATCHES_TABLE_NAME, PLAYERS_TABLE_NAME, MATCH_HISTORY_TABLE_NAME, existing.Item);
+		if (!settled && existing.Item && existing.Item.status === 'pending') {
 			const them = (existing.Item.players as any[]).find((p) => p.uuid !== uuid);
 			// Drop any stale queue row so this player isn't matched twice.
 			await ddb.send(new DeleteCommand({ TableName: QUEUE_TABLE_NAME, Key: { uuid } }));

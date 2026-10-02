@@ -262,6 +262,8 @@ export class BackendStack extends cdk.Stack {
 		// who did not create it can still be told about it.
 		matchesTable.grantReadWriteData(queueJoinFn);
 		seedPoolTable.grantReadWriteData(queueJoinFn);
+		// Settles a left-behind paced match rather than resuming it.
+		matchHistoryTable.grantWriteData(queueJoinFn);
 
 		api.addRoutes({
 			path: '/queue/join',
@@ -364,6 +366,9 @@ export class BackendStack extends cdk.Stack {
 				QUEUE_TABLE_NAME: queueTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
 				SEED_POOL_TABLE_NAME: seedPoolTable.tableName,
+				// Settling a paced match whose pace has already finished
+				// writes its history row (lib/paceSettle).
+				MATCH_HISTORY_TABLE_NAME: matchHistoryTable.tableName,
 				// A pace spends a real seed, so it draws under the same
 				// committed season secret as a ranked match.
 				...seasonEnv,
@@ -381,6 +386,8 @@ export class BackendStack extends cdk.Stack {
 		queueTable.grantReadWriteData(pacedMatchFn);
 		matchesTable.grantReadWriteData(pacedMatchFn);
 		seedPoolTable.grantReadWriteData(pacedMatchFn);
+		// Settles a left-behind paced match before starting a new one.
+		matchHistoryTable.grantWriteData(pacedMatchFn);
 
 		api.addRoutes({
 			path: '/matches/pace',
