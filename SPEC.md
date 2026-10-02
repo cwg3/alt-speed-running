@@ -677,15 +677,32 @@ A small lava island the player bridged off in about a minute, and did
 not report, cost 36 - nothing separates it from the dead end, so it is
 caught too and gets its bridge.
 
-**Harness worlds must be built like match worlds.** A match nether is
-not the nether of `netherSeed`: the generator gets `netherSeed`, but
-vanilla runs carvers and features with `world.getSeed()`, the
-overworld's - the same bug `NetherStructureSeedMixin` fixes for
-structures. Priced in a one-seed world, an arrival the player had walked
-straight out of, down a carved tunnel, came back as sealed in netherrack.
-`HarnessNetherSeedMixin` gives a dedicated server the match's split:
-`level-seed` is the overworld seed and `nethergen.txt` holds the nether
-seed. `ArrivalCheckHook` prices arrivals listed in `arrival.txt`.
+**The match nether used to be a hybrid of both seeds.** The generator
+got `netherSeed`, but vanilla carved caves, built the surface and placed
+features with `world.getSeed()`, the overworld's - the same bug
+`NetherStructureSeedMixin` already fixed for structures. Knowing the
+overworld seed told you where the nether's tunnels ran. Priced in a
+one-seed world, an arrival the player had walked straight out of, down a
+carved tunnel, came back as sealed in netherrack - which is how it was
+found.
+
+Fixed in WorldSetupVersion 2: `NetherStructureSeedMixin` seeds the
+carvers and `NetherRegionSeedMixin` seeds the chunk regions that
+features and surface are built through, so a match nether is now block
+for block the one-seed world of `netherSeed`. Checked by hashing chunks
+of both on two pairs, with the unfixed world hashing differently. The
+pool's `nether` check has always inspected that one-seed world, so from
+version 2 on it inspects what players actually get. Still from the
+world seed: the live world's biome lookup near borders, which picks
+mob spawn lists and builds no blocks.
+
+The arrival guard was calibrated on version 1 arrivals, rebuilt with
+`HarnessNetherSeedMixin` (`level-seed` the overworld seed,
+`nethergen.txt` the nether seed, no match state set). It measures
+vanilla nether terrain in general, so the line is expected to hold, but
+it has not been re-measured on version 2 arrivals.
+`ArrivalCheckHook` prices arrivals listed in `arrival.txt`, and its
+`hash` command compares two worlds.
 
 **Predicted structure Y is not usable, and the code now says so.**
 A structure's start is built before terrain exists, so its X and Z are

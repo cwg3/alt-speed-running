@@ -23,6 +23,8 @@ package com.speedrunmcalt.world;
  *   seed/LootTopUp            chest top-ups, obsidian, food
  *   seed/BastionLoot          bastion chest contents
  *   world/MatchWorldSetup     what runs, and in what order
+ *   world/NetherArrival       the way out opened at a bad arrival
+ *   mixin/NetherStructureSeedMixin  which seed builds the nether
  *
  * Changing a log line or a comment in those files does not count.
  * Changing a salt, a threshold, an amount or an order does.
@@ -39,8 +41,13 @@ public final class WorldSetupVersion {
 	 * Matches made before this exists carry no stamp at all. They are
 	 * not replayable and must not be silently treated as version 1:
 	 * "unknown" and "the current rules" are different claims.
+	 *
+	 * 2 - the nether's caves and features come from netherSeed, not the
+	 * overworld seed (NetherStructureSeedMixin). Every nether changes.
+	 * A version 1 nether can still be rebuilt for analysis with
+	 * HarnessNetherSeedMixin; see SPEC.md "Nether arrival terrain".
 	 */
-	public static final int CURRENT = 1;
+	public static final int CURRENT = 2;
 
 	private WorldSetupVersion() {
 	}

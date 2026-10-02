@@ -107,4 +107,43 @@ public abstract class NetherStructureSeedMixin {
 		}
 		return MatchState.netherSeed;
 	}
+
+	/**
+	 * The third half: CAVES.
+	 *
+	 * ChunkStatus.CARVERS calls carve(world.getSeed(), ...) - the WORLD
+	 * seed again. So until this, a match nether was netherSeed's terrain
+	 * with overworldSeed's tunnels cut through it. Knowing the overworld
+	 * seed told you where the nether's caves ran, which is the inference
+	 * the two-seed design exists to stop, and no harness reproduced it:
+	 * every nether check built a one-seed world. Found on 2026-10-01
+	 * when an arrival a one-seed harness priced as sealed in netherrack
+	 * had been walked straight out of in play, down a tunnel only the
+	 * overworld seed's carver makes.
+	 *
+	 * Decoration and surface had the same bug through ChunkRegion; see
+	 * NetherRegionSeedMixin. Together they make a match nether exactly
+	 * the one-seed world of netherSeed, so the pool's nether check now
+	 * inspects the world players get. Changes every nether -
+	 * WorldSetupVersion 2.
+	 *
+	 * Still from the world seed: the ServerWorld's own biome access,
+	 * used outside generation to pick which biome's mob list applies
+	 * within a few blocks of a border. It builds no blocks.
+	 */
+	@ModifyVariable(method = "carve", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+	private long speedrunmcalt$carveWithNetherSeed(long worldSeed) {
+		return speedrunmcalt$netherSeedFor(worldSeed);
+	}
+
+	/** netherSeed when this generator is a match nether, else the seed given. */
+	private long speedrunmcalt$netherSeedFor(long worldSeed) {
+		if (!MatchState.ourWorld() || MatchState.netherSeed == 0) {
+			return worldSeed;
+		}
+		if (!(((ChunkGenerator) (Object) this).getBiomeSource() instanceof MultiNoiseBiomeSource)) {
+			return worldSeed;
+		}
+		return MatchState.netherSeed;
+	}
 }

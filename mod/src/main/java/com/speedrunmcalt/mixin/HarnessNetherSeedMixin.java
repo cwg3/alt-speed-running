@@ -7,20 +7,24 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 /**
- * Lets a HARNESS server build its nether the way a match world does.
+ * Lets a HARNESS server build a nether the way a match world does.
  *
- * A match nether is not "the nether of netherSeed". MatchWorldCreator
- * builds the nether generator from netherSeed, but vanilla runs the
- * carvers and features with world.getSeed() - the overworld's - so the
- * terrain a player walks is netherSeed's noise with overworldSeed's
- * caves cut through it. A one-seed dedicated server reproduces neither
- * half on its own: found on 2026-10-01 when an arrival the harness
- * priced as sealed in netherrack had been walked straight out of in
- * play, down a carved tunnel.
+ * A match world's nether generator is built from netherSeed while the
+ * world seed is the overworld's. A dedicated server has one seed for
+ * both, so on its own it reproduces neither half. With level-seed set
+ * to the overworld seed and nethergen.txt holding the nether seed, this
+ * hands the nether generator netherSeed and leaves the world seed alone.
  *
- * With level-seed set to the overworld seed and nethergen.txt holding
- * the nether seed, this hands the nether generator netherSeed and leaves
- * the world seed alone, which is exactly the match world's split.
+ * Which nether that gives depends on MatchState:
+ *
+ *   - left unset: a WorldSetupVersion 1 nether, where vanilla carved
+ *     caves and laid surface and features with the overworld seed. The
+ *     only way to rebuild what a version 1 match actually looked like;
+ *     the nether arrival guard was calibrated in exactly this world.
+ *   - set as a match (ArrivalCheckHook's "match" line): the current
+ *     nether, which NetherStructureSeedMixin and NetherRegionSeedMixin
+ *     make identical to the one-seed world of netherSeed. Checked by
+ *     hashing chunks of both.
  *
  * Dedicated server only. The client calls the same factory when it
  * builds a match world (for the defaults it then discards), and must

@@ -36,8 +36,8 @@ import java.util.Comparator;
  * the tunnel, places the bridge - and nothing else.
  *
  * Calibrated on the ten nether arrivals played on 2026-10-01, priced in a
- * harness world built the way a match world is (see
- * HarnessNetherSeedMixin; a one-seed world got these badly wrong). Every
+ * harness world rebuilt the way those match worlds were - WorldSetupVersion
+ * 1, see HarnessNetherSeedMixin; a one-seed world got them badly wrong. Every
  * arrival the player walked away from cost at most 4. The dead end cost
  * 20, the buried arrival 42, and a small lava island - which the player
  * bridged off in about a minute and did not report - 36. No line

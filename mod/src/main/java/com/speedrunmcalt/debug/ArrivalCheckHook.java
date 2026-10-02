@@ -38,6 +38,44 @@ public class ArrivalCheckHook implements DedicatedServerModInitializer {
 				ServerWorld nether = server.getWorld(World.NETHER);
 				for (String line : Files.readAllLines(Paths.get("arrival.txt"))) {
 					String[] p = line.trim().split("\\s+");
+					if (p[0].equals("match") && p.length >= 2) {
+						// "match <netherSeed>": behave as a match world from
+						// here on. Must come before anything touches the
+						// nether, which generates nothing until asked.
+						com.speedrunmcalt.match.MatchState.netherSeed = Long.parseLong(p[1]);
+						com.speedrunmcalt.match.MatchState.matchStartMillis = System.currentTimeMillis();
+						com.speedrunmcalt.match.MatchState.matchId = "probe";
+						continue;
+					}
+					if (p[0].equals("hash") && p.length >= 4) {
+						// "hash cx cz r": every block in the chunks within r of
+						// chunk cx,cz, hashed - two worlds that agree on this
+						// agree block for block.
+						int cx = Integer.parseInt(p[1]);
+						int cz = Integer.parseInt(p[2]);
+						int r = Integer.parseInt(p[3]);
+						// Load a ring past the area first: a neighbour places
+						// its features into the chunk beside it when IT
+						// generates, so a chunk read before its neighbours
+						// exist is not finished yet.
+						for (int x = cx - r - 1; x <= cx + r + 1; x++) {
+							for (int z = cz - r - 1; z <= cz + r + 1; z++) {
+								nether.getChunk(x, z);
+							}
+						}
+						long h = 17;
+						BlockPos.Mutable m = new BlockPos.Mutable();
+						for (int x = (cx - r) * 16; x < (cx + r + 1) * 16; x++) {
+							for (int z = (cz - r) * 16; z < (cz + r + 1) * 16; z++) {
+								for (int y = 0; y < 128; y++) {
+									h = 31 * h + net.minecraft.block.Block.getRawIdFromState(
+											nether.getBlockState(m.set(x, y, z)));
+								}
+							}
+						}
+						SpeedrunMcAlt.LOGGER.info("[arrival] hash {},{} r{}: {}", cx, cz, r, Long.toHexString(h));
+						continue;
+					}
 					if (p.length < 4) {
 						continue;
 					}
