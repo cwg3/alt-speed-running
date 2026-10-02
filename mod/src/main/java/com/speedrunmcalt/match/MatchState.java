@@ -97,13 +97,10 @@ public final class MatchState {
 	public static volatile boolean netherArrivalChecked = false;
 
 	/**
-	 * Where the player first stood in the nether, held while the arrival
-	 * check waits for the terrain around it to load. Null until then.
+	 * The arrival check in progress: where the player first stood in the
+	 * nether, and which pass it is on. Null until they get there.
 	 */
-	public static volatile net.minecraft.util.math.BlockPos netherArrivalAt = null;
-
-	/** Ticks spent waiting for that terrain. */
-	public static volatile int netherArrivalWaited = 0;
+	public static volatile com.speedrunmcalt.world.NetherArrival.Job netherArrivalJob = null;
 
 	/**
 	 * When the pre-race countdown ends, or 0 if there is none.
@@ -265,8 +262,7 @@ public final class MatchState {
 		bastionZ = 0;
 		bastionLootApplied = false;
 		netherArrivalChecked = false;
-		netherArrivalAt = null;
-		netherArrivalWaited = 0;
+		netherArrivalJob = null;
 		countdownEndsAt = 0;
 		runAlreadyStarted = false;
 		setupFailure = null;

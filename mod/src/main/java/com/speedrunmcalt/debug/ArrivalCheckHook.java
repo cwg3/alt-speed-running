@@ -4,6 +4,7 @@ import com.speedrunmcalt.SpeedrunMcAlt;
 import com.speedrunmcalt.world.ArrivalReach;
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -28,16 +29,48 @@ import java.nio.file.Paths;
 public class ArrivalCheckHook implements DedicatedServerModInitializer {
 	public static final int[] RINGS = {16, 32, 48, 64, 96};
 
+	private static void appendCosts(StringBuilder row, ArrivalReach.Result r) {
+		for (int c : r.cost) {
+			row.append(',').append(c);
+		}
+	}
+
+	private static void writeRows(java.util.List<StringBuilder> rows) {
+		try (FileWriter csv = new FileWriter("arrival.csv", true)) {
+			for (StringBuilder row : rows) {
+				csv.write(row.append('\n').toString());
+			}
+		} catch (java.io.IOException e) {
+			SpeedrunMcAlt.LOGGER.error("[arrival] could not write arrival.csv", e);
+		}
+	}
+
 	@Override
 	public void onInitializeServer() {
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			if (!Files.exists(Paths.get("arrival.txt"))) {
 				return;
 			}
-			try (FileWriter csv = new FileWriter("arrival.csv", true)) {
+			java.util.List<BlockPos> arrivals = new java.util.ArrayList<>();
+			java.util.List<StringBuilder> rows = new java.util.ArrayList<>();
+			int flowTicks = 0;
+			try {
 				ServerWorld nether = server.getWorld(World.NETHER);
 				for (String line : Files.readAllLines(Paths.get("arrival.txt"))) {
 					String[] p = line.trim().split("\\s+");
+					if (p[0].equals("flow") && p.length >= 2) {
+						// "flow <ticks>": after pricing, let fluids run
+						// this long and price again.
+						flowTicks = Integer.parseInt(p[1]);
+						continue;
+					}
+					if (p[0].equals("bastion") && p.length >= 3) {
+						// "bastion x z": the match's bastion, which the way
+						// out is steered toward.
+						com.speedrunmcalt.match.MatchState.bastionX = Integer.parseInt(p[1]);
+						com.speedrunmcalt.match.MatchState.bastionZ = Integer.parseInt(p[2]);
+						continue;
+					}
 					if (p[0].equals("match") && p.length >= 2) {
 						// "match <netherSeed>": behave as a match world from
 						// here on. Must come before anything touches the
@@ -95,35 +128,67 @@ public class ArrivalCheckHook implements DedicatedServerModInitializer {
 					}
 					BlockPos at = new BlockPos(Integer.parseInt(p[1]),
 							Integer.parseInt(p[2]), Integer.parseInt(p[3]));
+					// The guard copies only loaded terrain, as it must live;
+					// here, generate it all first.
+					for (int x = (at.getX() >> 4) - 7; x <= (at.getX() >> 4) + 7; x++) {
+						for (int z = (at.getZ() >> 4) - 7; z <= (at.getZ() >> 4) + 7; z++) {
+							nether.getChunk(x, z);
+						}
+					}
 					long t0 = System.currentTimeMillis();
-					ArrivalReach.Result r = ArrivalReach.measure(nether, at, RINGS, 60, (x, z) -> true);
-					SpeedrunMcAlt.LOGGER.info("[arrival] {} at {},{},{}: {} (visited {}, {} ms)",
-							p[0], at.getX(), at.getY(), at.getZ(), r, r.visited,
-							System.currentTimeMillis() - t0);
+					ArrivalReach.Result r = com.speedrunmcalt.world.NetherArrival.price(nether, at, false);
+					long searchMs = System.currentTimeMillis() - t0;
+					ArrivalReach.Result predicted = com.speedrunmcalt.world.NetherArrival.price(nether, at, true);
+					SpeedrunMcAlt.LOGGER.info("[arrival] {} at {},{},{}: as generated {}; lava predicted {} (visited {}, {} ms)",
+							p[0], at.getX(), at.getY(), at.getZ(), r, predicted, r.visited, searchMs);
 					StringBuilder row = new StringBuilder(p[0]).append(',')
 							.append(at.getX()).append(',').append(at.getY()).append(',').append(at.getZ());
-					for (int c : r.cost) {
-						row.append(',').append(c);
-					}
-					row.append(',').append(r.visited);
+					appendCosts(row, r);
+					row.append(',').append(r.visited).append(',').append(searchMs);
+					appendCosts(row, predicted);
 
-					// Now the terrain is loaded: time the search alone, which
-					// is what a live match pays, then run the real guard and
-					// price the arrival again to see what it left behind.
-					long t1 = System.currentTimeMillis();
-					ArrivalReach.measure(nether, at, RINGS, 60, (x, z) -> true);
-					long searchMs = System.currentTimeMillis() - t1;
+					// Run the real guard, then price what it left behind.
 					com.speedrunmcalt.world.NetherArrival.check(nether, at, 0);
-					ArrivalReach.Result after = ArrivalReach.measure(nether, at, RINGS, 60, (x, z) -> true);
-					SpeedrunMcAlt.LOGGER.info("[arrival] {} search alone {} ms; after guard: {}",
-							p[0], searchMs, after);
-					row.append(',').append(searchMs);
-					for (int c : after.cost) {
-						row.append(',').append(c);
-					}
-					row.append('\n');
-					csv.write(row.toString());
+					ArrivalReach.Result after = com.speedrunmcalt.world.NetherArrival.price(nether, at, true);
+					SpeedrunMcAlt.LOGGER.info("[arrival] {} after guard: {}", p[0], after);
+					appendCosts(row, after);
+					arrivals.add(at);
+					rows.add(row);
 				}
+				if (flowTicks > 0) {
+					// Let the world actually move: force the arrivals'
+					// chunks so their fluids tick, run, and price again
+					// as it stands - no prediction - then let the guard
+					// have its later pass.
+					for (BlockPos at : arrivals) {
+						for (int x = (at.getX() >> 4) - 6; x <= (at.getX() >> 4) + 6; x++) {
+							for (int z = (at.getZ() >> 4) - 6; z <= (at.getZ() >> 4) + 6; z++) {
+								nether.setChunkForced(x, z, true);
+							}
+						}
+					}
+					int[] ticks = {0};
+					int stopAt = flowTicks;
+					ServerTickEvents.END_SERVER_TICK.register(srv -> {
+						if (++ticks[0] != stopAt) {
+							return;
+						}
+						for (int i = 0; i < arrivals.size(); i++) {
+							BlockPos at = arrivals.get(i);
+							ArrivalReach.Result flowed = com.speedrunmcalt.world.NetherArrival.price(nether, at, false);
+							com.speedrunmcalt.world.NetherArrival.check(nether, at, stopAt);
+							ArrivalReach.Result fin = com.speedrunmcalt.world.NetherArrival.price(nether, at, false);
+							SpeedrunMcAlt.LOGGER.info("[arrival] {} after {} ticks of flow: {}; after recheck: {}",
+									rows.get(i).toString().split(",")[0], stopAt, flowed, fin);
+							appendCosts(rows.get(i), flowed);
+							appendCosts(rows.get(i), fin);
+						}
+						writeRows(rows);
+						srv.stop(false);
+					});
+					return;
+				}
+				writeRows(rows);
 			} catch (Exception e) {
 				SpeedrunMcAlt.LOGGER.error("[arrival] failed", e);
 			}

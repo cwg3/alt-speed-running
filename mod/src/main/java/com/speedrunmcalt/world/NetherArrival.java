@@ -5,12 +5,19 @@ import com.speedrunmcalt.match.MatchState;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.Material;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ChunkTicketType;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.Direction;
 
 import java.util.Comparator;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Makes sure a nether arrival has a way out.
@@ -60,8 +67,27 @@ import java.util.Comparator;
  * Third, it is not instant. The terrain 96 blocks out does not exist when
  * the player steps through, and generating it on the spot would freeze
  * the game. It is requested in the background and the check runs once it
- * has loaded, normally a few seconds in. If it never all loads, the check
- * runs on what has, and treats the rest as open.
+ * has loaded, normally a few seconds in. If it never all loads, an
+ * arrival that only looks bad because of the missing terrain is left
+ * alone.
+ *
+ * WHAT THE FIRST LIVE FIRING TAUGHT (2026-10-01, the match after this
+ * shipped). It priced a sealed pocket, opened a tunnel that genuinely led
+ * out - and the runner still voted the seed bad, because:
+ *
+ *   - a lavafall from a ceiling spring only started running once the
+ *     arrival loaded it, spread over the floor at the portal, and cut the
+ *     pocket off from the tunnel. The check had read a world in motion.
+ *     ArrivalSnapshot now floods the copy with the lava that is about to
+ *     move before the search sees it, and the check runs again at
+ *     RECHECK_AFTER in case anything else moved;
+ *   - the tunnel ran east and the bastion lay northwest, so a runner
+ *     heading for the bastion never met it. The path now takes the exit
+ *     facing the bastion when one costs at most SLACK more;
+ *   - the search took 4.7 seconds on the server thread, a freeze at the
+ *     moment the runner most needs to move. The terrain is now copied a
+ *     few chunks per tick and searched on its own thread; only the edits
+ *     are made on the server thread.
  */
 public final class NetherArrival {
 	/** Ring distances priced, in blocks from the arrival. The last one decides. */
@@ -73,11 +99,32 @@ public final class NetherArrival {
 	/** Search gives up past this many edits. */
 	private static final int MAX_COST = 60;
 
+	/** Extra edits worth paying for an exit that faces the bastion. */
+	private static final int SLACK = 6;
+
 	/** Chunk radius requested around the arrival: covers the outer ring. */
 	private static final int LOAD_RADIUS = 7;
 
 	/** Longest wait for that terrain before checking what has loaded. */
 	private static final int MAX_WAIT_TICKS = 200;
+
+	/**
+	 * Ticks between passes after the first. A spring's fall and the
+	 * spread at its foot take seconds to run, so later passes see lava
+	 * the prediction missed, if any did.
+	 */
+	private static final int[] RECHECK_AFTER = {200, 400};
+
+	/**
+	 * Copy reach around the arrival. The search walks to one past the
+	 * outer ring, reads a block either side of anything it mines and two
+	 * above where it stands, within ArrivalReach's Y band of 32.
+	 */
+	private static final int COPY_RADIUS = 98;
+	private static final int COPY_Y_BAND = 34;
+
+	/** Server-thread time spent copying terrain per tick. */
+	private static final long COPY_BUDGET_NANOS = 8_000_000L;
 
 	/** Keeps the arrival's terrain loading; expires on its own. */
 	private static final ChunkTicketType<ChunkPos> TICKET =
@@ -87,30 +134,121 @@ public final class NetherArrival {
 	/** Radius of the pad built when no way out is found at all. */
 	private static final int PAD_RADIUS = 5;
 
+	private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+		Thread thread = new Thread(runnable, "speedrunmcalt-arrival");
+		thread.setDaemon(true);
+		return thread;
+	});
+
 	private NetherArrival() {
 	}
 
+	/** One match's arrival check, across its passes. */
+	public static final class Job {
+		final BlockPos at;
+		int pass = 0;
+		int waited = 0;
+		int idle = 0;
+		/** An earlier pass opened a way out, so any cost now means it was blocked again. */
+		boolean opened = false;
+		ArrivalSnapshot copying;
+		long copyNanos;
+		int copyTicks;
+		CompletableFuture<Measured> searching;
+
+		Job(BlockPos at) {
+			this.at = at;
+		}
+	}
+
+	/** A search result and what it cost, from the search thread. */
+	private static final class Measured {
+		final ArrivalReach.Result reach;
+		final int predicted;
+		final long searchMs;
+
+		Measured(ArrivalReach.Result reach, int predicted, long searchMs) {
+			this.reach = reach;
+			this.predicted = predicted;
+			this.searchMs = searchMs;
+		}
+	}
+
 	/**
-	 * Called every server tick while the check has not run. The first
-	 * call records where the player arrived and asks for the terrain
-	 * around it; later calls run the check once it is there.
+	 * Called every server tick until every pass has run. The first call
+	 * records where the player arrived and asks for the terrain around
+	 * it; later calls advance whichever stage the check is in.
 	 */
 	public static void tick(ServerWorld nether, BlockPos playerPos) {
-		if (MatchState.netherArrivalAt == null) {
-			MatchState.netherArrivalAt = playerPos;
-			ChunkPos chunk = new ChunkPos(playerPos);
-			nether.getChunkManager().addTicket(TICKET, chunk, LOAD_RADIUS, chunk);
+		Job job = MatchState.netherArrivalJob;
+		if (job == null) {
+			job = new Job(playerPos);
+			MatchState.netherArrivalJob = job;
+			requestTerrain(nether, playerPos);
 			return;
 		}
 
-		BlockPos at = MatchState.netherArrivalAt;
-		int waited = ++MatchState.netherArrivalWaited;
-		boolean loaded = allLoaded(nether, at);
-		if (!loaded && waited < MAX_WAIT_TICKS) {
+		if (job.searching != null) {
+			if (!job.searching.isDone()) {
+				return;
+			}
+			Measured m;
+			try {
+				m = job.searching.join();
+			} catch (Exception e) {
+				SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Nether arrival search failed", e);
+				m = null;
+			}
+			job.searching = null;
+			if (m != null) {
+				job.opened |= apply(nether, job.at, m, job.opened ? 0 : TOLERANCE,
+						String.format("pass %d, copied in %d ms over %d ticks, after %d ticks",
+								job.pass + 1, job.copyNanos / 1_000_000, job.copyTicks, job.waited));
+			}
+			job.pass++;
+			if (job.pass > RECHECK_AFTER.length) {
+				MatchState.netherArrivalChecked = true;
+				return;
+			}
+			job.idle = RECHECK_AFTER[job.pass - 1];
 			return;
 		}
-		MatchState.netherArrivalChecked = true;
-		check(nether, at, waited);
+
+		if (job.copying == null) {
+			if (job.idle > 0) {
+				job.idle--;
+				return;
+			}
+			if (job.pass == 0) {
+				job.waited++;
+				if (!allLoaded(nether, job.at) && job.waited < MAX_WAIT_TICKS) {
+					return;
+				}
+			} else {
+				requestTerrain(nether, job.at);
+			}
+			job.copying = new ArrivalSnapshot(job.at, COPY_RADIUS, COPY_Y_BAND);
+			job.copyNanos = 0;
+			job.copyTicks = 0;
+		}
+
+		long started = System.nanoTime();
+		boolean copied = job.copying.copySome(nether, COPY_BUDGET_NANOS, false);
+		job.copyNanos += System.nanoTime() - started;
+		job.copyTicks++;
+		if (!copied) {
+			return;
+		}
+		ArrivalSnapshot snapshot = job.copying;
+		job.copying = null;
+		BlockPos at = job.at;
+		BlockPos toward = bastion(at);
+		job.searching = CompletableFuture.supplyAsync(() -> measure(snapshot, at, toward), EXECUTOR);
+	}
+
+	private static void requestTerrain(ServerWorld nether, BlockPos at) {
+		ChunkPos chunk = new ChunkPos(at);
+		nether.getChunkManager().addTicket(TICKET, chunk, LOAD_RADIUS, chunk);
 	}
 
 	private static boolean allLoaded(ServerWorld nether, BlockPos at) {
@@ -127,49 +265,133 @@ public final class NetherArrival {
 		return true;
 	}
 
-	/** Runs the check now, on whatever has loaded. Public for the harness. */
+	/** Where the path out should face: this match's bastion, if known. */
+	private static BlockPos bastion(BlockPos at) {
+		if (MatchState.bastionX == 0 && MatchState.bastionZ == 0) {
+			return null;
+		}
+		return new BlockPos(MatchState.bastionX, at.getY(), MatchState.bastionZ);
+	}
+
+	/** Search thread: predict the lava, then price the way out. */
+	private static Measured measure(ArrivalSnapshot snapshot, BlockPos at, BlockPos toward) {
+		long started = System.currentTimeMillis();
+		snapshot.predictLava();
+		ArrivalReach.Result r = ArrivalReach.measure(snapshot, at, RINGS, MAX_COST,
+				snapshot::isLoaded, toward, SLACK);
+		return new Measured(r, snapshot.predicted, System.currentTimeMillis() - started);
+	}
+
+	/**
+	 * The whole check at once, on the calling thread - copy, predict,
+	 * search, edit. For the harness, where a freeze costs nothing: it
+	 * generates any terrain that is missing.
+	 */
 	public static void check(ServerWorld nether, BlockPos at, int waited) {
 		long started = System.currentTimeMillis();
+		ArrivalSnapshot snapshot = new ArrivalSnapshot(at, COPY_RADIUS, COPY_Y_BAND);
+		snapshot.copySome(nether, Long.MAX_VALUE, true);
+		long copyMs = System.currentTimeMillis() - started;
+		apply(nether, at, measure(snapshot, at, bastion(at)), TOLERANCE,
+				String.format("harness, copied in %d ms, after %d ticks", copyMs, waited));
+	}
+
+	/**
+	 * Prices the arrival on a fresh copy without changing anything.
+	 * For the harness; {@code predict} false prices the world as it
+	 * stands, lava where it is now.
+	 */
+	public static ArrivalReach.Result price(ServerWorld nether, BlockPos at, boolean predict) {
+		ArrivalSnapshot snapshot = new ArrivalSnapshot(at, COPY_RADIUS, COPY_Y_BAND);
+		snapshot.copySome(nether, Long.MAX_VALUE, true);
+		if (predict) {
+			snapshot.predictLava();
+		}
+		return ArrivalReach.measure(snapshot, at, RINGS, MAX_COST, snapshot::isLoaded);
+	}
+
+	/**
+	 * Server thread: act on a search result. True if it opened a way out.
+	 *
+	 * {@code tolerance} is TOLERANCE on a first look and 0 once a way has
+	 * been opened: in the 2026-10-01 arrival, lava that crossed the
+	 * opened path left a detour of three blocks - under TOLERANCE, and
+	 * still a seed voted bad, because nothing told the runner the way
+	 * existed, let alone that it now went round the lava.
+	 */
+	private static boolean apply(ServerWorld nether, BlockPos at, Measured m, int tolerance, String how) {
+		ArrivalReach.Result r = m.reach;
+		int outer = r.outer();
 		// An unloaded column stops the search like a wall would. If the
 		// verdict then comes out bad, it may be the missing terrain
 		// talking, so the world is left alone - unknown is not unrunnable.
-		ArrivalReach.Result r = ArrivalReach.measure(nether, at, RINGS, MAX_COST,
-				(x, z) -> nether.getChunkManager().isChunkLoaded(x >> 4, z >> 4));
-		long took = System.currentTimeMillis() - started;
-
-		int outer = r.outer();
-		boolean unknown = r.hitUnloaded && (outer < 0 || outer > TOLERANCE);
-		if ((outer >= 0 && outer <= TOLERANCE) || unknown) {
+		boolean unknown = r.hitUnloaded && (outer < 0 || outer > tolerance);
+		if ((outer >= 0 && outer <= tolerance) || unknown) {
 			SpeedrunMcAlt.LOGGER.info(
-					"[speedrunmcalt] Nether arrival at {},{},{} is runnable ({}; {} ms, after {} ticks{})",
-					at.getX(), at.getY(), at.getZ(), r, took, waited,
-					unknown ? ", terrain not all loaded - left alone" : "");
-			return;
+					"[speedrunmcalt] Nether arrival at {},{},{} is runnable ({}; {} cells of lava predicted; "
+							+ "searched in {} ms off-thread; {}{})",
+					at.getX(), at.getY(), at.getZ(), r, m.predicted, m.searchMs, how,
+					unknown ? "; terrain not all loaded - left alone" : "");
+			return false;
 		}
 
 		if (r.path.isEmpty()) {
 			SpeedrunMcAlt.LOGGER.warn(
-					"[speedrunmcalt] Nether arrival at {},{},{} has no way out within {} edits ({}) - building a pad",
-					at.getX(), at.getY(), at.getZ(), MAX_COST, r);
+					"[speedrunmcalt] Nether arrival at {},{},{} has no way out within {} edits ({}; {}) - building a pad",
+					at.getX(), at.getY(), at.getZ(), MAX_COST, r, how);
 			buildPad(nether, at);
-			return;
+			return false;
 		}
 
 		int mined = 0;
 		int placed = 0;
+		int skipped = 0;
 		for (ArrivalReach.Edit e : r.path) {
+			// The search ran on a copy, and the world has had a few
+			// ticks since. Never open a block onto lava that has arrived
+			// in the meantime, and never place one inside a player; the
+			// next pass prices whatever that leaves.
 			if (e.place) {
+				if (inPlayer(nether, e.pos)) {
+					skipped++;
+					continue;
+				}
 				nether.setBlockState(e.pos, Blocks.NETHERRACK.getDefaultState(), 3);
 				placed++;
 			} else {
+				if (besideLava(nether, e.pos)) {
+					skipped++;
+					continue;
+				}
 				nether.setBlockState(e.pos, Blocks.AIR.getDefaultState(), 3);
 				mined++;
 			}
 		}
 		SpeedrunMcAlt.LOGGER.warn(
-				"[speedrunmcalt] Nether arrival at {},{},{} was unrunnable ({}) - opened a way out: "
-						+ "{} mined, {} placed ({} ms)",
-				at.getX(), at.getY(), at.getZ(), r, mined, placed, took);
+				"[speedrunmcalt] Nether arrival at {},{},{} was unrunnable ({}) - opened a way out to {},{},{}: "
+						+ "{} mined, {} placed, {} skipped ({} cells of lava predicted; searched in {} ms off-thread; {})",
+				at.getX(), at.getY(), at.getZ(), r, r.exit.getX(), r.exit.getY(), r.exit.getZ(),
+				mined, placed, skipped, m.predicted, m.searchMs, how);
+		return true;
+	}
+
+	private static boolean besideLava(ServerWorld nether, BlockPos pos) {
+		for (Direction d : Direction.values()) {
+			if (nether.getBlockState(pos.offset(d)).getMaterial() == Material.LAVA) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static boolean inPlayer(ServerWorld nether, BlockPos pos) {
+		Box box = new Box(pos);
+		for (ServerPlayerEntity player : nether.getPlayers()) {
+			if (player.getBoundingBox().intersects(box)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

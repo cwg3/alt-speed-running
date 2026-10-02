@@ -69,13 +69,16 @@ public final class ArrivalReach {
 		public final int visited;
 		/** Edits along the cheapest path to the outermost ring reached, start first. */
 		public final List<Edit> path;
+		/** Where that path ends. */
+		public final BlockPos exit;
 
-		Result(int[] rings, int[] cost, boolean hitUnloaded, int visited, List<Edit> path) {
+		Result(int[] rings, int[] cost, boolean hitUnloaded, int visited, List<Edit> path, BlockPos exit) {
 			this.rings = rings;
 			this.cost = cost;
 			this.hitUnloaded = hitUnloaded;
 			this.visited = visited;
 			this.path = path;
+			this.exit = exit;
 		}
 
 		/** Edits needed to reach the outermost ring, or -1. */
@@ -120,7 +123,24 @@ public final class ArrivalReach {
 	 */
 	public static Result measure(BlockView world, BlockPos start, int[] rings,
 			int maxCost, Loaded loaded) {
+		return measure(world, start, rings, maxCost, loaded, null, 0);
+	}
+
+	/**
+	 * As above, but the way out it returns faces {@code toward} where it
+	 * can: of every exit through the outer ring costing at most
+	 * {@code slack} edits more than the cheapest, the path goes to the
+	 * one pointing most nearly at it. The cost reported stays the
+	 * cheapest, since that is what says whether the arrival needs help.
+	 *
+	 * From play on 2026-10-01: the cheapest way out of a sealed pocket
+	 * ran east while the bastion lay northwest, so the runner who
+	 * headed for the bastion never met the tunnel at all.
+	 */
+	public static Result measure(BlockView world, BlockPos start, int[] rings,
+			int maxCost, Loaded loaded, BlockPos toward, int slack) {
 		int outerRing = rings[rings.length - 1];
+		int last = rings.length - 1;
 		int[] cost = new int[rings.length];
 		java.util.Arrays.fill(cost, -1);
 		int ringsLeft = rings.length;
@@ -146,9 +166,17 @@ public final class ArrivalReach {
 		long farthestKey = startKey;
 		BlockPos.Mutable c = new BlockPos.Mutable();
 
-		for (int k = 0; k <= maxCost && ringsLeft > 0; k++) {
+		// Once the outer ring is reached, the search runs on to this cost
+		// collecting exits, and keeps the one that best faces `toward`.
+		int deadline = -1;
+		double bestFacing = Double.NEGATIVE_INFINITY;
+		double tx = toward == null ? 0 : toward.getX() - sx;
+		double tz = toward == null ? 0 : toward.getZ() - sz;
+		double tLen = Math.hypot(tx, tz);
+
+		for (int k = 0; k <= maxCost && (ringsLeft > 0 || k <= deadline); k++) {
 			ArrayDeque<Long> bucket = buckets.get(k);
-			while (!bucket.isEmpty() && ringsLeft > 0) {
+			while (!bucket.isEmpty()) {
 				long key = bucket.poll();
 				if (best.get(key) != k) {
 					continue; // stale entry, already reached cheaper
@@ -158,15 +186,25 @@ public final class ArrivalReach {
 				int z = BlockPos.unpackLongZ(key);
 
 				double d = Math.hypot(x - sx, z - sz);
-				for (int r = 0; r < rings.length; r++) {
+				for (int r = 0; r < last; r++) {
 					if (cost[r] < 0 && d >= rings[r]) {
 						cost[r] = k;
 						ringsLeft--;
 						farthestKey = key;
 					}
 				}
-				if (ringsLeft == 0) {
-					break;
+				if (d >= outerRing) {
+					if (cost[last] < 0) {
+						cost[last] = k;
+						ringsLeft--;
+						deadline = k + slack;
+					}
+					double facing = tLen == 0 ? 0 : ((x - sx) * tx + (z - sz) * tz) / (d * tLen);
+					if (facing > bestFacing) {
+						bestFacing = facing;
+						farthestKey = key;
+					}
+					continue; // an exit; nothing past it is priced
 				}
 
 				for (int[] dir : DIRS) {
@@ -213,7 +251,7 @@ public final class ArrivalReach {
 				collectEdits(world, c, chain.get(i - 1), chain.get(i), path);
 			}
 		}
-		return new Result(rings, cost, hitUnloaded, best.size(), path);
+		return new Result(rings, cost, hitUnloaded, best.size(), path, BlockPos.fromLong(farthestKey));
 	}
 
 	/**

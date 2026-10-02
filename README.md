@@ -243,9 +243,12 @@ the rest. Both players get identical worlds; neither gets a vanilla one.
 - **A portal frame**, when the seed's own one does not pass
 - **A shipwreck's three chests**, when vanilla generated a half-wreck
   holding one
-- **A way out of a bad nether arrival**: the blocks on the cheapest path
-  out are mined or bridged, only when walking 96 blocks away would
-  otherwise take more than 10
+- **A way out of a bad nether arrival**: the blocks on a path out are
+  mined or bridged, only when walking 96 blocks away would otherwise
+  take more than 10 - counting lava that is about to flow, not just lava
+  already there. The path is the cheapest, or one facing the bastion
+  that costs a few blocks more. Checked again about 10 and 30 seconds
+  later, and a path that was opened is reopened if anything blocked it
 - **No hostile mobs or bats inside the opening structure**, so they do
   not pollute a pie-ray reading
 

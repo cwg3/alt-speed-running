@@ -445,7 +445,7 @@ between the two, which is what Divine Travel depends on.
 | Fortress within **16 chunks of that bastion** | built (filter) |
 | Open terrain paths between spawn, bastion and fortress | **not built** |
 | Nether arrival is not in Basalt Deltas | built (filter) |
-| Nether arrival has a way out: not buried, not a dead end, not an island in lava | built (checked a few seconds after arrival, cheapest path out opened only when unrunnable) — **[ours]**; calibrated on 2026-10-01 arrivals in a harness world, not yet fired in a live match |
+| Nether arrival has a way out: not buried, not a dead end, not an island in lava | built (checked a few seconds after arrival and twice more in the first half-minute, path out opened only when unrunnable, lava about to flow counted as lava) — **[ours]**; fired live once on 2026-10-01 and opened a path that lava then cut, see "Nether arrival terrain" |
 | Blaze rods: pity-capped and mirrored | built (6 per 12 kills, max 2-miss streak) — confirmed in a live match |
 | Bastion chests: 3 iron, 5 obsidian, 48–64 string, all four types | built — confirmed live on hoglin stable and bridge |
 | Hoglin porkchop drops normalised and mirrored | built — **player-credited kills only**, see below; still never fired in play |
@@ -676,6 +676,51 @@ walked away from cost at most 4; the dead end 20, the buried arrival 42.
 A small lava island the player bridged off in about a minute, and did
 not report, cost 36 - nothing separates it from the dead end, so it is
 caught too and gets its bridge.
+
+**The first live firing, and why it still failed (2026-10-01, v0.1.14).**
+A shipwreck arrival in a sealed cave pocket priced 17; the guard mined a
+tunnel that genuinely led out, and the player voted the seed bad. The
+saved match world and the replay showed why. A lavafall from a ceiling
+spring only starts running once something loads it - the arrival did -
+and its spread at the floor covered the portal exit, the one link
+between the pocket and the tunnel. The player stood on that block at
+405 seconds; it is lava in the saved world, and with the flowing lava
+removed the world walks out to 96 for nothing. The guard had priced a
+world in motion. Two smaller faults made it worse: the tunnel ran east
+while the bastion lay northwest, so the runner never met it, and the
+search took 4.7 seconds on the server thread.
+
+The fixes, all in `NetherArrival` and the new `ArrivalSnapshot`:
+
+- **Lava that is about to flow is lava.** The terrain is copied and the
+  copy flooded by vanilla's own spread rules at nether speed - falls
+  fall, a fall lands with full reach, sideways spread loses a level a
+  block and goes only toward the nearest drop within four when there is
+  one. A first version let lava spread every way; in a settled world it
+  flooded the ground the runner stood on and called it buried.
+- **The path faces the bastion** when an exit that way costs at most 6
+  more than the cheapest.
+- **Checked three times**: once the terrain loads, then about 10 and 30
+  seconds later. Once a pass has opened a path, a later pass reopens it
+  at any cost above zero, not only above 10 - the harness reproduction
+  of this arrival left a three-block detour round the lava, under 10 and
+  still the arrival the player gave up on.
+- **Off the server thread.** The terrain is copied a few chunks a tick
+  and searched on its own thread; only the edits happen on the server
+  thread, and an edit is skipped if lava has reached the block since the
+  copy or a player is standing in it.
+
+`ArrivalCheckHook` now also takes `flow <ticks>` - force the arrivals'
+chunks, let fluids run that long, and price again as the world stands -
+and `bastion <x> <z>`. Reproduced in the harness, the old guard's tunnel
+exits at the same block as the live one and, after the flow, needs three
+blocks dug round the lava; the new guard's path walks out for nothing
+after the same flow.
+
+Re-run on all eleven arrivals with 1200 ticks of flow: the seven the
+player walked out of are still left alone (lava prediction moved one
+from 1 to 4); the dead end, the buried arrival, the island and this one
+are all opened, and after the flow each walks out for at most 1.
 
 **The match nether used to be a hybrid of both seeds.** The generator
 got `netherSeed`, but vanilla carved caves, built the surface and placed
