@@ -256,13 +256,20 @@ public final class NetherArrival {
 		nether.getChunkManager().addTicket(TICKET, chunk, LOAD_RADIUS, chunk);
 	}
 
+	/**
+	 * Whether the copy will find every chunk it needs. Asks the same
+	 * question ArrivalSnapshot does: in 0.1.16 this asked isChunkLoaded,
+	 * which says yes a little before getWorldChunk hands the chunk over,
+	 * so the first pass copied half-loaded terrain, could not price past
+	 * 48 blocks, and left the arrival to the pass ten seconds later.
+	 */
 	private static boolean allLoaded(ServerWorld nether, BlockPos at) {
 		int cx = at.getX() >> 4;
 		int cz = at.getZ() >> 4;
 		int r = (RINGS[RINGS.length - 1] >> 4) + 1;
 		for (int dx = -r; dx <= r; dx++) {
 			for (int dz = -r; dz <= r; dz++) {
-				if (!nether.getChunkManager().isChunkLoaded(cx + dx, cz + dz)) {
+				if (nether.getChunkManager().getWorldChunk(cx + dx, cz + dz) == null) {
 					return false;
 				}
 			}
