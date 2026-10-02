@@ -29,6 +29,27 @@ import java.nio.file.Paths;
 public class ArrivalCheckHook implements DedicatedServerModInitializer {
 	public static final int[] RINGS = {16, 32, 48, 64, 96};
 
+	private static void quietCheck(ServerWorld world, BlockPos at) {
+		com.speedrunmcalt.match.MatchState.quietBox = new net.minecraft.util.math.BlockBox(
+				at.getX() - 10, at.getY() - 5, at.getZ() - 10, at.getX() + 10, at.getY() + 20, at.getZ() + 10);
+		net.minecraft.entity.EntityType<?>[] types = {
+				net.minecraft.entity.EntityType.ZOMBIE, net.minecraft.entity.EntityType.HUSK,
+				net.minecraft.entity.EntityType.BAT};
+		for (BlockPos pos : new BlockPos[] {at, at.add(40, 0, 0)}) {
+			for (net.minecraft.entity.EntityType<?> type : types) {
+				net.minecraft.entity.mob.MobEntity mob =
+						(net.minecraft.entity.mob.MobEntity) type.create(world);
+				mob.refreshPositionAndAngles(pos, 0, 0);
+				boolean ok = mob.canSpawn(world, net.minecraft.entity.SpawnReason.NATURAL);
+				SpeedrunMcAlt.LOGGER.info("[arrival] quiet {} at {} ({} the box): canSpawn={}",
+						net.minecraft.util.registry.Registry.ENTITY_TYPE.getId(type).getPath(),
+						pos.getX() + "," + pos.getY() + "," + pos.getZ(),
+						com.speedrunmcalt.match.MatchState.quietBox.contains(pos) ? "inside" : "outside", ok);
+			}
+		}
+		com.speedrunmcalt.match.MatchState.quietBox = null;
+	}
+
 	private static void appendCosts(StringBuilder row, ArrivalReach.Result r) {
 		for (int c : r.cost) {
 			row.append(',').append(c);
@@ -62,6 +83,14 @@ public class ArrivalCheckHook implements DedicatedServerModInitializer {
 						// "flow <ticks>": after pricing, let fluids run
 						// this long and price again.
 						flowTicks = Integer.parseInt(p[1]);
+						continue;
+					}
+					if (p[0].equals("quiet") && p.length >= 4) {
+						// "quiet x y z": set a quiet box round x,y,z and ask
+						// whether a zombie, a husk and a bat may spawn there
+						// naturally, then 40 blocks outside it.
+						quietCheck(server.getWorld(World.OVERWORLD), new BlockPos(Integer.parseInt(p[1]),
+								Integer.parseInt(p[2]), Integer.parseInt(p[3])));
 						continue;
 					}
 					if (p[0].equals("bastion") && p.length >= 3) {

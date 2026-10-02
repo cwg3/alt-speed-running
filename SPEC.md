@@ -168,7 +168,7 @@ worth blocking this on.
 | Flint drops mirrored between players (same gravel-break count) | built (2 per 20 breaks = vanilla 10%, flint guaranteed within 10) — never fired in play |
 | Villager trades locked and identical between worlds | **out of scope** — see below |
 | Drowned never spawn holding a trident | built — **needs runners**, not self-testable, see below |
-| No hostile mobs or bats inside desert temples (keeps pie-ray clean) | built — but see below, reported broken in play twice |
+| No hostile mobs or bats inside desert temples (keeps pie-ray clean) | built — but see below: reported broken in play three times; the third was the mixin itself, fixed 2026-10-02 |
 | Suspicious stew never applies a harmful effect | built — never fired in play |
 | Craftable soups never poisonous | satisfied by vanilla — mushroom stew, rabbit stew and beetroot soup carry no effects at all |
 | Food guarantees count only food worth eating | built — rotten flesh counts at a desert temple and nowhere else |
@@ -281,10 +281,20 @@ smithless villages reaching live matches settled that trade.
 Same failure as everywhere else in this document: **a proxy was
 checked instead of the thing itself.**
 
-**Temple mobs: the box was in the wrong place, twice.** The suppression
-mixin was correct from the start — it cancels natural and
-chunk-generation spawns for hostiles and bats inside the temple. What
-was wrong is where it thought the temple was.
+**Temple mobs: the box was in the wrong place, twice - and then the
+mixin was not running at all.** The two box fixes below were real, but
+the mixin was not "correct from the start", as this section used to
+say. It hooked `MobEntity.canSpawn`, and every hostile mob is a
+`PathAwareEntity`, which overrides that method without calling super.
+So the hook only ever ran for bats. The player kept meeting mobs in
+desert temples after the box was right (2026-10-02); it was put down to
+the darkness, which is why they spawn and not why they were let in.
+`TempleSpawnMixin` now targets `PathAwareEntity` too. Checked in the
+harness (`quiet x y z` in `ArrivalCheckHook`): inside the box, zombie
+and husk went from allowed to refused, bat stayed refused; outside it,
+all three are allowed as before.
+
+The box history:
 
 `MatchState.templeBox` was set from the *predicted* structure box. That
 prediction is exact in X and Z and unreliable in Y: one measured temple
