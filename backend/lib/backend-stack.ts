@@ -112,6 +112,13 @@ export class BackendStack extends cdk.Stack {
 			timeToLiveAttribute: 'expiresAt',
 		});
 
+		// Every function that settles a match runs applyMatchCompletion,
+		// several writes in a row, and on Lambda's 3 s default a cold start
+		// plus a settle timed out mid-request (2026-10-02, Race a Pace
+		// settling a left-behind match). Cut off part-way, a match can be
+		// left half-scored. These are the functions that can settle one.
+		const MATCH_WRITE_TIMEOUT = cdk.Duration.seconds(10);
+
 		const verifySessionFn = new NodejsFunction(this, 'VerifySessionFunction', {
 			entry: path.join(__dirname, '..', 'lambda', 'verifySession.ts'),
 			runtime: Runtime.NODEJS_24_X,
@@ -217,6 +224,7 @@ export class BackendStack extends cdk.Stack {
 			entry: path.join(__dirname, '..', 'lambda', 'queueJoin.ts'),
 			runtime: Runtime.NODEJS_24_X,
 			handler: 'handler',
+			timeout: MATCH_WRITE_TIMEOUT,
 			environment: {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				PLAYERS_TABLE_NAME: playersTable.tableName,
@@ -279,6 +287,7 @@ export class BackendStack extends cdk.Stack {
 			entry: path.join(__dirname, '..', 'lambda', 'completeMatch.ts'),
 			runtime: Runtime.NODEJS_24_X,
 			handler: 'handler',
+			timeout: MATCH_WRITE_TIMEOUT,
 			environment: {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				PLAYERS_TABLE_NAME: playersTable.tableName,
@@ -331,6 +340,7 @@ export class BackendStack extends cdk.Stack {
 			entry: path.join(__dirname, '..', 'lambda', 'liveMatch.ts'),
 			runtime: Runtime.NODEJS_24_X,
 			handler: 'handler',
+			timeout: MATCH_WRITE_TIMEOUT,
 			environment: {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
@@ -364,6 +374,7 @@ export class BackendStack extends cdk.Stack {
 			entry: path.join(__dirname, '..', 'lambda', 'pacedMatch.ts'),
 			runtime: Runtime.NODEJS_24_X,
 			handler: 'handler',
+			timeout: MATCH_WRITE_TIMEOUT,
 			environment: {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				PLAYERS_TABLE_NAME: playersTable.tableName,
@@ -424,6 +435,7 @@ export class BackendStack extends cdk.Stack {
 			entry: path.join(__dirname, '..', 'lambda', 'badSeed.ts'),
 			runtime: Runtime.NODEJS_24_X,
 			handler: 'handler',
+			timeout: MATCH_WRITE_TIMEOUT,
 			environment: {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				MATCHES_TABLE_NAME: matchesTable.tableName,
@@ -449,6 +461,7 @@ export class BackendStack extends cdk.Stack {
 			entry: path.join(__dirname, '..', 'lambda', 'forfeitMatch.ts'),
 			runtime: Runtime.NODEJS_24_X,
 			handler: 'handler',
+			timeout: MATCH_WRITE_TIMEOUT,
 			environment: {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				PLAYERS_TABLE_NAME: playersTable.tableName,
