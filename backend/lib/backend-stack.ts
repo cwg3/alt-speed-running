@@ -116,6 +116,10 @@ export class BackendStack extends cdk.Stack {
 			entry: path.join(__dirname, '..', 'lambda', 'verifySession.ts'),
 			runtime: Runtime.NODEJS_24_X,
 			handler: 'handler',
+			// Waits on Mojang's session server. On the 3 s default a cold
+			// start took 2.7 s and the next one timed out (2026-10-02),
+			// and a timed-out login is "connection failed" at the menu.
+			timeout: cdk.Duration.seconds(15),
 			environment: {
 				PLAYERS_TABLE_NAME: playersTable.tableName,
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
