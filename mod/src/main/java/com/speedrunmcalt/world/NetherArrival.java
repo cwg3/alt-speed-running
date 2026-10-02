@@ -153,6 +153,7 @@ public final class NetherArrival {
 		boolean opened = false;
 		ArrivalSnapshot copying;
 		long copyNanos;
+		long longestCopyNanos;
 		int copyTicks;
 		CompletableFuture<Measured> searching;
 
@@ -202,8 +203,9 @@ public final class NetherArrival {
 			job.searching = null;
 			if (m != null) {
 				job.opened |= apply(nether, job.at, m, job.opened ? 0 : TOLERANCE,
-						String.format("pass %d, copied in %d ms over %d ticks, after %d ticks",
-								job.pass + 1, job.copyNanos / 1_000_000, job.copyTicks, job.waited));
+						String.format("pass %d, copied in %d ms over %d ticks, longest %d ms, after %d ticks",
+								job.pass + 1, job.copyNanos / 1_000_000, job.copyTicks,
+								job.longestCopyNanos / 1_000_000, job.waited));
 			}
 			job.pass++;
 			if (job.pass > RECHECK_AFTER.length) {
@@ -229,12 +231,15 @@ public final class NetherArrival {
 			}
 			job.copying = new ArrivalSnapshot(job.at, COPY_RADIUS, COPY_Y_BAND);
 			job.copyNanos = 0;
+			job.longestCopyNanos = 0;
 			job.copyTicks = 0;
 		}
 
 		long started = System.nanoTime();
 		boolean copied = job.copying.copySome(nether, COPY_BUDGET_NANOS, false);
-		job.copyNanos += System.nanoTime() - started;
+		long took = System.nanoTime() - started;
+		job.copyNanos += took;
+		job.longestCopyNanos = Math.max(job.longestCopyNanos, took);
 		job.copyTicks++;
 		if (!copied) {
 			return;

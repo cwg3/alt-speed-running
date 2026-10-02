@@ -98,8 +98,15 @@ public final class ArrivalSnapshot implements BlockView {
 			int i = nextChunk++;
 			int cx = chunkMinX + i % chunksX;
 			int cz = chunkMinZ + i / chunksX;
-			if (generate || world.getChunkManager().isChunkLoaded(cx, cz)) {
-				copyChunk(world.getChunk(cx, cz), cx, cz, m);
+			// getWorldChunk, not world.getChunk: on the server thread
+			// getChunk waits for the chunk and runs the server's queued
+			// tasks while it does, which is where a first copy on
+			// 2026-10-02 lost 5 seconds - over a budget of 8 ms a tick.
+			// getWorldChunk hands back only what is already finished.
+			WorldChunk chunk = generate ? world.getChunk(cx, cz)
+					: world.getChunkManager().getWorldChunk(cx, cz);
+			if (chunk != null) {
+				copyChunk(chunk, cx, cz, m);
 				loadedChunk[i] = true;
 			}
 			if (System.nanoTime() - started >= budgetNanos) {
