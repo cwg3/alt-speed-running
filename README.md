@@ -173,8 +173,9 @@ does not work here, deliberately.
   bastion → fortress
 - All four bastion types are eligible. The type is recorded, not
   filtered out
-- Your arrival is never in Basalt Deltas, and if it would put you on a
-  sliver of netherrack over open lava, a small pad is placed
+- Your arrival is never in Basalt Deltas, and if it would leave you
+  sealed in netherrack, at a dead end, or on an island in lava, the
+  cheapest way out is opened for you
 
 Not built: nothing checks that the terrain **between** spawn, bastion
 and fortress is walkable. You can be walled off and have to route
@@ -242,8 +243,9 @@ the rest. Both players get identical worlds; neither gets a vanilla one.
 - **A portal frame**, when the seed's own one does not pass
 - **A shipwreck's three chests**, when vanilla generated a half-wreck
   holding one
-- **A nether arrival pad**, only when the arrival is otherwise
-  unstandable
+- **A way out of a bad nether arrival**: the blocks on the cheapest path
+  out are mined or bridged, only when walking 96 blocks away would
+  otherwise take more than 10
 - **No hostile mobs or bats inside the opening structure**, so they do
   not pollute a pie-ray reading
 
