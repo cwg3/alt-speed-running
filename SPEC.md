@@ -59,7 +59,7 @@ code. Current departures:
 | ruined portal route | lava and water always available | 80/20 obsidian vs bucket |
 | seed type mix | even, 40 of each | unspecified |
 | wither skeleton crowding | max 4 within 12 blocks | unspecified |
-| nether arrival pad | built when <10% of nearby ground is standable | unspecified |
+| nether arrival way out | opened when walking 96 blocks out costs more than 10 blocks mined or placed | unspecified |
 
 The even type mix is the one most likely to be wrong. It means a
 quarter of matches open on buried treasure, which needs a technique
@@ -445,7 +445,7 @@ between the two, which is what Divine Travel depends on.
 | Fortress within **16 chunks of that bastion** | built (filter) |
 | Open terrain paths between spawn, bastion and fortress | **not built** |
 | Nether arrival is not in Basalt Deltas | built (filter) |
-| Nether arrival has usable ground, not an open lava sea | built (checked on arrival, pad placed only when unrunnable) — **[ours]**; never fired in play |
+| Nether arrival has a way out: not buried, not a dead end, not an island in lava | built (checked a few seconds after arrival, cheapest path out opened only when unrunnable) — **[ours]**; calibrated on 2026-10-01 arrivals in a harness world, not yet fired in a live match |
 | Blaze rods: pity-capped and mirrored | built (6 per 12 kills, max 2-miss streak) — confirmed in a live match |
 | Bastion chests: 3 iron, 5 obsidian, 48–64 string, all four types | built — confirmed live on hoglin stable and bridge |
 | Hoglin porkchop drops normalised and mirrored | built — **player-credited kills only**, see below; still never fired in play |
@@ -648,10 +648,44 @@ sea, which happened in testing.
 
 cubiomes cannot see terrain, so checking it means generating the nether
 spawn chunks for every candidate - a cost every type would pay, not
-just the ocean ones that already generate worlds. The alternative,
-consistent with how lava pools and portals are handled, is to place a
-small platform when the arrival point has nothing usable. Neither is
-built.
+just the ocean ones that already generate worlds - and the arrival
+point depends on where the player builds their portal anyway. So it is
+handled at arrival instead, consistent with how lava pools and portals
+are handled.
+
+The first version counted standable ground in a 17x17 square and built
+a netherrack pad when there was almost none. On 2026-10-01 it fired
+twice in play and missed both arrivals the player reported: one sealed
+in netherrack, where it fired but the pad (which only fills lava and
+air) changed nothing, and a dead end that passed easily - the ground
+was there, it just led nowhere after about 60 blocks.
+
+The current check (`NetherArrival`, `ArrivalReach`) asks whether the
+player can walk OUT. It searches from the arrival the way a runner
+moves - step up one, drop up to six, mine a block, place a block to
+bridge - and prices rings at 16, 32, 48, 64 and 96 blocks in blocks
+mined or placed. Over 10 at 96 blocks, it makes exactly the edits on
+the cheapest path out and nothing else. The terrain 96 blocks out does
+not exist yet when the player steps through, so it is requested in the
+background and the check runs once it has loaded; if it never all
+loads, an arrival that only looks bad because of the missing terrain is
+left alone.
+
+Calibrated on the ten arrivals played that day. Every one the player
+walked away from cost at most 4; the dead end 20, the buried arrival 42.
+A small lava island the player bridged off in about a minute, and did
+not report, cost 36 - nothing separates it from the dead end, so it is
+caught too and gets its bridge.
+
+**Harness worlds must be built like match worlds.** A match nether is
+not the nether of `netherSeed`: the generator gets `netherSeed`, but
+vanilla runs carvers and features with `world.getSeed()`, the
+overworld's - the same bug `NetherStructureSeedMixin` fixes for
+structures. Priced in a one-seed world, an arrival the player had walked
+straight out of, down a carved tunnel, came back as sealed in netherrack.
+`HarnessNetherSeedMixin` gives a dedicated server the match's split:
+`level-seed` is the overworld seed and `nethergen.txt` holds the nether
+seed. `ArrivalCheckHook` prices arrivals listed in `arrival.txt`.
 
 **Predicted structure Y is not usable, and the code now says so.**
 A structure's start is built before terrain exists, so its X and Z are

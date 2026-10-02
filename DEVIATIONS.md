@@ -109,8 +109,12 @@ world creation, the mod places one.
 **What the mod places.** Lava pools about two chunks out on village and
 temple seeds; lava and water at a ruined portal, so both the obsidian
 and the bucket route are open; a shipwreck's missing chests, when
-vanilla generated a half-wreck; a small landing pad, only when the
-nether arrival has no standable ground.
+vanilla generated a half-wreck; and at a nether arrival that has no way
+out - sealed in netherrack, a dead end, or an island in lava - the
+cheapest path out: the blocks a runner would have had to mine are
+removed and the gaps they would have had to bridge are filled with
+netherrack. Nothing else around the arrival changes, and an arrival you
+can walk away from is never touched.
 
 **Chest loot is topped up to a floor.** The loot table rolls normally
 and only the shortfall is added, so a good roll stays a good roll:

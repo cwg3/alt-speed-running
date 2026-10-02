@@ -19,6 +19,7 @@
 		],
 		"server": [
 			"com.speedrunmcalt.debug.NetherLocateHook",
+			"com.speedrunmcalt.debug.ArrivalCheckHook",
 			"com.speedrunmcalt.debug.RouteCheckHook",
 			"com.speedrunmcalt.debug.PortalFilterHook",
 			"com.speedrunmcalt.debug.SpawnResourceHook",

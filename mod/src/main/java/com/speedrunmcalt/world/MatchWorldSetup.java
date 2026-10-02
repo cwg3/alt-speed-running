@@ -101,11 +101,10 @@ public final class MatchWorldSetup {
 		if (!MatchState.replayMode && !MatchState.netherArrivalChecked) {
 			ServerWorld netherWorld = server.getWorld(World.NETHER);
 			if (netherWorld != null && !netherWorld.getPlayers().isEmpty()) {
-				MatchState.netherArrivalChecked = true;
 				try {
-					NetherArrival.ensureRunnable(netherWorld,
-							netherWorld.getPlayers().get(0).getBlockPos());
+					NetherArrival.tick(netherWorld, netherWorld.getPlayers().get(0).getBlockPos());
 				} catch (Exception e) {
+					MatchState.netherArrivalChecked = true;
 					SpeedrunMcAlt.LOGGER.error("[speedrunmcalt] Nether arrival check failed", e);
 				}
 			}
