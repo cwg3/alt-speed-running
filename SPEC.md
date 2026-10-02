@@ -445,7 +445,7 @@ between the two, which is what Divine Travel depends on.
 | Fortress within **16 chunks of that bastion** | built (filter) |
 | Open terrain paths between spawn, bastion and fortress | **not built** |
 | Nether arrival is not in Basalt Deltas | built (filter) |
-| Nether arrival has a way out: not buried, not a dead end, not an island in lava | built (checked a few seconds after arrival and twice more in the first half-minute, path out opened only when unrunnable, lava about to flow counted as lava) — **[ours]**; fired live once on 2026-10-01 and opened a path that lava then cut, see "Nether arrival terrain" |
+| Nether arrival has a way out: not buried, not a dead end, not an island in lava | built (a quick 48-block look as soon as that loads, the full look once all has, and twice more in the first half-minute, path out opened only when unrunnable, lava about to flow counted as lava) — **[ours]**; fired live once on 2026-10-01 and opened a path that lava then cut, see "Nether arrival terrain" |
 | Blaze rods: pity-capped and mirrored | built (6 per 12 kills, max 2-miss streak) — confirmed in a live match |
 | Bastion chests: 3 iron, 5 obsidian, 48–64 string, all four types | built — confirmed live on hoglin stable and bridge |
 | Hoglin porkchop drops normalised and mirrored | built — **player-credited kills only**, see below; confirmed in a live match 2026-10-02 (two kills dropped exactly the scheduled porkchops and hides) |
@@ -700,8 +700,14 @@ The fixes, all in `NetherArrival` and the new `ArrivalSnapshot`:
   flooded the ground the runner stood on and called it buried.
 - **The path faces the bastion** when an exit that way costs at most 6
   more than the cheapest.
-- **Checked three times**: once the terrain loads, then about 10 and 30
-  seconds later. Once a pass has opened a path, a later pass reopens it
+- **Checked four times**: a quick look out to 48 blocks as soon as that
+  terrain loads, the full 96-block look once all of it has, then again
+  about 10 and 30 seconds later. The quick look was added after the
+  first 0.1.17 arrival: loading all 96 blocks took ten seconds on the
+  player's machine and the search five more, so a bad arrival would
+  have been opened fifteen seconds in. Out to 48 it catches the buried
+  arrival, the island and the lavafall pocket; the dead end only shows
+  past 64, and the full look catches it as before. Once a pass has opened a path, a later pass reopens it
   at any cost above zero, not only above 10 - the harness reproduction
   of this arrival left a three-block detour round the lava, under 10 and
   still the arrival the player gave up on.

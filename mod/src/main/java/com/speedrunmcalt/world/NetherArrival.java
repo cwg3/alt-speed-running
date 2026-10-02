@@ -79,8 +79,8 @@ import java.util.concurrent.Executors;
  *     arrival loaded it, spread over the floor at the portal, and cut the
  *     pocket off from the tunnel. The check had read a world in motion.
  *     ArrivalSnapshot now floods the copy with the lava that is about to
- *     move before the search sees it, and the check runs again at
- *     RECHECK_AFTER in case anything else moved;
+ *     move before the search sees it, and the check runs again later
+ *     (PASS_DELAY) in case anything else moved;
  *   - the tunnel ran east and the bastion lay northwest, so a runner
  *     heading for the bastion never met it. The path now takes the exit
  *     facing the bastion when one costs at most SLACK more;
@@ -88,6 +88,15 @@ import java.util.concurrent.Executors;
  *     moment the runner most needs to move. The terrain is now copied a
  *     few chunks per tick and searched on its own thread; only the edits
  *     are made on the server thread.
+ *
+ * And from the first arrival on 0.1.17: waiting for all 96 blocks of
+ * terrain to load took ten seconds on the player's machine, and the
+ * search five more, so a bad arrival would have been opened about
+ * fifteen seconds in. The first pass is now a QUICK look, out to 48
+ * blocks, as soon as the terrain that far has loaded. On the ten
+ * calibration arrivals plus this one it catches the buried arrival, the
+ * island and the lavafall pocket; the dead end only shows past 64, and
+ * the full pass after it catches that as it did before.
  */
 public final class NetherArrival {
 	/** Ring distances priced, in blocks from the arrival. The last one decides. */
@@ -108,12 +117,17 @@ public final class NetherArrival {
 	/** Longest wait for that terrain before checking what has loaded. */
 	private static final int MAX_WAIT_TICKS = 200;
 
+	/** The quick first look: rings out to 48, from terrain that loads first. */
+	private static final int[] QUICK_RINGS = {16, 32, 48};
+	private static final int QUICK_COPY_RADIUS = 50;
+
 	/**
-	 * Ticks between passes after the first. A spring's fall and the
-	 * spread at its foot take seconds to run, so later passes see lava
-	 * the prediction missed, if any did.
+	 * Ticks idle before each pass: the quick look, the full look as soon
+	 * as its terrain is in, then two rechecks. A spring's fall and the
+	 * spread at its foot take seconds to run, so the later passes see
+	 * lava the prediction missed, if any did.
 	 */
-	private static final int[] RECHECK_AFTER = {200, 400};
+	private static final int[] PASS_DELAY = {0, 0, 200, 400};
 
 	/**
 	 * Copy reach around the arrival. The search walks to one past the
@@ -203,16 +217,17 @@ public final class NetherArrival {
 			job.searching = null;
 			if (m != null) {
 				job.opened |= apply(nether, job.at, m, job.opened ? 0 : TOLERANCE,
-						String.format("pass %d, copied in %d ms over %d ticks, longest %d ms, after %d ticks",
-								job.pass + 1, job.copyNanos / 1_000_000, job.copyTicks,
+						String.format("%s, copied in %d ms over %d ticks, longest %d ms, after %d ticks",
+								job.pass == 0 ? "quick look" : "pass " + (job.pass + 1),
+								job.copyNanos / 1_000_000, job.copyTicks,
 								job.longestCopyNanos / 1_000_000, job.waited));
 			}
 			job.pass++;
-			if (job.pass > RECHECK_AFTER.length) {
+			if (job.pass >= PASS_DELAY.length) {
 				MatchState.netherArrivalChecked = true;
 				return;
 			}
-			job.idle = RECHECK_AFTER[job.pass - 1];
+			job.idle = PASS_DELAY[job.pass];
 			return;
 		}
 
@@ -221,15 +236,17 @@ public final class NetherArrival {
 				job.idle--;
 				return;
 			}
-			if (job.pass == 0) {
+			// The first two passes wait for their terrain; the rechecks
+			// take what is there, and ask for the rest to stay loaded.
+			if (job.pass <= 1) {
 				job.waited++;
-				if (!allLoaded(nether, job.at) && job.waited < MAX_WAIT_TICKS) {
+				if (!allLoaded(nether, job.at, copyRadius(job.pass)) && job.waited < MAX_WAIT_TICKS) {
 					return;
 				}
 			} else {
 				requestTerrain(nether, job.at);
 			}
-			job.copying = new ArrivalSnapshot(job.at, COPY_RADIUS, COPY_Y_BAND);
+			job.copying = new ArrivalSnapshot(job.at, copyRadius(job.pass), COPY_Y_BAND);
 			job.copyNanos = 0;
 			job.longestCopyNanos = 0;
 			job.copyTicks = 0;
@@ -248,7 +265,16 @@ public final class NetherArrival {
 		job.copying = null;
 		BlockPos at = job.at;
 		BlockPos toward = bastion(at);
-		job.searching = CompletableFuture.supplyAsync(() -> measure(snapshot, at, toward), EXECUTOR);
+		int[] rings = rings(job.pass);
+		job.searching = CompletableFuture.supplyAsync(() -> measure(snapshot, at, toward, rings), EXECUTOR);
+	}
+
+	private static int[] rings(int pass) {
+		return pass == 0 ? QUICK_RINGS : RINGS;
+	}
+
+	private static int copyRadius(int pass) {
+		return pass == 0 ? QUICK_COPY_RADIUS : COPY_RADIUS;
 	}
 
 	private static void requestTerrain(ServerWorld nether, BlockPos at) {
@@ -263,13 +289,10 @@ public final class NetherArrival {
 	 * so the first pass copied half-loaded terrain, could not price past
 	 * 48 blocks, and left the arrival to the pass ten seconds later.
 	 */
-	private static boolean allLoaded(ServerWorld nether, BlockPos at) {
-		int cx = at.getX() >> 4;
-		int cz = at.getZ() >> 4;
-		int r = (RINGS[RINGS.length - 1] >> 4) + 1;
-		for (int dx = -r; dx <= r; dx++) {
-			for (int dz = -r; dz <= r; dz++) {
-				if (nether.getChunkManager().getWorldChunk(cx + dx, cz + dz) == null) {
+	private static boolean allLoaded(ServerWorld nether, BlockPos at, int radius) {
+		for (int cx = (at.getX() - radius) >> 4; cx <= (at.getX() + radius) >> 4; cx++) {
+			for (int cz = (at.getZ() - radius) >> 4; cz <= (at.getZ() + radius) >> 4; cz++) {
+				if (nether.getChunkManager().getWorldChunk(cx, cz) == null) {
 					return false;
 				}
 			}
@@ -286,10 +309,10 @@ public final class NetherArrival {
 	}
 
 	/** Search thread: predict the lava, then price the way out. */
-	private static Measured measure(ArrivalSnapshot snapshot, BlockPos at, BlockPos toward) {
+	private static Measured measure(ArrivalSnapshot snapshot, BlockPos at, BlockPos toward, int[] rings) {
 		long started = System.currentTimeMillis();
 		snapshot.predictLava();
-		ArrivalReach.Result r = ArrivalReach.measure(snapshot, at, RINGS, MAX_COST,
+		ArrivalReach.Result r = ArrivalReach.measure(snapshot, at, rings, MAX_COST,
 				snapshot::isLoaded, toward, SLACK);
 		return new Measured(r, snapshot.predicted, System.currentTimeMillis() - started);
 	}
@@ -300,12 +323,18 @@ public final class NetherArrival {
 	 * generates any terrain that is missing.
 	 */
 	public static void check(ServerWorld nether, BlockPos at, int waited) {
-		long started = System.currentTimeMillis();
-		ArrivalSnapshot snapshot = new ArrivalSnapshot(at, COPY_RADIUS, COPY_Y_BAND);
-		snapshot.copySome(nether, Long.MAX_VALUE, true);
-		long copyMs = System.currentTimeMillis() - started;
-		apply(nether, at, measure(snapshot, at, bastion(at)), TOLERANCE,
-				String.format("harness, copied in %d ms, after %d ticks", copyMs, waited));
+		// The quick look, then the full one, as a live arrival gets them.
+		boolean opened = false;
+		for (int pass = 0; pass <= 1; pass++) {
+			long started = System.currentTimeMillis();
+			ArrivalSnapshot snapshot = new ArrivalSnapshot(at, copyRadius(pass), COPY_Y_BAND);
+			snapshot.copySome(nether, Long.MAX_VALUE, true);
+			long copyMs = System.currentTimeMillis() - started;
+			opened |= apply(nether, at, measure(snapshot, at, bastion(at), rings(pass)),
+					opened ? 0 : TOLERANCE,
+					String.format("harness %s, copied in %d ms, after %d ticks",
+							pass == 0 ? "quick look" : "full look", copyMs, waited));
+		}
 	}
 
 	/**

@@ -247,8 +247,10 @@ the rest. Both players get identical worlds; neither gets a vanilla one.
   mined or bridged, only when walking 96 blocks away would otherwise
   take more than 10 - counting lava that is about to flow, not just lava
   already there. The path is the cheapest, or one facing the bastion
-  that costs a few blocks more. Checked again about 10 and 30 seconds
-  later, and a path that was opened is reopened if anything blocked it
+  that costs a few blocks more. A quick look 48 blocks out comes first,
+  as soon as that terrain loads; the full 96-block check follows, then
+  two more about 10 and 30 seconds later, and a path that was opened is
+  reopened if anything blocked it
 - **No hostile mobs or bats inside the opening structure**, so they do
   not pollute a pie-ray reading
 
