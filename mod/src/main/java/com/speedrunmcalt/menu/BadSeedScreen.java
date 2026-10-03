@@ -47,6 +47,22 @@ public class BadSeedScreen extends Screen {
 	 */
 	private TextFieldWidget reason;
 
+	/*
+	 * One column, laid out top to bottom from top(). The explanation and
+	 * the field used to be placed from two different anchors - the text
+	 * from height/2 - 52, the field and its label from height/2 - 18 -
+	 * and the last two lines of text landed on the label and the box.
+	 */
+	private static final int LABEL_Y = 66;
+	private static final int FIELD_Y = 78;
+	private static final int CANCEL_Y = 104;
+	private static final int VOTE_Y = 128;
+	private static final int COLUMN_HEIGHT = 148;
+
+	private int top() {
+		return Math.max(4, (this.height - COLUMN_HEIGHT) / 2);
+	}
+
 	public BadSeedScreen(Screen parent, boolean agreeing) {
 		super(new LiteralText("Bad seed"));
 		this.parent = parent;
@@ -56,8 +72,9 @@ public class BadSeedScreen extends Screen {
 	@Override
 	protected void init() {
 		int cx = this.width / 2;
+		int top = top();
 
-		reason = new TextFieldWidget(this.textRenderer, cx - 100, this.height / 2 - 6, 200, 18,
+		reason = new TextFieldWidget(this.textRenderer, cx - 100, top + FIELD_Y, 200, 18,
 				new LiteralText("Reason"));
 		// The backend truncates at 200; stopping here means the player
 		// sees what will actually be stored.
@@ -66,10 +83,10 @@ public class BadSeedScreen extends Screen {
 		this.addButton(reason);
 		this.setInitialFocus(reason);
 
-		this.addButton(new ButtonWidget(cx - 100, this.height / 2 + 22, 200, 20,
+		this.addButton(new ButtonWidget(cx - 100, top + CANCEL_Y, 200, 20,
 				new LiteralText(agreeing ? "Keep playing" : "Cancel"),
 				b -> this.client.openScreen(parent)));
-		this.addButton(new ButtonWidget(cx - 100, this.height / 2 + 46, 200, 20,
+		this.addButton(new ButtonWidget(cx - 100, top + VOTE_Y, 200, 20,
 				new LiteralText(agreeing ? "Agree - void this match" : "Vote: seed is unplayable"),
 				b -> {
 					BadSeedVote.cast(reason.getText().trim());
@@ -92,7 +109,7 @@ public class BadSeedScreen extends Screen {
 	public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
 		this.renderBackground(matrices);
 		int cx = this.width / 2;
-		int y = this.height / 2 - 52;
+		int y = top();
 
 		if (agreeing) {
 			String who = MatchState.opponentUsername == null
@@ -127,7 +144,7 @@ public class BadSeedScreen extends Screen {
 		// and a focused text box is quiet next to a lit button.
 		drawCenteredText(matrices, this.textRenderer,
 				new LiteralText("Reason (optional) - one line helps us fix the filter"),
-				cx, this.height / 2 - 18, ALERT);
+				cx, y + LABEL_Y, ALERT);
 
 		super.render(matrices, mouseX, mouseY, delta);
 	}
