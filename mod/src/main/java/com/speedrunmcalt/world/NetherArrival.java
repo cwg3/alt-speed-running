@@ -111,8 +111,16 @@ public final class NetherArrival {
 	/** Extra edits worth paying for an exit that faces the bastion. */
 	private static final int SLACK = 6;
 
-	/** Chunk radius requested around the arrival: covers the outer ring. */
-	private static final int LOAD_RADIUS = 7;
+	/**
+	 * Chunk radius requested around the arrival. The copy needs chunks
+	 * up to 7 away, but it reads them through getWorldChunk, which only
+	 * hands over TICKING chunks, and a ticket's outermost ring is loaded
+	 * as a border chunk that never ticks. At 7 the full look waited out
+	 * all 200 ticks for chunks that could not arrive, then left three
+	 * arrivals in one evening (2026-10-02) to the recheck half a minute
+	 * later. 8 makes the ring the copy needs a ticking one.
+	 */
+	private static final int LOAD_RADIUS = 8;
 
 	/** Longest wait for that terrain before checking what has loaded. */
 	private static final int MAX_WAIT_TICKS = 200;
