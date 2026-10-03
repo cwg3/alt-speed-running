@@ -782,8 +782,19 @@ record_released({t: (rows.get(t, {}).get('released') or 0)
 # of the reporting step is the exact failure the reporting step exists to
 # prevent, and it survived a dry run (which stops earlier) and a unit
 # test of this block alone (which never went through the shell).
+#
+# stalled was decided BEFORE the build, from the last run. A type this run
+# went on to close is at the floor now, and naming it NOT CONVERGING puts
+# a false alarm first in the subject, worded exactly like the real one.
+# Only a type that was parked AND is still short after this build stays.
 parts = []
-stalled = [t for t in plan.get('stalled') or [] if t in plan['targets']]
+short_now = {t for t, _ in still_short}
+stalled_before = [t for t in plan.get('stalled') or [] if t in plan['targets']]
+stalled = [t for t in stalled_before if t in short_now]
+closed = [t for t in stalled_before if t not in short_now]
+if closed:
+    print()
+    print('  was not closing before this run, closed by it: ' + ', '.join(closed))
 if stalled:
     parts.append('NOT CONVERGING: ' + ', '.join(stalled))
 if still_short:
