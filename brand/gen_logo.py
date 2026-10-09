@@ -99,6 +99,32 @@ def upscaled_mask(rows, width, height, scale, pad):
     return small.resize((small.width * scale, small.height * scale), Image.NEAREST)
 
 
+def bold_rows(rows, width, height):
+    """Every lit glyph pixel also lights the one right of it, below it
+    and diagonally - one glyph pixel heavier in both directions. The
+    letters are LETTER_GAP apart, so a gap of 2 closes to 1 and none
+    touch.
+
+    The result is one cell wider and taller than the input. Growing
+    into a grid the same size as the glyphs threw away the new bottom
+    row and right column, which shaved the base off every letter.
+    """
+    out = [[False] * (width + 1) for _ in range(height + 1)]
+    for y in range(height):
+        for x in range(width):
+            if rows[y][x]:
+                for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                    out[y + dy][x + dx] = True
+    return out
+
+
+def flat(mask):
+    """Phosphor strokes and nothing else: alpha is the mask itself."""
+    out = Image.new("RGBA", mask.size, PHOSPHOR + (0,))
+    out.putalpha(mask)
+    return out
+
+
 def bloom_layer(mask, radius, gain):
     glow = Image.new("RGB", mask.size, (0, 0, 0))
     glow.paste(Image.new("RGB", mask.size, PHOSPHOR), mask=mask)
@@ -186,7 +212,27 @@ def main():
     tile.paste(art, ((256 - art.width) // 2, (256 - art.height) // 2))
     crt(tile, transparent=False).save(f"{out_dir}/logo_square.png")
 
-    print("wrote logo_alt.png, logo_alt_preview.png, icon.png, logo_square.png")
+    # The in-game HUD's wordmark: bold and FLAT. The HUD draws "alt"
+    # about 16 GUI pixels tall over the open world, where logo_alt.png's
+    # glow - meant for a dark screen - read as a dirty outline round the
+    # letters, and thickening it by drawing that texture several times
+    # stacked the glow up into a hard fringe. The weight is built into
+    # the pixels instead.
+    #
+    # Same pixel grid and padding as logo_alt.png, so the two have the
+    # same aspect and line up the same way. Scale 2 because the HUD
+    # shows it about 60-100 screen pixels tall: close to 1:1, so the
+    # game is not shrinking hard pixel edges into mush.
+    # The bold grid is one cell bigger, which would make the canvas one
+    # cell bigger too; the extra cell comes out of the right and bottom
+    # padding instead, so the size - and the aspect the game assumes -
+    # stays the same as logo_alt.png's.
+    bold = bold_rows(rows, w, h)
+    hud = upscaled_mask(bold, w + 1, h + 1, scale=2, pad=4)
+    hud = hud.crop((0, 0, (w + 8) * 2, (h + 8) * 2))
+    flat(hud).save(f"{out_dir}/logo_alt_hud.png")
+
+    print("wrote logo_alt.png, logo_alt_preview.png, icon.png, logo_square.png, logo_alt_hud.png")
 
 
 if __name__ == "__main__":

@@ -35,6 +35,11 @@ public final class MatchHud {
 	private static final int X = 6;
 	private static final int Y = 6;
 	private static final int LINE = 10;
+	/**
+	 * The live clock's size. 2x with milliseconds on it was wider than
+	 * the rest of the panel and drowned out the logo beside it.
+	 */
+	private static final float CLOCK_SCALE = 1.5f;
 
 	// Split order for display. Kept here rather than derived from the
 	// maps so rows stay in run order even when a split hasn't happened
@@ -446,112 +451,74 @@ public final class MatchHud {
 				// line simply disappears and nothing replaces it until
 				// the match world finishes loading.
 				//
-				// Drawn in three pieces like the menu's version: the
+				// Drawn in pieces like the menu's version: the
 				// opponent's NAME in yellow, the sentence around it in
 				// purple. It is the one word being looked for.
-				int x = X + client.textRenderer.getWidth("alt  ");
-				drawShadowed(matrices, client, "alt", X, Y,
-						com.speedrunmcalt.menu.Palette.PHOSPHOR);
-				String lead = "match found vs ";
-				String name = com.speedrunmcalt.menu.Matchmaker.opponent();
-				drawShadowed(matrices, client, lead, x, Y,
-						com.speedrunmcalt.menu.Palette.PURPLE);
-				x += client.textRenderer.getWidth(lead);
+				//
 				// A pace keeps its yellow word and cyan time here too.
 				// This overlay and the menu's MATCH FOUND screen announce
 				// the same match to the same player seconds apart, and
 				// only one of them was saying which kind of opponent it
 				// was.
+				String name = com.speedrunmcalt.menu.Matchmaker.opponent();
 				String[] found = com.speedrunmcalt.menu.Palette.paceParts(name);
 				if (found == null) {
-					drawShadowed(matrices, client, name, x, Y,
-							com.speedrunmcalt.menu.Palette.YELLOW);
-					x += client.textRenderer.getWidth(name);
+					statusLine(matrices, client,
+							new String[] { "match found vs ", name == null ? "" : name, "  - loading world" },
+							new int[] { com.speedrunmcalt.menu.Palette.PURPLE,
+								com.speedrunmcalt.menu.Palette.YELLOW,
+								com.speedrunmcalt.menu.Palette.PURPLE });
 				} else {
-					drawShadowed(matrices, client, found[0], x, Y,
-							com.speedrunmcalt.menu.Palette.YELLOW);
-					x += client.textRenderer.getWidth(found[0]);
-					drawShadowed(matrices, client, found[1], x, Y,
-							com.speedrunmcalt.menu.Palette.CYAN);
-					x += client.textRenderer.getWidth(found[1]);
+					statusLine(matrices, client,
+							new String[] { "match found vs ", found[0], found[1], "  - loading world" },
+							new int[] { com.speedrunmcalt.menu.Palette.PURPLE,
+								com.speedrunmcalt.menu.Palette.YELLOW,
+								com.speedrunmcalt.menu.Palette.CYAN,
+								com.speedrunmcalt.menu.Palette.PURPLE });
 				}
-				drawShadowed(matrices, client, "  - loading world", x, Y,
-						com.speedrunmcalt.menu.Palette.PURPLE);
 				return;
 			}
 			if (line != null) {
-				drawShadowed(matrices, client, "alt", X, Y,
-						com.speedrunmcalt.menu.Palette.PHOSPHOR);
-				drawShadowed(matrices, client, line,
-						X + client.textRenderer.getWidth("alt  "), Y, colour);
+				statusLine(matrices, client, new String[] { line }, new int[] { colour });
 			}
 			return;
 		}
 
-		int y = Y;
-		long elapsed = MatchState.elapsedMillis();
+		renderMatch(matrices, client);
+	}
+
+	/**
+	 * The live readout: one panel in the corner, the clock big.
+	 *
+	 * It used to be a column of separate boxes, one per line and one per
+	 * piece of a line, at body size. Over sky and water that read as
+	 * debug text - and the clock, the one number glanced at every few
+	 * seconds, was the same size as the word "rod".
+	 *
+	 * Still top-left. Top-right is where vanilla stacks status effect
+	 * icons, and a speedrunner always has some.
+	 */
+	private static void renderMatch(MatrixStack matrices, MinecraftClient client) {
+		net.minecraft.client.font.TextRenderer font = client.textRenderer;
+		final int pad = 5;
+		final int gap = 10;
+
+		String clockText = MatchState.formatTimeMillis(MatchState.elapsedMillis());
 		String outcome = MatchState.result;
-		// "alt" keeps its brand colour here too, so the HUD and the
-		// menu read as the same product.
-		drawShadowed(matrices, client, "alt", X, y, com.speedrunmcalt.menu.Palette.PHOSPHOR);
-		drawShadowed(matrices, client, MatchState.formatTime(elapsed),
-				X + client.textRenderer.getWidth("alt  "), y, ACCENT);
-		y += LINE;
+		String opponent = MatchState.opponentUsername == null ? "..." : MatchState.opponentUsername;
 
-		if (outcome != null) {
-			drawShadowed(matrices, client, outcome, X, y,
-					outcome.startsWith("VICTORY") ? AHEAD : BEHIND);
-			y += LINE;
-		}
-
-		// "vs" stays recessive; the NAME is yellow, the same way the
-		// player's own name is yellow on the menu. In dim grey it was
-		// nearly invisible over bright water.
-		//
-		// A pace splits yellow/cyan here as well. The live endpoint sends
-		// one as a plain opponent name, so this line is the LAST place a
-		// pace match still looked like a person - the announce, countdown,
-		// end, history and detail screens all say it in two colours, and
-		// the HUD is the surface the player stares at for twenty minutes.
-		String opponent = MatchState.opponentUsername;
-		drawShadowed(matrices, client, "vs ", X, y, DIM);
-		String shown = opponent == null ? "..." : opponent;
-		int nx = X + client.textRenderer.getWidth("vs ");
-		String[] parts = com.speedrunmcalt.menu.Palette.paceParts(shown);
-		if (parts == null) {
-			drawShadowed(matrices, client, shown, nx, y,
-					com.speedrunmcalt.menu.Palette.YELLOW);
-		} else {
-			// Two drawShadowed calls, so each piece gets its own backdrop
-			// - the same way the "match found vs NAME" line above is
-			// built. The backdrops overlap by a couple of pixels and the
-			// seam is invisible against a world.
-			drawShadowed(matrices, client, parts[0], nx, y,
-					com.speedrunmcalt.menu.Palette.YELLOW);
-			drawShadowed(matrices, client, parts[1],
-					nx + client.textRenderer.getWidth(parts[0]), y,
-					com.speedrunmcalt.menu.Palette.CYAN);
-		}
-		y += LINE + 2;
-
+		// Rows first, so the panel can be sized to what is in it.
+		java.util.List<String[]> rows = new java.util.ArrayList<>();
+		java.util.List<int[]> rowColours = new java.util.ArrayList<>();
 		for (int i = 0; i < ORDER.length; i++) {
-			String key = ORDER[i];
-			Long mine = MatchState.mySplits.get(key);
-			Long theirs = MatchState.opponentSplits.get(key);
+			Long mine = MatchState.mySplits.get(ORDER[i]);
+			Long theirs = MatchState.opponentSplits.get(ORDER[i]);
 			if (mine == null && theirs == null) {
 				continue; // neither player has reached this yet
 			}
-
-			String label = LABELS[i];
-			String mineText = mine == null ? "--:--" : MatchState.formatTime(mine);
-			String theirsText = theirs == null ? "--:--" : MatchState.formatTime(theirs);
-			String sep = "  /  ";
-
-			// The TIMES carry won and lost; the label does not. A whole
-			// line in red said "you are behind" about the word "rod",
-			// which is not a thing that can be behind - and it made the
-			// two numbers, the only part that is actually a race, the
-			// least distinguishable thing on the row.
+			// The TIMES carry won and lost; the label does not. A
+			// whole line in red said "you are behind" about the word
+			// "rod", which is not a thing that can be behind.
 			//
 			// Labels are purple, the same purple as the seed type on
 			// the reveal screen: both name WHAT this is rather than how
@@ -570,21 +537,109 @@ public final class MatchHud {
 				mineColour = DIM;
 				theirsColour = AHEAD;
 			}
+			rows.add(new String[] { LABELS[i],
+				mine == null ? "--:--" : MatchState.formatTime(mine),
+				theirs == null ? "--:--" : MatchState.formatTime(theirs) });
+			rowColours.add(new int[] { mineColour, theirsColour });
+		}
 
-			// One background for the row, then the pieces on top -
-			// drawShadowed fills behind each call, so four of them
-			// would stack four boxes with visible seams.
-			String whole = label + "  " + mineText + sep + theirsText;
-			DrawableHelper.fill(matrices, X - 2, y - 2,
-					X + client.textRenderer.getWidth(whole) + 2, y + 9, 0x70000000);
+		int labelW = 0;
+		int timeW = font.getWidth("them");
+		for (String[] r : rows) {
+			labelW = Math.max(labelW, font.getWidth(r[0]));
+			timeW = Math.max(timeW, Math.max(font.getWidth(r[1]), font.getWidth(r[2])));
+		}
+		int tableW = labelW + gap + timeW + gap + timeW;
 
-			int lx = X;
-			lx = plain(matrices, client, label, lx, y, com.speedrunmcalt.menu.Palette.PURPLE);
-			lx = plain(matrices, client, "  ", lx, y, DIM);
-			lx = plain(matrices, client, mineText, lx, y, mineColour);
-			lx = plain(matrices, client, sep, lx, y, DIM);
-			plain(matrices, client, theirsText, lx, y, theirsColour);
+		int logoH = 16;
+		int logoW = logoH * 288 / 186;
+		int headerW = logoW + 6 + (int) Math.ceil(font.getWidth(clockText) * CLOCK_SCALE);
+		int vsW = font.getWidth("vs " + opponent);
+		int outcomeW = outcome == null ? 0 : font.getWidth(outcome);
+		int inner = Math.max(Math.max(headerW, vsW), Math.max(outcomeW, rows.isEmpty() ? 0 : tableW));
+
+		int height = logoH + 4 + (outcome == null ? 0 : LINE) + LINE;
+		if (!rows.isEmpty()) {
+			height += 5 + LINE + rows.size() * LINE;
+		}
+
+		int left = X - 2;
+		int top = Y - 2;
+		com.speedrunmcalt.menu.Ui.hudPanel(matrices, left, top,
+				left + pad * 2 + inner, top + pad * 2 + height - 2);
+
+		int x = left + pad;
+		int y = top + pad;
+
+		// "alt" is the wordmark texture, the same one as the lobby, so
+		// the HUD and the menu read as one product. Then the clock,
+		// cyan as the clock is everywhere in this mod, sitting on the
+		// same baseline as the logo: a digit is 7 font pixels tall, and
+		// the logo's letters end 15px down.
+		com.speedrunmcalt.menu.Ui.logo(matrices, client, x + logoW / 2, y, logoH, true);
+		matrices.push();
+		matrices.translate(x + logoW + 6, y + 15 - 7 * CLOCK_SCALE, 0);
+		matrices.scale(CLOCK_SCALE, CLOCK_SCALE, 1.0f);
+		font.drawWithShadow(matrices, clockText, 0, 0, ACCENT);
+		matrices.pop();
+		y += logoH + 4;
+
+		if (outcome != null) {
+			font.drawWithShadow(matrices, outcome, x, y,
+					outcome.startsWith("VICTORY") ? AHEAD : BEHIND);
 			y += LINE;
+		}
+
+		// "vs" recedes; the NAME is yellow, the way the player's own
+		// name is yellow on the menu. A pace splits yellow/cyan here as
+		// well - the live endpoint sends one as a plain opponent name,
+		// and this is the surface stared at for twenty minutes.
+		int nx = plain(matrices, client, "vs ", x, y, DIM);
+		com.speedrunmcalt.menu.Palette.drawName(matrices, font, opponent, nx, y);
+		y += LINE;
+
+		if (rows.isEmpty()) {
+			return;
+		}
+
+		// A rule under the header, then the table in columns. Times are
+		// right-aligned so the minutes line up and a gap can be read
+		// down the column rather than worked out.
+		y += 2;
+		DrawableHelper.fill(matrices, x, y, x + inner, y + 1, 0x30FFFFFF);
+		y += 3;
+		int mineRight = x + labelW + gap + timeW;
+		int theirsRight = mineRight + gap + timeW;
+		font.drawWithShadow(matrices, "you", mineRight - font.getWidth("you"), y, DIM);
+		font.drawWithShadow(matrices, "them", theirsRight - font.getWidth("them"), y, DIM);
+		y += LINE;
+		for (int i = 0; i < rows.size(); i++) {
+			String[] r = rows.get(i);
+			int[] c = rowColours.get(i);
+			font.drawWithShadow(matrices, r[0], x, y, com.speedrunmcalt.menu.Palette.PURPLE);
+			font.drawWithShadow(matrices, r[1], mineRight - font.getWidth(r[1]), y, c[0]);
+			font.drawWithShadow(matrices, r[2], theirsRight - font.getWidth(r[2]), y, c[1]);
+			y += LINE;
+		}
+	}
+
+	/**
+	 * A one-line status in the corner - searching, or match found -
+	 * with the "alt" mark in front and one panel behind the lot.
+	 */
+	private static void statusLine(MatrixStack matrices, MinecraftClient client,
+			String[] parts, int[] colours) {
+		net.minecraft.client.font.TextRenderer font = client.textRenderer;
+		String mark = "alt  ";
+		int w = font.getWidth(mark);
+		for (String part : parts) {
+			w += font.getWidth(part);
+		}
+		com.speedrunmcalt.menu.Ui.hudPanel(matrices, X - 4, Y - 4, X + w + 4, Y + 12);
+		int x = plain(matrices, client, "alt", X, Y, com.speedrunmcalt.menu.Palette.PHOSPHOR);
+		x += font.getWidth("  ");
+		for (int i = 0; i < parts.length; i++) {
+			x = plain(matrices, client, parts[i], x, Y, colours[i]);
 		}
 	}
 

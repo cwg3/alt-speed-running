@@ -22,7 +22,7 @@ import net.minecraft.text.LiteralText;
  * world starts loading. Escape is ignored rather than wired to
  * anything: there is nothing to go back to, the match is already made.
  */
-public class MatchFoundScreen extends Screen {
+public class MatchFoundScreen extends AltScreen {
 	private final String opponent;
 	/** Non-null when this is a pace, and then it is the time to beat. */
 	private final String paceLabel;
@@ -48,20 +48,15 @@ public class MatchFoundScreen extends Screen {
 		int cx = this.width / 2;
 		int cy = this.height / 2;
 
-		// Drawn at double size to match the weight of the in-world
-		// title, so the two contexts announce the same thing with the
-		// same emphasis. Coordinates are halved because the scale
-		// applies to them too.
+		// Drawn at triple size: the in-world title is 4x, and this is
+		// the same announcement in the other context.
 		// A pace is not a match. Announcing one as MATCH FOUND would be
 		// the single most misleading thing this screen could say, and it
 		// is the thing a player would remember on finding out.
 		boolean pace = paceLabel != null;
-		matrices.push();
-		matrices.scale(2.0f, 2.0f, 1.0f);
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText(pace ? "RACE A PACE" : "MATCH FOUND"),
-				cx / 2, (cy - 20) / 2, Palette.YELLOW);
-		matrices.pop();
+		Ui.panel(matrices, cx - 130, cy - 44, cx + 130, cy + (pace ? 52 : 38));
+		Ui.bigCentered(matrices, this.textRenderer,
+				pace ? "RACE A PACE" : "MATCH FOUND", cx, cy - 32, 3.0f, Palette.YELLOW);
 
 		// Same rule as the countdown and the end screen: yellow for the
 		// word "Pace", cyan for the time it names.

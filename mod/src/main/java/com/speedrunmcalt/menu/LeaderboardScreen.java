@@ -28,7 +28,7 @@ import java.util.List;
  * Needs no session token: the endpoint is public, so this renders on the
  * title screen before anyone has logged in.
  */
-public class LeaderboardScreen extends Screen {
+public class LeaderboardScreen extends AltScreen {
 	/** Screen headings are cyan everywhere in this mod. */
 	private static final int ACCENT = Palette.CYAN;
 
@@ -179,6 +179,23 @@ public class LeaderboardScreen extends Screen {
 		int xPoints = cx + 52;
 		int xRecord = cx + 96;
 
+		int shown = Math.min(list.size(), rowsPerPage());
+		// The table sits in a panel, every other row striped and the
+		// player's own row tinted, so a name can be followed across to
+		// its numbers without a ruler.
+		Ui.panel(matrices, xRank - 8, ROWS_TOP - 18, xRecord + 72,
+				ROWS_TOP + shown * ROW_HEIGHT + 4);
+		String me = AltSession.uuid();
+		for (int i = 0; i < shown; i++) {
+			int top = ROWS_TOP + i * ROW_HEIGHT - 2;
+			boolean mine = me != null && me.equals(list.get(i).uuid);
+			if (mine) {
+				fill(matrices, xRank - 7, top, xRecord + 71, top + ROW_HEIGHT, 0x30000000 | Palette.CYAN);
+			} else if (i % 2 == 1) {
+				fill(matrices, xRank - 7, top, xRecord + 71, top + ROW_HEIGHT, 0x14FFFFFF);
+			}
+		}
+
 		int y = ROWS_TOP - 14;
 		this.textRenderer.drawWithShadow(matrices, "#", xRank, y, Palette.DIM);
 		this.textRenderer.drawWithShadow(matrices, "player", xName, y, Palette.DIM);
@@ -186,9 +203,7 @@ public class LeaderboardScreen extends Screen {
 		this.textRenderer.drawWithShadow(matrices, "points", xPoints, y, Palette.DIM);
 		this.textRenderer.drawWithShadow(matrices, "W-L-F", xRecord, y, Palette.DIM);
 
-		String me = AltSession.uuid();
 		y = ROWS_TOP;
-		int shown = Math.min(list.size(), rowsPerPage());
 		for (int i = 0; i < shown; i++) {
 			LeaderboardEntry e = list.get(i);
 			boolean isMe = me != null && me.equals(e.uuid);

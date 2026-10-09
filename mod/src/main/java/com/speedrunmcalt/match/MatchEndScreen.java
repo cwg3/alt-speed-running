@@ -14,7 +14,7 @@ import net.minecraft.text.LiteralText;
  * are the two things a player actually wants next - queue again, or
  * stop - so neither is buried behind the title screen.
  */
-public class MatchEndScreen extends Screen {
+public class MatchEndScreen extends com.speedrunmcalt.menu.AltScreen {
 	/** Cyan. Named for what it IS - see the note in Palette. */
 	private static final int ACCENT = com.speedrunmcalt.menu.Palette.CYAN;
 	private static final int DIM = com.speedrunmcalt.menu.Palette.DIM;
@@ -68,7 +68,7 @@ public class MatchEndScreen extends Screen {
 	@Override
 	protected void init() {
 		int cx = this.width / 2;
-		int y = this.height / 2 + 30;
+		int y = this.height / 2 + 32;
 		this.addButton(new ButtonWidget(cx - 100, y, 200, 20,
 				new LiteralText("Find another match"),
 				b -> this.client.openScreen(new AltMenuScreen(new TitleScreen()))));
@@ -90,11 +90,15 @@ public class MatchEndScreen extends Screen {
 	public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
 		this.renderBackground(matrices);
 		int cx = this.width / 2;
-		int y = this.height / 2 - 60;
+		int cy = this.height / 2;
 
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText(won ? "VICTORY" : "DEFEAT"), cx, y, won ? WIN : LOSS);
-		y += 20;
+		// The result at 4x, the size of a vanilla title: it is the one
+		// word on this screen that matters from across the room. The
+		// numbers sit in a panel beneath it.
+		com.speedrunmcalt.menu.Ui.bigCentered(matrices, this.textRenderer,
+				won ? "VICTORY" : "DEFEAT", cx, cy - 90, 4.0f, won ? WIN : LOSS);
+		com.speedrunmcalt.menu.Ui.panel(matrices, cx - 110, cy - 50, cx + 110, cy + 24);
+		int y = cy - 42;
 
 		// Same treatment as the HUD and the menu: "vs" recedes, the
 		// name is yellow. Player names are yellow everywhere.
@@ -139,7 +143,7 @@ public class MatchEndScreen extends Screen {
 		// said the same 30:00 three times.
 		if (myTimeMs != null) {
 			drawCenteredText(matrices, this.textRenderer,
-					new LiteralText("your time   " + MatchState.formatTime(myTimeMs)),
+					new LiteralText("your time   " + MatchState.formatTimeMillis(myTimeMs)),
 					cx, y, ACCENT);
 			y += paceLabel != null ? 18 : 12;
 		} else if (paceLabel == null) {
@@ -151,7 +155,7 @@ public class MatchEndScreen extends Screen {
 		// A pace's time is the tier, already on the target line, so only
 		// a real opponent gets a "their time" line.
 		if (paceLabel == null) {
-			String theirs = opponentTimeMs == null ? "--:--" : MatchState.formatTime(opponentTimeMs);
+			String theirs = opponentTimeMs == null ? "--:--.---" : MatchState.formatTimeMillis(opponentTimeMs);
 			drawCenteredText(matrices, this.textRenderer,
 					new LiteralText("their time  " + theirs), cx, y, DIM);
 			y += 18;

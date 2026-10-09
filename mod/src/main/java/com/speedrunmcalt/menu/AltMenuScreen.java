@@ -6,7 +6,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.LiteralText;
 
 /** The lobby: connection state, profile, and queue controls. */
-public class AltMenuScreen extends Screen {
+public class AltMenuScreen extends AltScreen {
 	// Phosphor green from the wordmark, so the screen and the brand match.
 	/** Cyan. Named for what it IS - see the note in Palette. */
 	private static final int ACCENT = Palette.CYAN;
@@ -102,31 +102,28 @@ public class AltMenuScreen extends Screen {
 		// centre, and since the hyphen and "alt" are both phosphor
 		// green the eye lines those two up and sees the error.
 		//
-		// "speed-running" is drawn at 1.5x, the same scale as the other
-		// screens' titles, so the logo outranks the button labels below
-		// it. "alt" is 2x on top of that: it is the name, the subtitle
-		// is the description. The two scales mean the hyphen is measured
-		// in speed-running's space and carried over to alt's through
-		// screen coordinates.
+		// "alt" is the brand/ wordmark as a texture, glow and all, not
+		// the font at 2x - the font version was the same letters every
+		// other mod's menu is made of. "speed-running" stays text at
+		// 1.5x, the same scale as the other screens' titles.
 		float wordScale = 1.5f;
-		float altScale = 2.0f;
 		int scx = (int) (cx / wordScale);
 		String[] wordmark = { "speed", "-", "running" };
-		float hyphenX = Palette.segmentCenterX(this.textRenderer, scx, wordmark, 1) * wordScale;
+		int hyphenX = (int) (Palette.segmentCenterX(this.textRenderer, scx, wordmark, 1) * wordScale);
 
-		matrices.push();
-		matrices.scale(altScale, altScale, 1.0f);
-		drawCenteredText(matrices, this.textRenderer, new LiteralText("alt"),
-				(int) (hyphenX / altScale), (int) ((top - 12) / altScale), Palette.PHOSPHOR);
-		matrices.pop();
+		int logoHeight = 44;
+		Ui.logo(matrices, this.client, hyphenX, Math.max(2, top - 40), logoHeight);
 
 		matrices.push();
 		matrices.scale(wordScale, wordScale, 1.0f);
 		Palette.drawCenteredSegments(matrices, this.textRenderer, scx,
-				(int) ((top + 10) / wordScale),
+				(int) ((top + 8) / wordScale),
 				wordmark,
 				new int[] { Palette.PURPLE, Palette.PHOSPHOR, Palette.PURPLE });
 		matrices.pop();
+
+		// Profile and queue share one panel, ending above Find Match.
+		Ui.panel(matrices, cx - 115, top + 27, cx + 115, top + 77);
 
 		String status;
 		String detail = null;
@@ -219,10 +216,10 @@ public class AltMenuScreen extends Screen {
 	/**
 	 * Clamps a line to the screen width. Backend and Mojang errors come
 	 * through as raw JSON and ran off both edges of the screen without
-	 * this.
+	 * this. Held inside the profile panel, too, now that there is one.
 	 */
 	private String fit(String text) {
-		int max = this.width - 40;
+		int max = Math.min(this.width - 40, 220);
 		if (this.textRenderer.getWidth(text) <= max) {
 			return text;
 		}
@@ -246,6 +243,22 @@ public class AltMenuScreen extends Screen {
 					default:
 						return "Find Match";
 				}
+		}
+	}
+
+	/**
+	 * The lobby picture at full strength. Every other menu draws it
+	 * under a dark wash (Ui.backdrop); this is the one screen it is
+	 * the point of, and the menu here is short enough to stand on it.
+	 *
+	 * Only out of a world. Opened over a world, the world shows through
+	 * the usual wash like any other alt screen.
+	 */
+	@Override
+	public void renderBackground(MatrixStack matrices, int vOffset) {
+		if (this.client.world != null
+				|| !Ui.cover(matrices, this.client, Ui.LOBBY, this.width, this.height)) {
+			super.renderBackground(matrices, vOffset);
 		}
 	}
 

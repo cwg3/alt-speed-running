@@ -18,7 +18,7 @@ import java.util.List;
  * part: "where did the nether start" is the first question anyone asks
  * of a run, and it is answered by looking rather than seeking.
  */
-public class ReplayTimelineScreen extends Screen {
+public class ReplayTimelineScreen extends com.speedrunmcalt.menu.AltScreen {
 	private static final int BAR_HEIGHT = 14;
 
 	private static final int OVERWORLD_COLOUR = Palette.CYAN;

@@ -13,7 +13,7 @@ import net.minecraft.text.LiteralText;
  * the opponent a win, so it should never be one mistaken keypress away
  * mid-run. Cancel is the default focus.
  */
-public class ForfeitConfirmScreen extends Screen {
+public class ForfeitConfirmScreen extends AltScreen {
 	/** Cyan. Named for what it IS - see the note in Palette. */
 	private static final int ACCENT = Palette.CYAN;
 	private static final int DIM = Palette.DIM;
@@ -48,13 +48,19 @@ public class ForfeitConfirmScreen extends Screen {
 	public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
 		this.renderBackground(matrices);
 		int cx = this.width / 2;
+		int cy = this.height / 2;
+		// Framed like every other alt screen. This one is drawn over the
+		// live world rather than the menu backdrop, and the three lines
+		// floating loose over a forest were the hardest text in the mod
+		// to read - on the one screen where reading it matters most.
+		String consequence = "Your opponent is awarded the win and ratings change.";
+		int half = Math.max(110, this.textRenderer.getWidth(consequence) / 2 + 12);
+		Ui.panel(matrices, cx - half, cy - 60, cx + half, cy - 2);
+		Ui.bigCentered(matrices, this.textRenderer, "Forfeit this match?", cx, cy - 52, 1.5f, ACCENT);
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("Forfeit this match?"), cx, this.height / 2 - 40, ACCENT);
+				new LiteralText(consequence), cx, cy - 32, ALERT);
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("Your opponent is awarded the win and ratings change."),
-				cx, this.height / 2 - 24, ALERT);
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("This cannot be undone."), cx, this.height / 2 - 12, FINAL);
+				new LiteralText("This cannot be undone."), cx, cy - 19, FINAL);
 		super.render(matrices, mouseX, mouseY, delta);
 	}
 

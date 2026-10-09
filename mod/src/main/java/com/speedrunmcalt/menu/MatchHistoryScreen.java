@@ -22,7 +22,7 @@ import java.util.List;
  * Fetched on a background thread like everything else that talks to
  * the backend, with the screen reading volatile state each frame.
  */
-public class MatchHistoryScreen extends Screen {
+public class MatchHistoryScreen extends AltScreen {
 	/**
 	 * Most rows a page will ever hold. The real number is whatever
 	 * fits the window - see rowsPerPage().
@@ -237,8 +237,21 @@ public class MatchHistoryScreen extends Screen {
 		int y = ROWS_TOP;
 		// Belt and braces: never draw past the footer even if entries
 		// outlives the resize that shrank the window.
-		int drawable = Math.min(entries.size(), rowsPerPage());
-		for (MatchHistoryEntry e : entries.subList(0, drawable)) {
+		int visible = Math.min(entries.size(), rowsPerPage());
+		// Panel, stripes, and the hovered row lit cyan: every row is a
+		// button, and nothing used to say so until it was clicked.
+		Ui.panel(matrices, left - 8, ROWS_TOP - 8, left + 308, ROWS_TOP + visible * ROW_HEIGHT + 4);
+		for (int i = 0; i < visible; i++) {
+			int top = ROWS_TOP + i * ROW_HEIGHT - 3;
+			boolean hover = mouseX >= rowsLeft && mouseX <= rowsLeft + 300
+					&& mouseY >= rowsTop + i * ROW_HEIGHT && mouseY < rowsTop + (i + 1) * ROW_HEIGHT;
+			if (hover) {
+				fill(matrices, left - 7, top, left + 307, top + ROW_HEIGHT, 0x38000000 | Palette.CYAN);
+			} else if (i % 2 == 1) {
+				fill(matrices, left - 7, top, left + 307, top + ROW_HEIGHT, 0x14FFFFFF);
+			}
+		}
+		for (MatchHistoryEntry e : entries.subList(0, visible)) {
 			// A forfeit is not a loss and should not read as one.
 			//
 			// The row is per player, and forfeitedBy is the quitter's

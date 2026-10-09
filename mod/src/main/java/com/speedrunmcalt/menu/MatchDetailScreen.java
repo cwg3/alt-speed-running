@@ -21,7 +21,7 @@ import net.minecraft.text.LiteralText;
  * after seeing you dropped fourteen seconds finding the stronghold,
  * not before.
  */
-public class MatchDetailScreen extends Screen {
+public class MatchDetailScreen extends AltScreen {
 	private static final int ROW_HEIGHT = 14;
 
 	private final Screen parent;

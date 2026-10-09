@@ -22,7 +22,7 @@ import net.minecraft.text.LiteralText;
  * World generation happens behind this screen, which turns load time
  * from something merely uncharged into the planning window itself.
  */
-public class SeedRevealScreen extends Screen {
+public class SeedRevealScreen extends AltScreen {
 	/** Cyan. Named for what it IS - see the note in Palette. */
 	private static final int ACCENT = Palette.CYAN;
 	private static final int DIM = Palette.DIM;
@@ -77,20 +77,33 @@ public class SeedRevealScreen extends Screen {
 
 	@Override
 	public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
-		this.renderBackground(matrices);
 		int cx = this.width / 2;
-		int y = this.height / 2 - 40;
+		int h = this.height;
+
+		// The seed type's wallpaper, with the text laid over it the way
+		// a title card is: the type in the sky, then the count, who and
+		// the commitment stacked along the bottom. Nothing in the middle -
+		// that is where every render puts its structure, and the count
+		// there sat exactly on the buried treasure's chest. No panel, for
+		// the same reason.
+		// Without a wallpaper - a type added before its render - the
+		// plain backdrop stands in, and the layout is unchanged.
+		if (!Ui.wallpaper(matrices, this.client, MatchState.seedType, this.width, h)) {
+			this.renderBackground(matrices);
+		}
+		Ui.gradient(matrices, 0, 0, this.width, 44, 0xB0000000, 0x00000000);
+		Ui.gradient(matrices, 0, h - 112, this.width, h, 0x00000000, 0xC8000000);
 
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("YOUR SEED"), cx, y, DIM);
-		drawCenteredText(matrices, this.textRenderer,
+				new LiteralText("YOUR SEED"), cx, 8, DIM);
+		Ui.bigCentered(matrices, this.textRenderer,
 				// Purple, not cyan. The countdown on this same screen is
 				// cyan, so the seed type sat in the timer's colour and
 				// the two read as one kind of information. The match
 				// history screen already draws the type in purple -
 				// this makes the seed type one colour everywhere it
 				// appears, and leaves cyan meaning "clock".
-				new LiteralText(typeName(MatchState.seedType)), cx, y + 16, Palette.PURPLE);
+				typeName(MatchState.seedType), cx, 19, 2.0f, Palette.PURPLE);
 
 		// Who you are actually racing.
 		//
@@ -107,22 +120,24 @@ public class SeedRevealScreen extends Screen {
 		String pace = MatchState.paceLabel;
 		if (pace != null) {
 			com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer,
-					cx, y + 30,
+					cx, h - 44,
 					new String[] { "vs ", "Pace ", pace },
 					new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW,
 						com.speedrunmcalt.menu.Palette.CYAN });
 		} else {
 			String vs = MatchState.opponentUsername;
 			com.speedrunmcalt.menu.Palette.drawCenteredSegments(matrices, this.textRenderer,
-					cx, y + 30,
+					cx, h - 44,
 					new String[] { "vs ", vs == null ? "opponent" : vs },
 					new int[] { DIM, com.speedrunmcalt.menu.Palette.YELLOW });
 		}
 
 		long remaining = MatchState.countdownRemaining();
 		long seconds = (remaining + 999) / 1000;
-		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText(String.valueOf(seconds)), cx, y + 44, COUNT);
+		// 5x: the number is the thing both players are watching, and a
+		// 1x digit between two lines of text was easy to miss entirely.
+		Ui.bigCenteredOutlined(matrices, this.textRenderer,
+				String.valueOf(seconds), cx, h - 98, 5.0f, COUNT);
 		// The server's commitment to this world, where a camera can see it.
 		//
 		// Both players are shown it before either can play, so a copy of
@@ -160,12 +175,12 @@ public class SeedRevealScreen extends Screen {
 			matrices.scale(0.5f, 0.5f, 1.0f);
 			this.textRenderer.draw(matrices, line,
 					cx * 2 - this.textRenderer.getWidth(line) / 2.0f,
-					(y + 57) * 2.0f, DIM);
+					(h - 31) * 2.0f, DIM);
 			matrices.pop();
 		}
 
 		drawCenteredText(matrices, this.textRenderer,
-				new LiteralText("the race begins at zero"), cx, y + 64, DIM);
+				new LiteralText("the race begins at zero"), cx, h - 20, DIM);
 
 		super.render(matrices, mouseX, mouseY, delta);
 	}

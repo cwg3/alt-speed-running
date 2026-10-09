@@ -24,7 +24,7 @@ import net.minecraft.text.LiteralText;
  * later, and this project's whole pitch against the incumbent is that it
  * does not hide how it works.
  */
-public class RacePaceScreen extends Screen {
+public class RacePaceScreen extends AltScreen {
 	/** Cyan. Named for what it IS - see the note in Palette. */
 	private static final int ACCENT = Palette.CYAN;
 
@@ -87,6 +87,12 @@ public class RacePaceScreen extends Screen {
 	public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
 		this.renderBackground(matrices);
 		int cx = this.width / 2;
+		// One panel round the title, the tiers and the notes, ending above
+		// Back. Loose on the lobby picture the grey subtitle sat right on
+		// the horizon's glow and could barely be read.
+		int half = Math.max(146, this.textRenderer.getWidth(
+				"Nothing is rated. A pace repeats its splits, and it spends a seed.") / 2 + 10);
+		Ui.panel(matrices, cx - half, this.height / 2 - 74, cx + half, this.height / 2 + 31);
 
 		// Same heading treatment as MATCHES and LEADERBOARD: uppercase,
 		// 1.5x, cyan. This was the last screen title still drawn at body

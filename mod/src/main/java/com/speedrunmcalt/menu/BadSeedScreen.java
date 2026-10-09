@@ -23,7 +23,7 @@ import net.minecraft.text.LiteralText;
  * for both of them with no rating change, so it is not mistaken for a
  * forfeit.
  */
-public class BadSeedScreen extends Screen {
+public class BadSeedScreen extends AltScreen {
 	/** Cyan. Named for what it IS - see the note in Palette. */
 	private static final int ACCENT = Palette.CYAN;
 	private static final int DIM = Palette.DIM;

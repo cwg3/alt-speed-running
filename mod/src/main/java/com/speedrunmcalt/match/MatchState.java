@@ -318,4 +318,17 @@ public final class MatchState {
 		long totalSeconds = Math.max(0, millis) / 1000;
 		return String.format("%d:%02d", totalSeconds / 60, totalSeconds % 60);
 	}
+
+	/**
+	 * formatTime with milliseconds, as m:ss.mmm.
+	 *
+	 * For the live clock. A race clock that only ticks once a second
+	 * looks stalled, and every other speedrun timer shows the fraction.
+	 * Minecraft's font draws every digit at the same width, so the
+	 * readout does not jitter as it counts.
+	 */
+	public static String formatTimeMillis(long millis) {
+		long ms = Math.max(0, millis);
+		return String.format("%d:%02d.%03d", ms / 60000, (ms / 1000) % 60, ms % 1000);
+	}
 }
