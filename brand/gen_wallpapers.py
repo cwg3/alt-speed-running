@@ -15,8 +15,9 @@ world with the structure taken away, so a buried chest sits in real sand.
 
 Dumps are `wall-<type>.txt` (structures on) and `wallB-<type>.txt`
 (off) - lines of `P x0 y0 z0 x1 y1 z1` for each structure piece and
-`B x y z block` for every non-air block. They are not in git: they come
-from a seed, and seeds stay out of this repository.
+`B x y z block` for every non-air block. They live in brand/walldata/,
+which is gitignored: they come from a seed, and seeds stay out of this
+repository. Its README says how to re-dump them.
 
 Requires Pillow and numpy:  venv/bin/pip install Pillow numpy
 Usage:  venv/bin/python gen_wallpapers.py <dump_dir> <out_dir> [--width N] [type ...]

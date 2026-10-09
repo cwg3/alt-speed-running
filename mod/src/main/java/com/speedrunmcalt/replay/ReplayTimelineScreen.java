@@ -2,7 +2,6 @@ package com.speedrunmcalt.replay;
 
 import com.speedrunmcalt.menu.Palette;
 import com.speedrunmcalt.net.ReplayData;
-import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.LiteralText;

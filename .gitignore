@@ -38,6 +38,9 @@ cdk.out/
 *.key
 credentials.json
 brand/venv/
+# gen_wallpapers.py's structure dumps and the harness that makes them.
+# Generated from a seed, so they stay out like the rest of seed data.
+brand/walldata/
 pack/*.mrpack
 pack/*.jar
 
