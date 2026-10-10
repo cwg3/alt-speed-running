@@ -1,4 +1,4 @@
-<img src="brand/logo_alt_preview.png" alt="alt" width="200">
+<img src="brand/social_preview_lobby.png" alt="alt speed-running">
 
 A 1v1 ladder for Minecraft 1.16.1 speedrunning (RSG).
 
