@@ -235,8 +235,11 @@ public class TuneInScreen extends Screen {
 		}
 	}
 
-	/** A white-green core with a phosphor halo, for the line and the dot. */
-	private static void glow(MatrixStack matrices, int x0, int y0, int x1, int y1, float a) {
+	/**
+	 * A white-green core with a phosphor halo, for the line and the dot.
+	 * PowerOn draws the same glow switching the set on.
+	 */
+	static void glow(MatrixStack matrices, int x0, int y0, int x1, int y1, float a) {
 		int halo = (int) (70 * a) << 24 | Palette.PHOSPHOR;
 		int core = (int) (255 * a) << 24 | 0xF0FFEC;
 		fill(matrices, x0 - 2, y0 - 2, x1 + 2, y1 + 2, halo);

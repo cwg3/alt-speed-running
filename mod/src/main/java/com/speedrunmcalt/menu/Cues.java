@@ -51,6 +51,7 @@ public final class Cues {
 	 * is good news" sound rather than a blip.
 	 */
 	public static void matchFound() {
+		MenuMusic.matchStarting();
 		play(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0f);
 	}
 
@@ -97,7 +98,22 @@ public final class Cues {
 	 * belongs here rather than in a re-render.
 	 */
 	public static void tuneIn() {
+		MenuMusic.matchStarting();
 		play(new SoundEvent(new net.minecraft.util.Identifier("speedrunmcalt", "tune_in")),
+				1.0f, 0.2f);
+	}
+
+	/**
+	 * The set switching off as Quit Game is pressed: the knob's clunk,
+	 * a "tsch" of static with the glass crackling over it, the tube's
+	 * knock, the flyback whine dying - timed against PowerOff's picture.
+	 *
+	 * Synthesised by brand/gen_power_off.py and shipped as
+	 * sounds/power_off.ogg, mastered to the tune-in's loudness and
+	 * played at the same 0.2 for the same reason.
+	 */
+	public static void powerOff() {
+		play(new SoundEvent(new net.minecraft.util.Identifier("speedrunmcalt", "power_off")),
 				1.0f, 0.2f);
 	}
 
@@ -169,7 +185,11 @@ public final class Cues {
 			// the longest cue, defeat's beacon at 3.50s - and the music
 			// comes back on its own afterwards. Nothing to restore and
 			// nothing to leak if a cue never fires.
-			if (client.getMusicTracker() != null) {
+			//
+			// Unless the menu music is already fading itself out - a
+			// match being found starts that fade, and a stop here would
+			// cut it dead.
+			if (client.getMusicTracker() != null && !MenuMusic.fading()) {
 				client.getMusicTracker().stop();
 			}
 			client.getSoundManager().play(PositionedSoundInstance.master(sound, pitch, volume));

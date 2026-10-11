@@ -14,8 +14,6 @@ import net.minecraft.client.util.math.MatrixStack;
  * health, effects).
  */
 public final class MatchHud {
-	/** Cyan. Named for what it IS - see the note in Palette. */
-	private static final int ACCENT = com.speedrunmcalt.menu.Palette.CYAN;
 	private static final int DIM = com.speedrunmcalt.menu.Palette.DIM;
 	/**
 	 * Who won each split: green for the player who got there first,
@@ -573,14 +571,15 @@ public final class MatchHud {
 
 		// "alt" is the wordmark texture, the same one as the lobby, so
 		// the HUD and the menu read as one product. Then the clock,
-		// cyan as the clock is everywhere in this mod, sitting on the
-		// same baseline as the logo: a digit is 7 font pixels tall, and
-		// the logo's letters end 15px down.
+		// in the wordmark's cyan-to-purple fade (cyan minutes, the
+		// milliseconds deepest), sitting on the same baseline as the
+		// logo: a digit is 7 font pixels tall, and the logo's letters
+		// end 15px down.
 		com.speedrunmcalt.menu.Ui.logo(matrices, client, x + logoW / 2, y, logoH, true);
 		matrices.push();
 		matrices.translate(x + logoW + 6, y + 15 - 7 * CLOCK_SCALE, 0);
 		matrices.scale(CLOCK_SCALE, CLOCK_SCALE, 1.0f);
-		font.drawWithShadow(matrices, clockText, 0, 0, ACCENT);
+		com.speedrunmcalt.menu.Palette.drawFaded(matrices, font, clockText, 0, 0);
 		matrices.pop();
 		y += logoH + 4;
 

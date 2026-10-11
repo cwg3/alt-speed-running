@@ -99,8 +99,8 @@ public class AltMenuScreen extends AltScreen {
 		// Centring it on the string is what the geometry says and it
 		// reads as off by several pixels: "speed" is five characters
 		// against "running"'s seven, so the hyphen is well left of
-		// centre, and since the hyphen and "alt" are both phosphor
-		// green the eye lines those two up and sees the error.
+		// centre, and the eye lines the hyphen up with "alt" and sees
+		// the error.
 		//
 		// "alt" is the brand/ wordmark as a texture, glow and all, not
 		// the font at 2x - the font version was the same letters every
@@ -108,8 +108,9 @@ public class AltMenuScreen extends AltScreen {
 		// 1.5x, the same scale as the other screens' titles.
 		float wordScale = 1.5f;
 		int scx = (int) (cx / wordScale);
-		String[] wordmark = { "speed", "-", "running" };
-		int hyphenX = (int) (Palette.segmentCenterX(this.textRenderer, scx, wordmark, 1) * wordScale);
+		String[] wordmark = Palette.WORDMARK;
+		int hyphenX = (int) (Palette.segmentCenterX(this.textRenderer, scx, wordmark,
+				Palette.WORDMARK_HYPHEN) * wordScale);
 
 		int logoHeight = 44;
 		Ui.logo(matrices, this.client, hyphenX, Math.max(2, top - 40), logoHeight);
@@ -119,7 +120,7 @@ public class AltMenuScreen extends AltScreen {
 		Palette.drawCenteredSegments(matrices, this.textRenderer, scx,
 				(int) ((top + 8) / wordScale),
 				wordmark,
-				new int[] { Palette.PURPLE, Palette.PHOSPHOR, Palette.PURPLE });
+				Palette.wordmarkColors());
 		matrices.pop();
 
 		// Profile and queue share one panel, ending above Find Match.

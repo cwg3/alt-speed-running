@@ -83,9 +83,24 @@ public final class Ui extends DrawableHelper {
 			panorama = new RotatingCubeMapRenderer(TitleScreen.PANORAMA_CUBE_MAP);
 		}
 		panorama.render(delta, 1.0f);
+		vignette(matrices, width, height);
+	}
+
+	/**
+	 * The panorama's vignette: dark at the top and heavier at the
+	 * bottom, lightest through the middle where the content sits. Also
+	 * laid over the title screen's own panorama (TitleScreenMixin).
+	 */
+	public static void vignette(MatrixStack matrices, int width, int height) {
+		vignette(matrices, width, height, 0x70);
+	}
+
+	/** The same vignette with the middle band's alpha (0-255) chosen. */
+	public static void vignette(MatrixStack matrices, int width, int height, int midAlpha) {
 		int mid = height / 2;
-		gradient(matrices, 0, 0, width, mid, 0xC8000000 | GLASS, 0x70000000 | GLASS);
-		gradient(matrices, 0, mid, width, height, 0x70000000 | GLASS, 0xE0000000 | GLASS);
+		int middle = midAlpha << 24 | GLASS;
+		gradient(matrices, 0, 0, width, mid, 0xC8000000 | GLASS, middle);
+		gradient(matrices, 0, mid, width, height, middle, 0xE0000000 | GLASS);
 	}
 
 	/** A dark translucent box with a one-pixel cyan frame. */

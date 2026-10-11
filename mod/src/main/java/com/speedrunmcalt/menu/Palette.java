@@ -79,6 +79,65 @@ public final class Palette {
 	}
 
 	/**
+	 * "speed-running", one letter per entry, for drawCenteredSegments
+	 * and the title-screen button. Lettered by wordmarkColors().
+	 */
+	public static final String[] WORDMARK = "speed-running".split("");
+	/** The hyphen's index in WORDMARK. */
+	public static final int WORDMARK_HYPHEN = 5;
+
+	/**
+	 * Where the wordmark's fade lands on the final g: a step deeper
+	 * than the original royal purple (0x7B2FF7) PURPLE was lightened
+	 * from. Far too deep to carry a whole word, but as the end of a run
+	 * of lighter letters it gives the fade somewhere dark to arrive.
+	 */
+	public static final int WORDMARK_END = 0x5B1FD6;
+
+	/**
+	 * The wordmark's colour per letter: CYAN on the s fading to
+	 * WORDMARK_END on the g, the hyphen MAGENTA. The fade counts
+	 * letters only, so the hyphen does not take a step of it.
+	 *
+	 * Not purple throughout, as it once was: on the title screen the
+	 * button wears the enchantment glint, which is purple itself and
+	 * washed purple lettering out. Cyan starts far from it in hue, and
+	 * the lobby uses the same lettering so the mark is one thing.
+	 */
+	public static int[] wordmarkColors() {
+		int[] colors = new int[WORDMARK.length];
+		int letters = WORDMARK.length - 1;
+		for (int i = 0, letter = 0; i < WORDMARK.length; i++) {
+			colors[i] = i == WORDMARK_HYPHEN ? MAGENTA : fade(letter++, letters);
+		}
+		return colors;
+	}
+
+	/** Step index of count along the wordmark's CYAN-to-WORDMARK_END fade. */
+	public static int fade(int index, int count) {
+		return count <= 1 ? CYAN : mix(CYAN, WORDMARK_END, index / (float) (count - 1));
+	}
+
+	/**
+	 * Draws text with the wordmark's fade across it, one character per
+	 * step - the match clock wears it so the HUD matches the lobby.
+	 */
+	public static void drawFaded(MatrixStack matrices, TextRenderer font, String text, int x, int y) {
+		for (int i = 0; i < text.length(); i++) {
+			String c = text.substring(i, i + 1);
+			font.drawWithShadow(matrices, c, x, y, fade(i, text.length()));
+			x += font.getWidth(c);
+		}
+	}
+
+	private static int mix(int from, int to, float t) {
+		int r = Math.round((from >> 16 & 0xFF) + ((to >> 16 & 0xFF) - (from >> 16 & 0xFF)) * t);
+		int g = Math.round((from >> 8 & 0xFF) + ((to >> 8 & 0xFF) - (from >> 8 & 0xFF)) * t);
+		int b = Math.round((from & 0xFF) + ((to & 0xFF) - (from & 0xFF)) * t);
+		return r << 16 | g << 8 | b;
+	}
+
+	/**
 	 * Draws a run of differently-coloured segments as one centred line.
 	 *
 	 * Minecraft's drawCenteredText takes a single colour, so a wordmark

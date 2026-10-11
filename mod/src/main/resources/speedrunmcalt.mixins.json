@@ -34,6 +34,10 @@
     "GammaUnlockMixin",
     "PauseMenuMixin",
     "LoadingScreenLogoMixin",
+    "SplashColorMixin",
+    "MenuMusicTypeMixin",
+    "MusicTrackerMixin",
+    "SplashTextMixin",
     "SpectatorSlotMixin",
     "ReplaySkinMixin",
     "GammaLabelMixin"

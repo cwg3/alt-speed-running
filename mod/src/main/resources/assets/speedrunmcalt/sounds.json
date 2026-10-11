@@ -1,7 +1,24 @@
 {
   "tune_in": {
     "sounds": [
-      { "name": "speedrunmcalt:tune_in" }
+      {
+        "name": "speedrunmcalt:tune_in"
+      }
+    ]
+  },
+  "menu_loop": {
+    "sounds": [
+      {
+        "name": "speedrunmcalt:menu_loop",
+        "stream": true
+      }
+    ]
+  },
+  "power_off": {
+    "sounds": [
+      {
+        "name": "speedrunmcalt:power_off"
+      }
     ]
   }
 }
