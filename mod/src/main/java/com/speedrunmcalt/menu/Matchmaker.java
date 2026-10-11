@@ -83,6 +83,9 @@ public final class Matchmaker {
 
 	private static volatile int waited;
 
+	/** When TuneInScreen opened for the pending match, or 0 if it has not. */
+	private static volatile long tuneStartedAt;
+
 	/** Registered once, from the client initializer. */
 	public static void init() {
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
@@ -161,6 +164,24 @@ public final class Matchmaker {
 					new net.minecraft.text.TranslatableText("menu.savingLevel")));
 			return;
 		}
+
+		// The tune-in, before the chunk loading screen.
+		//
+		// Here rather than earlier because it needs the world gone: the
+		// disconnect above stops every sound, which would cut the cue
+		// off a few ticks in. Held for the screen's full length so the
+		// tube has collapsed to black before the loading screen
+		// replaces it.
+		if (tuneStartedAt == 0) {
+			tuneStartedAt = System.currentTimeMillis();
+			client.openScreen(new TuneInScreen(tuneStartedAt));
+			Cues.tuneIn();
+			return;
+		}
+		if (System.currentTimeMillis() - tuneStartedAt < TuneInScreen.TOTAL_MS) {
+			return;
+		}
+		tuneStartedAt = 0;
 
 		pending = null;
 		waited = 0;
@@ -330,6 +351,7 @@ public final class Matchmaker {
 						result.paceLabel, result.matchId, result.seedType);
 				pendingToken = token;
 				waited = 0;
+				tuneStartedAt = 0;
 				pending = result;
 			} catch (Exception e) {
 				if (generation == searchGeneration) {
@@ -401,6 +423,7 @@ public final class Matchmaker {
 				// handler picks it up from here.
 				pendingToken = token;
 				waited = 0;
+				tuneStartedAt = 0;
 				pending = result;
 			} catch (InterruptedException interrupted) {
 				Thread.currentThread().interrupt();

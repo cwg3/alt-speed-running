@@ -77,6 +77,30 @@ public final class Cues {
 	 * that information belongs.
 	 */
 
+	/**
+	 * The tune-in screen: an arc strike, transformer buzz and static
+	 * clearing, then the power-down thump - 2.6 seconds, timed against
+	 * TuneInScreen's picture.
+	 *
+	 * The one cue that is not a vanilla sound. Nothing in the game
+	 * sounds like high voltage, so this is synthesised by
+	 * brand/gen_tune_in.py and shipped as sounds/tune_in.ogg.
+	 *
+	 * Not put in the sound event registry. The client's sound manager
+	 * resolves a cue by its id through sounds.json alone, and a
+	 * registry entry is something Fabric would try to sync with a
+	 * server that has never heard of it.
+	 *
+	 * 0.2, down from 0.8 in two -6 dB steps - a quarter of the
+	 * amplitude, -12 dB. At 0.8 the arc strike was jarring in playtest
+	 * and 0.4 was still loud; the file is mastered hot, so the cut
+	 * belongs here rather than in a re-render.
+	 */
+	public static void tuneIn() {
+		play(new SoundEvent(new net.minecraft.util.Identifier("speedrunmcalt", "tune_in")),
+				1.0f, 0.2f);
+	}
+
 	/** The advancement chime - the game's own "you did it". */
 	public static void victory() {
 		play(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0f);
