@@ -1,7 +1,6 @@
 package com.speedrunmcalt.menu;
 
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.LiteralText;
 
@@ -65,7 +64,7 @@ public class RacePaceScreen extends AltScreen {
 		int x = cx - total / 2;
 		for (String[] tier : TIERS) {
 			final String id = tier[0];
-			this.addButton(new ButtonWidget(x, top, w, 20,
+			this.addButton(new NeonButton(x, top, w, 20,
 					new LiteralText(tier[1]),
 					button -> {
 						Matchmaker.racePace(this.client, id);
@@ -78,7 +77,7 @@ public class RacePaceScreen extends AltScreen {
 			x += w + gap;
 		}
 
-		this.addButton(new ButtonWidget(
+		this.addButton(new NeonButton(
 				cx - 100, this.height / 2 + 40, 200, 20,
 				new LiteralText("Back"), button -> this.client.openScreen(parent)));
 	}

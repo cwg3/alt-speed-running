@@ -45,8 +45,8 @@ public final class Ui extends DrawableHelper {
 	private static final int GLASS = 0x07110A;
 
 	/** Panel fill, and the faint cyan frame around it. */
-	private static final int PANEL = 0xB8000000 | GLASS;
-	private static final int FRAME = 0x5A000000 | Palette.CYAN;
+	static final int PANEL = 0xB8000000 | GLASS;
+	static final int FRAME = 0x5A000000 | Palette.CYAN;
 
 	/**
 	 * One renderer for every screen, so the panorama keeps turning from

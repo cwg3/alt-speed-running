@@ -5,7 +5,6 @@ import com.speedrunmcalt.net.BackendClient;
 import com.speedrunmcalt.net.LeaderboardEntry;
 import com.speedrunmcalt.net.LeaderboardResult;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.LiteralText;
 
@@ -50,7 +49,7 @@ public class LeaderboardScreen extends AltScreen {
 	@Override
 	protected void init() {
 		int cx = this.width / 2;
-		this.addButton(new ButtonWidget(cx - 100, this.height - 28, 200, 20,
+		this.addButton(new NeonButton(cx - 100, this.height - 28, 200, 20,
 				new LiteralText("Back"), b -> this.client.openScreen(parent)));
 		if (result == null) {
 			load();

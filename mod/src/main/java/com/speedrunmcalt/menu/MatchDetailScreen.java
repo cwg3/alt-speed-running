@@ -5,7 +5,6 @@ import com.speedrunmcalt.net.BackendClient;
 import com.speedrunmcalt.net.MatchDetail;
 import com.speedrunmcalt.net.ModList;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.LiteralText;
 
@@ -42,14 +41,14 @@ public class MatchDetailScreen extends AltScreen {
 		int cx = this.width / 2;
 		int bottom = this.height - 28;
 
-		this.addButton(new ButtonWidget(cx - 155, bottom, 150, 20,
+		this.addButton(new NeonButton(cx - 155, bottom, 150, 20,
 				new LiteralText("Watch replay"),
 				b -> {
 					com.speedrunmcalt.replay.ReplayLauncher.clearError();
 					com.speedrunmcalt.replay.ReplayLauncher.open(
 							this.client, matchId, AltSession.uuid());
 				}));
-		this.addButton(new ButtonWidget(cx + 5, bottom, 150, 20,
+		this.addButton(new NeonButton(cx + 5, bottom, 150, 20,
 				new LiteralText("Back"), b -> this.client.openScreen(parent)));
 
 		if (detail == null) {

@@ -2,7 +2,6 @@ package com.speedrunmcalt.match;
 
 import com.speedrunmcalt.menu.AltMenuScreen;
 import net.minecraft.client.gui.screen.TitleScreen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.LiteralText;
 
@@ -68,7 +67,7 @@ public class MatchEndScreen extends com.speedrunmcalt.menu.AltScreen {
 	protected void init() {
 		int cx = this.width / 2;
 		int y = this.height / 2 + 32;
-		this.addButton(new ButtonWidget(cx - 100, y, 200, 20,
+		this.addButton(new com.speedrunmcalt.menu.NeonButton(cx - 100, y, 200, 20,
 				new LiteralText("Find another match"),
 				b -> this.client.openScreen(new AltMenuScreen(new TitleScreen()))));
 		// Straight to the picker, because the most likely reason somebody
@@ -76,11 +75,11 @@ public class MatchEndScreen extends com.speedrunmcalt.menu.AltScreen {
 		// and that has not changed in the last ten minutes. Sending them
 		// back to the lobby to find the button again is a step that knows
 		// what they want and asks anyway.
-		this.addButton(new ButtonWidget(cx - 100, y + 26, 200, 20,
+		this.addButton(new com.speedrunmcalt.menu.NeonButton(cx - 100, y + 26, 200, 20,
 				new LiteralText("Race a Pace"),
 				b -> this.client.openScreen(new com.speedrunmcalt.menu.RacePaceScreen(
 						new AltMenuScreen(new TitleScreen())))));
-		this.addButton(new ButtonWidget(cx - 100, y + 52, 200, 20,
+		this.addButton(new com.speedrunmcalt.menu.NeonButton(cx - 100, y + 52, 200, 20,
 				new LiteralText("Back to title"),
 				b -> this.client.openScreen(new TitleScreen())));
 	}

@@ -3,7 +3,6 @@ package com.speedrunmcalt.menu;
 import com.speedrunmcalt.match.BadSeedVote;
 import com.speedrunmcalt.match.MatchState;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.LiteralText;
@@ -83,10 +82,10 @@ public class BadSeedScreen extends AltScreen {
 		this.addButton(reason);
 		this.setInitialFocus(reason);
 
-		this.addButton(new ButtonWidget(cx - 100, top + CANCEL_Y, 200, 20,
+		this.addButton(new NeonButton(cx - 100, top + CANCEL_Y, 200, 20,
 				new LiteralText(agreeing ? "Keep playing" : "Cancel"),
 				b -> this.client.openScreen(parent)));
-		this.addButton(new ButtonWidget(cx - 100, top + VOTE_Y, 200, 20,
+		this.addButton(new NeonButton(cx - 100, top + VOTE_Y, 200, 20,
 				new LiteralText(agreeing ? "Agree - void this match" : "Vote: seed is unplayable"),
 				b -> {
 					BadSeedVote.cast(reason.getText().trim());

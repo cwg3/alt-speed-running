@@ -29,7 +29,7 @@ public class AltMenuScreen extends AltScreen {
 		// queue status line above them. At the midpoint the "searching
 		// for opponent..." text overlapped the Cancel button - only
 		// while searching, which is why it went unnoticed.
-		actionButton = this.addButton(new ButtonWidget(
+		actionButton = this.addButton(new NeonButton(
 				cx - 100, this.height / 2 + 14, 200, 20,
 				new LiteralText("..."), button -> onAction()));
 
@@ -40,12 +40,12 @@ public class AltMenuScreen extends AltScreen {
 		//
 		// Between Find Match and Back: they are the second thing a player
 		// wants from this screen, and Matches is the way into a replay.
-		this.addButton(new ButtonWidget(
+		this.addButton(new NeonButton(
 				cx - 100, this.height / 2 + 42, 98, 20,
 				new LiteralText("Matches"),
 				button -> this.client.openScreen(new MatchHistoryScreen(this))));
 
-		this.addButton(new ButtonWidget(
+		this.addButton(new NeonButton(
 				cx + 2, this.height / 2 + 42, 98, 20,
 				new LiteralText("Leaderboard"),
 				button -> this.client.openScreen(new LeaderboardScreen(this))));
@@ -54,12 +54,12 @@ public class AltMenuScreen extends AltScreen {
 		// Find Match and deliberately not automatic: a pace is offered
 		// and chosen, never substituted for an opponent the player asked
 		// for. The backend refuses it anyway while somebody is queued.
-		this.addButton(new ButtonWidget(
+		this.addButton(new NeonButton(
 				cx - 100, this.height / 2 + 70, 200, 20,
 				new LiteralText("Race a Pace"),
 				button -> this.client.openScreen(new RacePaceScreen(this))));
 
-		this.addButton(new ButtonWidget(
+		this.addButton(new NeonButton(
 				cx - 100, this.height / 2 + 98, 200, 20,
 				new LiteralText("Back"), button -> this.client.openScreen(parent)));
 

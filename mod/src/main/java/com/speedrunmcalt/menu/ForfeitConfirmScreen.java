@@ -2,7 +2,6 @@ package com.speedrunmcalt.menu;
 
 import com.speedrunmcalt.match.Forfeit;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.LiteralText;
 
@@ -35,9 +34,9 @@ public class ForfeitConfirmScreen extends AltScreen {
 	@Override
 	protected void init() {
 		int cx = this.width / 2;
-		this.addButton(new ButtonWidget(cx - 100, this.height / 2 + 10, 200, 20,
+		this.addButton(new NeonButton(cx - 100, this.height / 2 + 10, 200, 20,
 				new LiteralText("Keep playing"), b -> this.client.openScreen(parent)));
-		this.addButton(new ButtonWidget(cx - 100, this.height / 2 + 36, 200, 20,
+		this.addButton(new NeonButton(cx - 100, this.height / 2 + 36, 200, 20,
 				new LiteralText("Forfeit - opponent wins"), b -> {
 					Forfeit.surrender(this.client);
 					this.client.openScreen(null);

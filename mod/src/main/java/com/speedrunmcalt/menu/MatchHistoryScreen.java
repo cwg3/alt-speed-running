@@ -4,7 +4,6 @@ import com.speedrunmcalt.SpeedrunMcAlt;
 import com.speedrunmcalt.net.BackendClient;
 import com.speedrunmcalt.net.MatchHistoryEntry;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.LiteralText;
 
@@ -92,20 +91,20 @@ public class MatchHistoryScreen extends AltScreen {
 		int cx = this.width / 2;
 		int bottom = this.height - 30;
 
-		this.addButton(new ButtonWidget(cx - 155, bottom, 100, 20,
+		this.addButton(new NeonButton(cx - 155, bottom, 100, 20,
 				new LiteralText("Newer"), b -> {
 					before = 0;
 					atEnd = false;
 					load();
 				}));
-		this.addButton(new ButtonWidget(cx - 50, bottom, 100, 20,
+		this.addButton(new NeonButton(cx - 50, bottom, 100, 20,
 				new LiteralText("Older"), b -> {
 					if (!entries.isEmpty() && !atEnd) {
 						before = entries.get(entries.size() - 1).completedAt;
 						load();
 					}
 				}));
-		this.addButton(new ButtonWidget(cx + 55, bottom, 100, 20,
+		this.addButton(new NeonButton(cx + 55, bottom, 100, 20,
 				new LiteralText("Back"), b -> this.client.openScreen(parent)));
 
 		// init() runs again on every resize, so this is also where a

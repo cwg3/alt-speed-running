@@ -41,21 +41,21 @@ public class ReplayTimelineScreen extends com.speedrunmcalt.menu.AltScreen {
 		int cx = this.width / 2;
 		int row = this.height - 44;
 
-		this.addButton(new ButtonWidget(cx - 156, row, 60, 20,
+		this.addButton(new com.speedrunmcalt.menu.NeonButton(cx - 156, row, 60, 20,
 				new LiteralText(ReplayPlayback.paused() ? "Play" : "Pause"),
 				b -> {
 					ReplayPlayback.togglePause();
 					b.setMessage(new LiteralText(ReplayPlayback.paused() ? "Play" : "Pause"));
 				}));
 
-		this.addButton(new ButtonWidget(cx - 92, row, 40, 20,
+		this.addButton(new com.speedrunmcalt.menu.NeonButton(cx - 92, row, 40, 20,
 				new LiteralText("-10s"), b -> ReplayPlayback.nudge(-10_000)));
-		this.addButton(new ButtonWidget(cx - 48, row, 40, 20,
+		this.addButton(new com.speedrunmcalt.menu.NeonButton(cx - 48, row, 40, 20,
 				new LiteralText("+10s"), b -> ReplayPlayback.nudge(10_000)));
 
 		// Locked vs free-roam. Named for what you get, not for what it
 		// toggles.
-		this.addButton(new ButtonWidget(cx - 156, row - 24, 120, 20,
+		this.addButton(new com.speedrunmcalt.menu.NeonButton(cx - 156, row - 24, 120, 20,
 				new LiteralText(ReplayPlayback.camera() == ReplayPlayback.Camera.LOCKED
 						? "Camera: locked" : "Camera: free"),
 				b -> {
@@ -65,7 +65,7 @@ public class ReplayTimelineScreen extends com.speedrunmcalt.menu.AltScreen {
 									? "Camera: locked" : "Camera: free"));
 				}));
 
-		this.addButton(new ButtonWidget(cx - 4, row, 60, 20,
+		this.addButton(new com.speedrunmcalt.menu.NeonButton(cx - 4, row, 60, 20,
 				new LiteralText(speedLabel()),
 				b -> {
 					// 1x, 2x, 4x, 8x, then back. A slower-than-real
@@ -92,7 +92,7 @@ public class ReplayTimelineScreen extends com.speedrunmcalt.menu.AltScreen {
 				String label = !hasTrace
 						? t.username + " - none"
 						: (watching ? "> " : "") + t.username;
-				ButtonWidget b = new ButtonWidget(x, row, 96, 20,
+				ButtonWidget b = new com.speedrunmcalt.menu.NeonButton(x, row, 96, 20,
 						new LiteralText(label),
 						btn -> {
 							ReplayPlayback.watch(uuid);
@@ -109,7 +109,7 @@ public class ReplayTimelineScreen extends com.speedrunmcalt.menu.AltScreen {
 
 		// Top right, clear of the control row and of the helper line at
 		// the bottom - those two were drawn over each other.
-		this.addButton(new ButtonWidget(this.width - 90, 10, 80, 20,
+		this.addButton(new com.speedrunmcalt.menu.NeonButton(this.width - 90, 10, 80, 20,
 				new LiteralText("Exit replay"), b -> ReplayLauncher.exit(this.client)));
 	}
 
