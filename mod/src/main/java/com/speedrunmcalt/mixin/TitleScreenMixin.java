@@ -150,8 +150,9 @@ public abstract class TitleScreenMixin extends Screen {
 	 * "Share with your friends!" off one end of the alt button, in
 	 * the same splash motion as "Vanilla!" across the screen - tilted
 	 * -20 degrees, pulsing once a second - with its near end pointing
-	 * at the button (SHARE_ON_RIGHT picks the side). Lettered in the wordmark's fade (Palette.drawFaded)
-	 * where "Vanilla!" is plain white: this one is alt talking.
+	 * at the button (SHARE_ON_RIGHT picks the side). Lettered in the
+	 * wordmark's fade (Palette.drawFaded) where "Vanilla!" is plain
+	 * white: this one is alt talking.
 	 */
 	private void speedrunmcalt$shareLabel(MatrixStack matrices) {
 		String text = "Share with your friends!";
@@ -160,9 +161,18 @@ public abstract class TitleScreenMixin extends Screen {
 				net.minecraft.util.math.MathHelper.sin(
 						(float) (net.minecraft.util.Util.getMeasuringTimeMs() % 1000L) / 1000.0F
 								* 6.2831855F) * 0.1F);
-		float scale = pulse * SHARE_SCALE / 1.8F;
-		float half = this.textRenderer.getWidth(text) * SHARE_SCALE / 2.0F;
 		double tilt = Math.toRadians(20.0);
+		// Shrink to fit beside the button. At 1920x1080 on auto GUI scale
+		// the screen is only 480 wide, and at full size the line ran off
+		// the edge with the cake gone entirely - unseen on an ultrawide,
+		// where there is room to spare. Measured on the whole line, cake
+		// included, flattened by the tilt.
+		int textWidth = this.textRenderer.getWidth(text);
+		float room = this.width / 2.0F - 100 - SHARE_GAP - 4;
+		float span = (textWidth + 6 + 10) * SHARE_SCALE * (float) Math.cos(tilt);
+		float size = SHARE_SCALE * Math.min(1.0F, room / span);
+		float scale = pulse * size / 1.8F;
+		float half = textWidth * size / 2.0F;
 		// Anchor the centre so the near end lands just off the button's
 		// middle. The tilt lifts the right end and drops the left: on the
 		// left side the centre sits below-left of the right end, on the
