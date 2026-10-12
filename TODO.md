@@ -423,6 +423,22 @@ the entire function of that file.
   reason is given in plain English, and it can be argued with. Same shape
   as the anti-cheat flags, and it should reuse that machinery rather than
   grow a second one.
+- [ ] **Live spectating** — watching a match while it is still being
+  played, Ranked's "Live Replay". Waiting on what it should mean before
+  anything is built:
+
+  1. **Who can watch.** Both players are on the same seed, so a player
+     who can watch the other live can copy their route. Ranked limits
+     live viewing to designated spectator accounts and private-room
+     hosts; ordinary players see their matches afterwards, as replays.
+  2. **Whether there is a delay**, and how long. Unknown what Ranked
+     does. A delay blunts stream-sniping from a second account.
+  3. **Transport.** Replays upload once, at the end of a match
+     (`uploadReplay`), so live viewing needs the trace sent in pieces
+     during the run and a way to fetch them.
+
+  The playback controls it would use - camera, follow a player, speed,
+  names - are the existing replay viewer's.
 - [ ] **Download Replay / "My Replays"** — scoped in `REPLAY-SCOPE.md`,
   never built. Replays live server-side with no expiry.
 - [ ] **Spawn events in replays** — deliberately not built. Every mob
