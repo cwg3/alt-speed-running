@@ -32,6 +32,15 @@ public final class SplitReporter {
 		String matchId = MatchState.matchId;
 		String sessionToken = MatchState.sessionToken;
 
+		// Once per match. After a RaceReset the fresh world's
+		// advancements fire again, and the server would refuse the
+		// repeat AND record it as a rejection on the match - the audit
+		// trail anti-cheat reads. The first time is the split.
+		if (MatchState.mySplits.containsKey(splitName)) {
+			SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] {} again at {} ms - already split, not sent",
+					splitName, elapsedMs);
+			return;
+		}
 		SpeedrunMcAlt.LOGGER.info("[speedrunmcalt] SPLIT {} at {} ms", splitName, elapsedMs);
 		// Record locally first so the HUD updates immediately rather than
 		// waiting on the network round trip.

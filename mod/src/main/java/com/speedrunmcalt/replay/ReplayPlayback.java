@@ -52,6 +52,15 @@ public final class ReplayPlayback {
 
 	private static volatile Camera camera = Camera.LOCKED;
 
+	/**
+	 * Name tags over the replay bodies. On by default - knowing which
+	 * body is which is the first thing a viewer needs - and off for a
+	 * clean view, which is what Ranked's "Player Name Visibility" is.
+	 * Kept across replays: it is a viewing preference, not part of a
+	 * match.
+	 */
+	private static volatile boolean namesVisible = true;
+
 	/** Which dimension the camera is currently IN, to spot a change. */
 	private static volatile int cameraDim = -1;
 
@@ -230,6 +239,14 @@ public final class ReplayPlayback {
 
 	public static void togglePause() {
 		paused = !paused;
+	}
+
+	public static boolean namesVisible() {
+		return namesVisible;
+	}
+
+	public static void toggleNames() {
+		namesVisible = !namesVisible;
 	}
 
 	public static void toggleCamera() {

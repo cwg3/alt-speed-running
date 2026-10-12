@@ -281,6 +281,32 @@ public final class MatchState {
 		BadSeedVote.reset();
 		result = null;
 		resultAtMillis = 0;
+		RaceReset.clear();
+	}
+
+	/**
+	 * Forgets everything that belongs to the match WORLD rather than the
+	 * match, for RaceReset. The seeds, coordinates, clock and splits are
+	 * the match and stay; what the setup placed, what has been checked
+	 * in this world and how far the drop and barter schedules have got
+	 * are the world's, and a fresh copy starts them again.
+	 */
+	public static void resetWorld() {
+		firstBarterLogged = false;
+		barterCount = 0;
+		obsidianThisWindow = 0;
+		pearlsThisWindow = 0;
+		placedPortal = null;
+		quietBox = null;
+		bastionLootApplied = false;
+		netherArrivalChecked = false;
+		netherArrivalJob = null;
+		setupFailure = null;
+		portalObsidianNeeded = 0;
+		BarterSchedule.reset();
+		DropSchedule.reset();
+		// NOT FountainFinish: a finish already claimed is the end of the
+		// run, whichever world it was claimed from.
 	}
 
 	/** Milliseconds left on the pre-race countdown; 0 once it is done. */

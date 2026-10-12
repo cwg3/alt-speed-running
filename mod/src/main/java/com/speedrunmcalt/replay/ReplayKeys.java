@@ -21,12 +21,13 @@ import org.lwjgl.glfw.GLFW;
 public final class ReplayKeys {
 	/** What each slot does, in order. Rendered by MatchHud. */
 	public static final String[] LABELS = {
-		"play/pause", "-10s", "+10s", "speed", "camera", "player 1", "player 2",
+		"play/pause", "-10s", "+10s", "speed", "camera", "player 1", "player 2", "names",
 	};
 
 	private static final int[] KEYS = {
 		GLFW.GLFW_KEY_1, GLFW.GLFW_KEY_2, GLFW.GLFW_KEY_3,
 		GLFW.GLFW_KEY_4, GLFW.GLFW_KEY_5, GLFW.GLFW_KEY_6, GLFW.GLFW_KEY_7,
+		GLFW.GLFW_KEY_8,
 	};
 
 	/** Edge detection: act on the press, not once per tick while held. */
@@ -87,6 +88,9 @@ public final class ReplayKeys {
 				}
 				break;
 			}
+			case 7:
+				ReplayPlayback.toggleNames();
+				break;
 			default:
 				break;
 		}

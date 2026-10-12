@@ -60,7 +60,18 @@ public abstract class PauseMenuMixin extends Screen {
 		// min() of the two: the natural position on a tall window, the
 		// bottom of the screen on a short one.
 		int forfeitY = Math.min(this.height / 4 + 144, this.height - 52);
-		this.addButton(new ButtonWidget(this.width / 2 - 102, forfeitY, 204, 20,
+		// Reset shares forfeit's row, half each, rather than taking a
+		// row of its own: a third row ran into Save and Quit at 720p.
+		// Reset on the left because it is the one that keeps you in the
+		// race. Grey once the match has a result - the poller can land
+		// one while this menu is open.
+		ButtonWidget reset = new ButtonWidget(this.width / 2 - 102, forfeitY, 100, 20,
+				new LiteralText("Reset world"),
+				button -> this.client.openScreen(
+						new com.speedrunmcalt.menu.ResetWorldConfirmScreen((Screen) (Object) this)));
+		reset.active = com.speedrunmcalt.match.RaceReset.available();
+		this.addButton(reset);
+		this.addButton(new ButtonWidget(this.width / 2 + 2, forfeitY, 100, 20,
 				new LiteralText("Forfeit match"),
 				button -> this.client.openScreen(new ForfeitConfirmScreen((Screen) (Object) this))));
 

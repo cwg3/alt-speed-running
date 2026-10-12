@@ -1,4 +1,6 @@
 {
 	"key.categories.speedrunmcalt": "alt",
-	"key.speedrunmcalt.forfeit": "Forfeit match"
+	"key.speedrunmcalt.forfeit": "Forfeit match",
+	"key.speedrunmcalt.reset": "Reset race world",
+	"key.speedrunmcalt.cancelQueue": "Cancel search"
 }

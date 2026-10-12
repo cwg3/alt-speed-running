@@ -40,6 +40,7 @@
     "SplashTextMixin",
     "SpectatorSlotMixin",
     "ReplaySkinMixin",
+    "ReplayNameMixin",
     "GammaLabelMixin"
   ],
   "injectors": {

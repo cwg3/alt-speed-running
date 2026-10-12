@@ -66,6 +66,16 @@ confirmation first. Your opponent wins and your rating moves as it would
 for any loss, but the match is recorded and shown as a **forfeit**, not
 a loss.
 
+**Press ] to reset your world** - a fresh copy of the same seed, back at
+spawn with nothing. Your clock keeps running, so it is a way out of a
+bad start, not a do-over. Also in the pause menu, beside Forfeit.
+
+**Press Z to cancel a search.** Every alt key is under Options > Controls,
+in the "alt" section, and can be rebound there.
+
+In a replay, keys 1-8 are the controls on the hotbar; **8 hides or shows
+the player names.**
+
 ---
 
 ## Who can play

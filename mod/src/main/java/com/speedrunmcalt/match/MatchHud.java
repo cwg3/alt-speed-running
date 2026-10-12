@@ -220,9 +220,9 @@ public final class MatchHud {
 		int y = Y + LINE * 4;
 		for (int i = from; i < recent.size(); i++) {
 			com.speedrunmcalt.net.ReplayData.Event e = recent.get(i);
-			// A death is the only one that changes what happens next,
-			// so it is the only one that gets a colour.
-			int colour = "death".equals(e.type)
+			// A death and a reset are the ones that change what happens
+			// next, so they are the ones that get a colour.
+			int colour = "death".equals(e.type) || "reset".equals(e.type)
 					? com.speedrunmcalt.menu.Palette.MAGENTA
 					: com.speedrunmcalt.menu.Palette.DIM;
 			String label = MatchState.formatTime(e.t) + "  " + readable(e);
@@ -238,6 +238,9 @@ public final class MatchHud {
 	private static String readable(com.speedrunmcalt.net.ReplayData.Event e) {
 		if ("death".equals(e.type)) {
 			return e.detail;   // already a death message
+		}
+		if ("reset".equals(e.type)) {
+			return "reset the world";
 		}
 		String d = e.detail;
 		int dot = d.lastIndexOf('.');
@@ -261,11 +264,12 @@ public final class MatchHud {
 	 * without being told - which is also why the slots carry no key
 	 * numbers.
 	 *
-	 * Six slots, not nine. The bar texture is 182px of 9 slots at 20px
-	 * inside a 1px border, so the left 121px gives the border plus six
-	 * slots and the last column of the source supplies the right cap.
-	 * Stretching a 9-slot bar under 6 controls would leave three empty
-	 * boxes inviting keys 7, 8 and 9 to do something.
+	 * One slot per control, not nine. The bar texture is 182px of 9
+	 * slots at 20px inside a 1px border, so the left 1 + 20n px gives
+	 * the border plus n slots and the last column of the source
+	 * supplies the right cap. Stretching a 9-slot bar under fewer
+	 * controls would leave empty boxes inviting the spare number keys
+	 * to do something.
 	 */
 	private static void renderReplayControls(MatrixStack matrices, MinecraftClient client) {
 		String[] labels = com.speedrunmcalt.replay.ReplayKeys.LABELS;
@@ -344,6 +348,21 @@ public final class MatchHud {
 					icon(client, new net.minecraft.item.ItemStack(free
 							? net.minecraft.item.Items.ENDER_EYE
 							: net.minecraft.item.Items.COMPASS), iconX, iconY);
+					break;
+				}
+				case 7: {
+					// A name tag is what puts a name over a head. Faded
+					// out while the names are hidden, the way the other
+					// toggles show their state on the item itself.
+					icon(client, new net.minecraft.item.ItemStack(net.minecraft.item.Items.NAME_TAG),
+							iconX, iconY);
+					if (!com.speedrunmcalt.replay.ReplayPlayback.namesVisible()) {
+						matrices.push();
+						matrices.translate(0, 0, 200);
+						net.minecraft.client.gui.DrawableHelper.fill(
+								matrices, iconX, iconY, iconX + 16, iconY + 16, 0xB0000000);
+						matrices.pop();
+					}
 					break;
 				}
 				default: {
