@@ -423,6 +423,31 @@ the entire function of that file.
   reason is given in plain English, and it can be argued with. Same shape
   as the anti-cheat flags, and it should reuse that machinery rather than
   grow a second one.
+
+  **How it would be built** (scoped 2026-10-11; about a day without the
+  enforcement path):
+
+  - **Transport: the live poll.** `LiveMatchPoller` already asks
+    `liveMatch` every 3s, so messages ride back on that - no new
+    connection, next to no cost. Up to 3s of delay, fine for "gg" and
+    "glhf"; instant delivery would mean API Gateway WebSockets, a much
+    bigger change.
+  - **Backend:** a send endpoint that checks the sender is in the match
+    and it is pending, caps length and rate, and appends to the match
+    record (decision 1). `liveMatch` returns what the caller has not
+    seen. A CDK change, so the user runs the deploy.
+  - **Mod:** in a match, vanilla chat (T) sends to the opponent rather
+    than the integrated server; anything starting with `/` still goes
+    to the game. Incoming lines go into vanilla chat as
+    `<opponent> message`. Messages are also replay events, so a report
+    can be "look at the match".
+  - **Mute toggle** - Ranked's "Private Chat Toggle" - as a key in the
+    "alt" Controls section.
+  - **Paces get no chat.** The opponent is a recording.
+
+  Biggest single piece is the enforcement path (a report button and a
+  review queue), bigger than chat itself - it can follow in a later
+  round, but chat should not ship long without it.
 - [ ] **Live spectating** — watching a match while it is still being
   played, Ranked's "Live Replay". Waiting on what it should mean before
   anything is built:
