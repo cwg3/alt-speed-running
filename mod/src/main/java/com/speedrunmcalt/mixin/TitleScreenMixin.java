@@ -87,6 +87,45 @@ public abstract class TitleScreenMixin extends Screen {
 				// DEFAULT - any run carrying its own style wins.
 				speedrunmcalt$label(),
 				button -> this.client.openScreen(new AltMenuScreen(this))));
+		speedrunmcalt$dropRealms(singleplayerTop);
+	}
+
+	/**
+	 * Realms can't be played on 1.16.1 any more, so its button goes, and
+	 * the Options/Quit row (with the language and accessibility icons)
+	 * moves up a row to close the gap it leaves. Found by its
+	 * translation key, not its position, so a button some other mod
+	 * puts in that slot is left alone.
+	 */
+	private void speedrunmcalt$dropRealms(int singleplayerTop) {
+		boolean removed = this.buttons.removeIf(speedrunmcalt$isRealms())
+				| this.children.removeIf(speedrunmcalt$isRealms());
+		if (!removed) {
+			return;
+		}
+		int bottomRow = singleplayerTop + 72 + 12;
+		for (net.minecraft.client.gui.widget.AbstractButtonWidget b : this.buttons) {
+			if (b.y == bottomRow) {
+				b.y -= 24;
+			}
+		}
+	}
+
+	private static java.util.function.Predicate<Object> speedrunmcalt$isRealms() {
+		return o -> o instanceof net.minecraft.client.gui.widget.AbstractButtonWidget
+				&& ((net.minecraft.client.gui.widget.AbstractButtonWidget) o).getMessage()
+						instanceof net.minecraft.text.TranslatableText
+				&& "menu.online".equals(((net.minecraft.text.TranslatableText)
+						((net.minecraft.client.gui.widget.AbstractButtonWidget) o).getMessage()).getKey());
+	}
+
+	/**
+	 * With the button gone, its notification icon (and the Realms
+	 * server polling behind it) has nothing to sit beside.
+	 */
+	@Inject(method = "areRealmsNotificationsEnabled", at = @At("HEAD"), cancellable = true)
+	private void speedrunmcalt$noRealmsNotifications(CallbackInfoReturnable<Boolean> cir) {
+		cir.setReturnValue(false);
 	}
 
 	/**
@@ -283,9 +322,9 @@ public abstract class TitleScreenMixin extends Screen {
 	}
 
 	/**
-	 * A tall ">" of two blaze rods closing around Singleplayer,
-	 * Multiplayer and Realms, its point aimed at "Vanilla!" and a
-	 * vanilla cone - the one row above is ours, the three it brackets
+	 * A tall ">" of two blaze rods closing around Singleplayer and
+	 * Multiplayer, its point aimed at "Vanilla!" and a
+	 * vanilla cone - the one row above is ours, the two it brackets
 	 * are Mojang's. Blaze rods because every run goes through them.
 	 *
 	 * The label borrows the splash text's motion, copied from
@@ -300,9 +339,9 @@ public abstract class TitleScreenMixin extends Screen {
 	 */
 	private void speedrunmcalt$vanillaLabel(MatrixStack matrices) {
 		int singleplayerTop = this.height / 4 + 48;
-		// Singleplayer's top to Realms' bottom: three 20px rows, 24 apart.
+		// Singleplayer's top to Multiplayer's bottom: two 20px rows, 24 apart.
 		int top = singleplayerTop;
-		int bottom = singleplayerTop + 24 * 2 + 20;
+		int bottom = singleplayerTop + 24 + 20;
 		int mid = (top + bottom) / 2;
 		int x0 = this.width / 2 + 100 + BRACKET_GAP;
 		int tip = x0 + BRACKET_DEPTH;
