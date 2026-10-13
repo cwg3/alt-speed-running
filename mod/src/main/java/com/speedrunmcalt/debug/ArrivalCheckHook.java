@@ -141,6 +141,41 @@ public class ArrivalCheckHook implements DedicatedServerModInitializer {
 					if (p.length < 4) {
 						continue;
 					}
+					if (p[0].equals("lava") && p.length >= 5) {
+						// "lava x y z r": every lava block within r, sources marked.
+						BlockPos c = new BlockPos(Integer.parseInt(p[1]), Integer.parseInt(p[2]), Integer.parseInt(p[3]));
+						int r = Integer.parseInt(p[4]);
+						StringBuilder found = new StringBuilder();
+						for (BlockPos q : BlockPos.iterate(c.add(-r, -r, -r), c.add(r, r, r))) {
+							net.minecraft.fluid.FluidState f = nether.getFluidState(q);
+							if (f.isIn(net.minecraft.tag.FluidTags.LAVA)) {
+								found.append(q.getX()).append(',').append(q.getY()).append(',').append(q.getZ())
+										.append(f.isStill() ? "S " : "f" + f.getLevel() + " ");
+							}
+						}
+						SpeedrunMcAlt.LOGGER.info("[arrival] lava near {}: {}", c, found);
+						continue;
+					}
+					if (p[0].equals("portal")) {
+						// "portal x y z": build the portal vanilla would for
+						// an entity arriving at x,y,z (overworld coords / 8,
+						// from a replay). Its frame is part of the arrival -
+						// in a match it is there before the guard looks.
+						// The forcer's random is seeded from the world seed,
+						// so the first portal here faces the way the match's did.
+						double px = Double.parseDouble(p[1]);
+						double pz = Double.parseDouble(p[3]);
+						for (int x = ((int) px >> 4) - 2; x <= ((int) px >> 4) + 2; x++) {
+							for (int z = ((int) pz >> 4) - 2; z <= ((int) pz >> 4) + 2; z++) {
+								nether.getChunk(x, z);
+							}
+						}
+						net.minecraft.entity.Entity probe = net.minecraft.entity.EntityType.PIG.create(nether);
+						probe.refreshPositionAndAngles(px, Double.parseDouble(p[2]), pz, 0, 0);
+						nether.getPortalForcer().createPortal(probe);
+						SpeedrunMcAlt.LOGGER.info("[arrival] built a portal for {},{},{}", p[1], p[2], p[3]);
+						continue;
+					}
 					if (p[0].equals("dump")) {
 						// "dump x z ylo yhi": what a column is made of, top down.
 						int dx = Integer.parseInt(p[1]);

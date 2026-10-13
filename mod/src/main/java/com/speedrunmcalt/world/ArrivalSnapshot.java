@@ -64,6 +64,15 @@ public final class ArrivalSnapshot implements BlockView {
 	public int predicted = 0;
 
 	/**
+	 * For each lava cell, real or predicted, the lava cell in the copy its
+	 * flow was traced from. Set by {@link #predictLava}.
+	 */
+	private int[] origin;
+
+	/** Most flowing lava one cap drains, so a lava sea cannot run away with it. */
+	private static final int MAX_DRAIN = 4096;
+
+	/**
 	 * An empty copy covering {@code radius} blocks around {@code at}
 	 * across and {@code yBand} above and below.
 	 */
@@ -155,9 +164,12 @@ public final class ArrivalSnapshot implements BlockView {
 	 * and this settles to one answer whatever order cells are visited in.
 	 */
 	public void predictLava() {
+		java.util.Arrays.fill(future, false);
+		predicted = 0;
 		int[] level = new int[states.length];
 		boolean[] falling = new boolean[states.length];
 		boolean[] source = new boolean[states.length];
+		origin = new int[states.length];
 		ArrayDeque<Integer> queue = new ArrayDeque<>();
 		for (int i = 0; i < states.length; i++) {
 			BlockState s = states[i];
@@ -168,6 +180,7 @@ public final class ArrivalSnapshot implements BlockView {
 			level[i] = f.getLevel();
 			source[i] = f.isStill();
 			falling[i] = !source[i] && f.get(FlowableFluid.FALLING);
+			origin[i] = i;
 			queue.add(i);
 		}
 
@@ -181,6 +194,7 @@ public final class ArrivalSnapshot implements BlockView {
 				if (!falling[below]) {
 					falling[below] = true;
 					level[below] = LAVA_REACH;
+					origin[below] = origin[i];
 					mark(below);
 					queue.add(below);
 				}
@@ -197,6 +211,7 @@ public final class ArrivalSnapshot implements BlockView {
 			for (int n : spreadTargets(i, source)) {
 				if (level[n] < spread) {
 					level[n] = spread;
+					origin[n] = origin[i];
 					mark(n);
 					queue.add(n);
 				}
@@ -296,6 +311,125 @@ public final class ArrivalSnapshot implements BlockView {
 		Material m = s.getMaterial();
 		return !m.blocksMovement() && m != Material.LAVA && m != Material.WATER
 				&& m != Material.PORTAL;
+	}
+
+	/**
+	 * The lava sources, at or above the arrival's feet, whose flow - as
+	 * {@link #predictLava} last ran it - reaches any open cell within
+	 * {@code radius} blocks across of {@code at}, at its feet or head height.
+	 *
+	 * From play on 2026-10-07: the vanilla portal landed on a fortress
+	 * bridge under two wall springs. Their predicted fall covered both
+	 * ways off the portal, the search could not take a single step, and
+	 * the pad it fell back on only clears lava up to head height - the
+	 * springs kept pouring. Sources below the feet are lakes and the lava
+	 * sea, which the search already bridges, so they are left alone.
+	 */
+	public java.util.Set<Integer> springsReaching(BlockPos at, int radius) {
+		java.util.Set<Integer> springs = new java.util.HashSet<>();
+		if (origin == null) {
+			return springs;
+		}
+		for (int y = at.getY(); y <= at.getY() + 1; y++) {
+			for (int x = at.getX() - radius; x <= at.getX() + radius; x++) {
+				for (int z = at.getZ() - radius; z <= at.getZ() + radius; z++) {
+					if (x < minX || x >= minX + sizeX || z < minZ || z >= minZ + sizeZ
+							|| y < minY || y >= minY + sizeY) {
+						continue;
+					}
+					int i = index(x, y, z);
+					boolean real = states[i] != null && states[i].getMaterial() == Material.LAVA;
+					if (!future[i] && !real) {
+						continue;
+					}
+					for (int src : sourcesFeeding(origin[i])) {
+						if (src / (sizeX * sizeZ) + minY >= at.getY()) {
+							springs.add(src);
+						}
+					}
+				}
+			}
+		}
+		return springs;
+	}
+
+	/**
+	 * The sources a real lava cell is fed from: itself if it is one,
+	 * otherwise up its flow - the lava above a falling cell, or a
+	 * sideways neighbour standing higher.
+	 */
+	private java.util.List<Integer> sourcesFeeding(int start) {
+		java.util.List<Integer> out = new java.util.ArrayList<>();
+		java.util.Set<Integer> seen = new java.util.HashSet<>();
+		ArrayDeque<Integer> queue = new ArrayDeque<>();
+		queue.add(start);
+		seen.add(start);
+		int layer = sizeX * sizeZ;
+		while (!queue.isEmpty() && seen.size() < MAX_DRAIN) {
+			int i = queue.poll();
+			FluidState f = states[i].getFluidState();
+			if (f.isStill()) {
+				out.add(i);
+				continue;
+			}
+			int above = i + layer;
+			if (above < states.length && realLava(above)) {
+				if (seen.add(above)) {
+					queue.add(above);
+				}
+				continue;
+			}
+			for (int d = 0; d < 4; d++) {
+				int n = neighbour(i, d);
+				if (n >= 0 && realLava(n) && seen.add(n)) {
+					FluidState g = states[n].getFluidState();
+					if (g.isStill() || g.getLevel() > f.getLevel()) {
+						queue.add(n);
+					}
+				}
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * Seals {@code springs} with netherrack and drains the flowing lava
+	 * running from them, in the copy. Returns the cells changed: sealed
+	 * springs first, then drained cells, as {@code [sealed, drained]}.
+	 * Run {@link #predictLava} again afterwards.
+	 */
+	public java.util.List<java.util.List<BlockPos>> cap(java.util.Set<Integer> springs) {
+		java.util.List<BlockPos> sealed = new java.util.ArrayList<>();
+		java.util.List<BlockPos> drained = new java.util.ArrayList<>();
+		ArrayDeque<Integer> queue = new ArrayDeque<>();
+		for (int i : springs) {
+			states[i] = Blocks.NETHERRACK.getDefaultState();
+			sealed.add(position(i));
+			queue.add(i);
+		}
+		int layer = sizeX * sizeZ;
+		while (!queue.isEmpty() && drained.size() < MAX_DRAIN) {
+			int i = queue.poll();
+			int[] next = {neighbour(i, 0), neighbour(i, 1), neighbour(i, 2), neighbour(i, 3),
+					i - layer >= 0 ? i - layer : -1};
+			for (int n : next) {
+				if (n >= 0 && realLava(n) && !states[n].getFluidState().isStill()) {
+					states[n] = Blocks.AIR.getDefaultState();
+					drained.add(position(n));
+					queue.add(n);
+				}
+			}
+		}
+		return java.util.Arrays.asList(sealed, drained);
+	}
+
+	private boolean realLava(int i) {
+		return states[i] != null && states[i].getMaterial() == Material.LAVA;
+	}
+
+	private BlockPos position(int i) {
+		int layer = sizeX * sizeZ;
+		return new BlockPos(minX + i % sizeX, minY + i / layer, minZ + (i / sizeX) % sizeZ);
 	}
 
 	private int index(int x, int y, int z) {

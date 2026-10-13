@@ -6,15 +6,20 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.Material;
+import net.minecraft.fluid.FluidState;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ChunkTicketType;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.tag.FluidTags;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Direction;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -153,6 +158,15 @@ public final class NetherArrival {
 			ChunkTicketType.create("speedrunmcalt_arrival",
 					Comparator.comparingLong(ChunkPos::toLong), MAX_WAIT_TICKS + 100);
 
+	/**
+	 * How far across from the arrival lava from above counts as pouring
+	 * onto it: as far as nether lava spreads from where it lands.
+	 */
+	private static final int SPRING_REACH = 8;
+
+	/** Rounds of sealing springs and searching again before giving up on it. */
+	private static final int CAP_ROUNDS = 3;
+
 	/** Radius of the pad built when no way out is found at all. */
 	private static final int PAD_RADIUS = 5;
 
@@ -189,11 +203,17 @@ public final class NetherArrival {
 		final ArrivalReach.Result reach;
 		final int predicted;
 		final long searchMs;
+		/** Springs to seal and flowing lava to drain before anything else. */
+		final List<BlockPos> sealed;
+		final List<BlockPos> drained;
 
-		Measured(ArrivalReach.Result reach, int predicted, long searchMs) {
+		Measured(ArrivalReach.Result reach, int predicted, long searchMs,
+				List<BlockPos> sealed, List<BlockPos> drained) {
 			this.reach = reach;
 			this.predicted = predicted;
 			this.searchMs = searchMs;
+			this.sealed = sealed;
+			this.drained = drained;
 		}
 	}
 
@@ -316,13 +336,64 @@ public final class NetherArrival {
 		return new BlockPos(MatchState.bastionX, at.getY(), MatchState.bastionZ);
 	}
 
-	/** Search thread: predict the lava, then price the way out. */
+	/**
+	 * Search thread: predict the lava, then price the way out. If that
+	 * is too dear and lava from above reaches the arrival, seal the
+	 * springs it comes from and price again - a runner cannot walk under
+	 * a lavafall, and digging round it only digs into more of it.
+	 */
 	private static Measured measure(ArrivalSnapshot snapshot, BlockPos at, BlockPos toward, int[] rings) {
 		long started = System.currentTimeMillis();
-		snapshot.predictLava();
-		ArrivalReach.Result r = ArrivalReach.measure(snapshot, at, rings, MAX_COST,
-				snapshot::isLoaded, toward, SLACK);
-		return new Measured(r, snapshot.predicted, System.currentTimeMillis() - started);
+		List<BlockPos> sealed = new ArrayList<>();
+		List<BlockPos> drained = new ArrayList<>();
+		ArrivalReach.Result r;
+		int round = 0;
+		while (true) {
+			snapshot.predictLava();
+			r = ArrivalReach.measure(snapshot, at, rings, MAX_COST, snapshot::isLoaded, toward, SLACK);
+			int outer = r.outer();
+			// Unloaded terrain may be what blocked it; apply leaves that alone.
+			if ((outer >= 0 && outer <= TOLERANCE) || r.hitUnloaded || round++ >= CAP_ROUNDS) {
+				break;
+			}
+			Set<Integer> springs = snapshot.springsReaching(at, SPRING_REACH);
+			if (springs.isEmpty()) {
+				break;
+			}
+			List<List<BlockPos>> changed = snapshot.cap(springs);
+			sealed.addAll(changed.get(0));
+			drained.addAll(changed.get(1));
+		}
+		return new Measured(r, snapshot.predicted, System.currentTimeMillis() - started, sealed, drained);
+	}
+
+	/**
+	 * Server thread: seal the springs the search sealed in its copy and
+	 * drain what ran from them. Only cells still lava are touched; a
+	 * cell the world has since changed is left as it is.
+	 */
+	private static String capLava(ServerWorld nether, Measured m) {
+		if (m.sealed.isEmpty()) {
+			return "";
+		}
+		int sealed = 0;
+		int drained = 0;
+		for (BlockPos pos : m.sealed) {
+			FluidState f = nether.getFluidState(pos);
+			if (f.isIn(FluidTags.LAVA) && f.isStill()) {
+				nether.setBlockState(pos, Blocks.NETHERRACK.getDefaultState(), 3);
+				sealed++;
+			}
+		}
+		for (BlockPos pos : m.drained) {
+			FluidState f = nether.getFluidState(pos);
+			if (f.isIn(FluidTags.LAVA) && !f.isStill()) {
+				nether.setBlockState(pos, Blocks.AIR.getDefaultState(), 3);
+				drained++;
+			}
+		}
+		return String.format("; sealed %d of %d springs pouring onto it, drained %d lava", sealed,
+				m.sealed.size(), drained);
 	}
 
 	/**
@@ -371,6 +442,7 @@ public final class NetherArrival {
 	private static boolean apply(ServerWorld nether, BlockPos at, Measured m, int tolerance, String how) {
 		ArrivalReach.Result r = m.reach;
 		int outer = r.outer();
+		how += capLava(nether, m);
 		// An unloaded column stops the search like a wall would. If the
 		// verdict then comes out bad, it may be the missing terrain
 		// talking, so the world is left alone - unknown is not unrunnable.
