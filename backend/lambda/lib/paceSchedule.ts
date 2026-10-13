@@ -47,6 +47,7 @@ export const PACE_TIERS: readonly PaceTier[] = [
 	{ id: 'p17', label: '17:00', finishMs: 17 * 60_000 },
 	{ id: 'p22', label: '22:00', finishMs: 22 * 60_000 },
 	{ id: 'p30', label: '30:00', finishMs: 30 * 60_000 },
+	{ id: 'p60', label: '60:00', finishMs: 60 * 60_000 },
 ];
 
 export function tierById(id: string): PaceTier | undefined {

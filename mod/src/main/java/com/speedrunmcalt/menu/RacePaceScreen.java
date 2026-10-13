@@ -42,6 +42,7 @@ public class RacePaceScreen extends AltScreen {
 		{ "p17", "17:00" },
 		{ "p22", "22:00" },
 		{ "p30", "30:00" },
+		{ "p60", "60:00" },
 	};
 
 	private final Screen parent;
@@ -56,9 +57,10 @@ public class RacePaceScreen extends AltScreen {
 		int cx = this.width / 2;
 		int top = this.height / 2 - 30;
 
-		// One row, because five tiers in a column would push Back off a
-		// short window and the labels are short enough to read at 56px.
-		int w = 56;
+		// One row, because six tiers in a column would push Back off a
+		// short window and the labels are short enough to read at 52px.
+		// 52, not 56: six at 56 ran wider than the panel behind them.
+		int w = 52;
 		int gap = 4;
 		int total = TIERS.length * w + (TIERS.length - 1) * gap;
 		int x = cx - total / 2;
