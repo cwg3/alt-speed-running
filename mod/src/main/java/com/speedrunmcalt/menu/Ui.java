@@ -187,8 +187,8 @@ public final class Ui extends DrawableHelper {
 	private static final java.util.Set<Identifier> FILTERED = new java.util.HashSet<>();
 
 	/** Size the wallpapers are shipped at - gen_wallpapers.py --width. */
-	private static final int WALL_W = 1280;
-	private static final int WALL_H = 720;
+	private static final int WALL_W = 1920;
+	private static final int WALL_H = 1080;
 
 	/**
 	 * The seed type's wallpaper, filling the screen. False when there is

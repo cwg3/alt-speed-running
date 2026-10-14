@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 """Render the five seed-type wallpapers shown behind the countdown.
 
-Syd Mead by way of 1982 Tron: each structure as a dark, glossy model
-traced in neon - silhouette and crease edges bright, the seams between
-blocks faint - standing on a slab of its own terrain, on an endless
-reflective grid under a low sunset.
+The look is a still from Tron (1982): each structure a lit grey model
+traced in glowing strips - a white-hot core in an azure halo, only where
+two surfaces meet - standing on a dark slab of its own terrain, on a
+glossy floor grid under a low sunset, softened like film and grained.
+
+The lines are not drawn edge by edge. Every attempt at that left nicks,
+beads or overshoots where one block's stroke met the next; instead each
+pixel is tagged with the flat surface covering it and a line goes
+wherever two surfaces meet. See draw_model.
+
+Slabs are trimmed to whole floor-grid squares and the grid is laid from
+the slab's corner, so every slab edge runs along a grid line.
 
 The geometry is real. Each structure is dumped from a generated world
 twice, once with structures on and once with them off, and the model is
@@ -19,12 +27,15 @@ Dumps are `wall-<type>.txt` (structures on) and `wallB-<type>.txt`
 which is gitignored: they come from a seed, and seeds stay out of this
 repository. Its README says how to re-dump them.
 
-Requires Pillow and numpy:  venv/bin/pip install Pillow numpy
+Requires Pillow, numpy and pycairo:  venv/bin/pip install Pillow numpy pycairo
+(pycairo builds against Homebrew's cairo: PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig)
 Usage:  venv/bin/python gen_wallpapers.py <dump_dir> <out_dir> [--width N] [type ...]
 
-The mod ships them at --width 1280, into
-mod/src/main/resources/assets/speedrunmcalt/textures/gui/seed/ - full
-1920 frames are five megabytes of jar for a screen shown ten seconds.
+The mod ships them at --width 1920, into
+mod/src/main/resources/assets/speedrunmcalt/textures/gui/seed/ (and the
+lobby into textures/gui/). The soft lines have no hard edge for the
+game's stretching to show, and grain makes a 3840 frame several times
+the size. Ui.java's WALL_W/WALL_H must match.
 """
 import gzip
 import math
@@ -32,15 +43,98 @@ import os
 import struct
 import sys
 
+import cairo
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageFilter
 
 W, H = 1920, 1080
 SS = 2  # supersampling factor
 
+
+class Canvas:
+    """An opaque RGB picture that lines and polygons are drawn onto as
+    vector paths, through cairo, anti-aliased.
+
+    Pillow's ImageDraw has no anti-aliasing: every neon edge was a
+    staircase, and supersampling only made the steps smaller. Cairo
+    covers each pixel by how much of the path is in it, so a line at
+    any angle is smooth at any size.
+    """
+
+    def __init__(self, img_or_size):
+        img = (img_or_size if isinstance(img_or_size, Image.Image)
+               else Image.new("RGB", img_or_size))
+        w, h = img.size
+        rgb = np.asarray(img.convert("RGB"))
+        # ARGB32 is BGRA in memory on a little-endian machine. Opaque
+        # throughout, so premultiplying changes nothing.
+        self.buf = np.empty((h, w, 4), np.uint8)
+        self.buf[..., 0] = rgb[..., 2]
+        self.buf[..., 1] = rgb[..., 1]
+        self.buf[..., 2] = rgb[..., 0]
+        self.buf[..., 3] = 255
+        self.surface = cairo.ImageSurface.create_for_data(
+            memoryview(self.buf), cairo.FORMAT_ARGB32, w, h, w * 4)
+        self.ctx = cairo.Context(self.surface)
+        self.ctx.set_antialias(cairo.ANTIALIAS_BEST)
+        self.ctx.set_line_join(cairo.LINE_JOIN_ROUND)
+
+    def _colour(self, rgba):
+        r, g, b, a = rgba
+        self.ctx.set_source_rgba(r / 255, g / 255, b / 255, a / 255)
+
+    def polygon(self, pts, fill):
+        self.ctx.move_to(*pts[0])
+        for p in pts[1:]:
+            self.ctx.line_to(*p)
+        self.ctx.close_path()
+        self._colour(fill)
+        # Not anti-aliased. Two smoothed faces sharing an edge each only
+        # half-cover it, and the lines behind leaked through every such
+        # crack as dashes. Every visible face border is stroked over.
+        self.ctx.set_antialias(cairo.ANTIALIAS_NONE)
+        self.ctx.fill()
+        self.ctx.set_antialias(cairo.ANTIALIAS_BEST)
+
+    def line(self, pts, fill, width, round_caps=True):
+        # Round caps close the corners where a face's edges meet; the
+        # grid's lines are many short segments of changing alpha, and
+        # round caps there doubled up at every joint into beads.
+        self.ctx.set_line_cap(cairo.LINE_CAP_ROUND if round_caps else cairo.LINE_CAP_BUTT)
+        self.ctx.set_line_width(width)
+        self.ctx.move_to(*pts[0])
+        for p in pts[1:]:
+            self.ctx.line_to(*p)
+        self._colour(fill)
+        self.ctx.stroke()
+
+    def faded_line(self, pts, alphas, rgb, width):
+        """One stroke along a straight run of points whose alpha
+        changes along it. Drawn as many short strokes, every joint
+        between two of them was a visible nick in the line."""
+        (x0, y0), (x1, y1) = pts[0], pts[-1]
+        span = math.hypot(x1 - x0, y1 - y0)
+        if span < 1e-6:
+            return
+        g = cairo.LinearGradient(x0, y0, x1, y1)
+        r, gr, b = (c / 255 for c in rgb)
+        for (x, y), a in zip(pts, alphas):
+            t = min(1.0, max(0.0, math.hypot(x - x0, y - y0) / span))
+            g.add_color_stop_rgba(t, r, gr, b, a / 255)
+        self.ctx.set_line_cap(cairo.LINE_CAP_BUTT)
+        self.ctx.set_line_width(width)
+        self.ctx.move_to(x0, y0)
+        self.ctx.line_to(x1, y1)
+        self.ctx.set_source(g)
+        self.ctx.stroke()
+
+    def image(self):
+        self.surface.flush()
+        return Image.fromarray(self.buf[..., 2::-1].copy())
+
 # The mod's palette (Palette.java), so the renders and the screens they
 # sit behind are one set of colours.
-CYAN = (34, 211, 238)
+CYAN = (90, 185, 255)  # Tron azure
 PURPLE = (169, 123, 255)
 MAGENTA = (236, 72, 153)
 ORANGE = (255, 106, 0)
@@ -97,20 +191,93 @@ def accent(name):
     return CYAN
 
 
+def split_state(name):
+    """"oak_stairs|facing=west|half=top" -> ("oak_stairs", {...}).
+
+    Only template blocks carry a state, and only the ones whose shape
+    depends on it; a dump has bare names, and gets the defaults.
+    """
+    base, *props = name.split("|")
+    return base, dict(p.split("=", 1) for p in props)
+
+
+# Quarter-block halves, by the side of the cube they sit against.
+SIDE = {
+    "north": (0, 0, 0, 1, 1, 0.5), "south": (0, 0, 0.5, 1, 1, 1),
+    "west": (0, 0, 0, 0.5, 1, 1), "east": (0.5, 0, 0, 1, 1, 1),
+}
+
+
+def _cut(box, y0, y1):
+    return (box[0], y0, box[2], box[3], y1, box[5])
+
+
 def shape(name):
-    """(x0, y0, z0, x1, y1, z1) inside the unit cube, and whether the
-    block is a full cube for culling purposes."""
-    if name.endswith("_slab"):
-        return (0, 0, 0, 1, 0.5, 1), False
-    if name.endswith(("_fence", "_wall", "_bars", "_pane")) or name in ("iron_bars",):
-        return (0.375, 0, 0.375, 0.625, 1, 0.625), False
-    if name.endswith(("_trapdoor", "_carpet", "_pressure_plate")) or name in ("rail", "snow"):
-        return (0, 0, 0, 1, 0.1875, 1), False
-    if name.endswith(("torch", "_lantern")) or name in ("lantern", "bell", "flower_pot"):
-        return (0.375, 0, 0.375, 0.625, 0.625, 0.625), False
-    if name in ("chest", "trapped_chest"):
-        return (0.0625, 0, 0.0625, 0.9375, 0.875, 0.9375), False
-    return (0, 0, 0, 1, 1, 1), True
+    """Boxes (x0, y0, z0, x1, y1, z1) inside the unit cube, and whether
+    the block is a full cube for culling purposes.
+
+    A dump's stairs and doors have no state - which way they face is
+    unknown - and stay cubes, as they always were."""
+    base, st = split_state(name)
+    if base.endswith("_stairs") and st:
+        # A slab and a step. Upside-down stairs are most of a
+        # shipwreck's hull; as cubes it was a heap of blocks.
+        top = st.get("half") == "top"
+        slab = (0, 0.5, 0, 1, 1, 1) if top else (0, 0, 0, 1, 0.5, 1)
+        step = _cut(SIDE[st.get("facing", "north")], *((0, 0.5) if top else (0.5, 1)))
+        return [slab, step], False
+    if base.endswith("_slab"):
+        kind = st.get("type", "bottom")
+        if kind == "double":
+            return [(0, 0, 0, 1, 1, 1)], True
+        return [(0, 0.5, 0, 1, 1, 1) if kind == "top" else (0, 0, 0, 1, 0.5, 1)], False
+    if base.endswith(("_fence", "_wall", "_bars", "_pane")) or base in ("iron_bars",):
+        # The post, and a rail toward each neighbour it joins.
+        boxes = [(0.375, 0, 0.375, 0.625, 1, 0.625)]
+        rails = {"north": (0.4375, 0.375, 0, 0.5625, 0.9375, 0.5),
+                 "south": (0.4375, 0.375, 0.5, 0.5625, 0.9375, 1),
+                 "west": (0, 0.375, 0.4375, 0.5, 0.9375, 0.5625),
+                 "east": (0.5, 0.375, 0.4375, 1, 0.9375, 0.5625)}
+        boxes += [r for d, r in rails.items() if st.get(d) == "true"]
+        return boxes, False
+    if base.endswith("_trapdoor"):
+        if st.get("open") == "true":
+            opposite = {"north": "south", "south": "north", "east": "west", "west": "east"}
+            thin = {"north": (0, 0, 0, 1, 1, 0.1875), "south": (0, 0, 0.8125, 1, 1, 1),
+                    "west": (0, 0, 0, 0.1875, 1, 1), "east": (0.8125, 0, 0, 1, 1, 1)}
+            return [thin[opposite[st.get("facing", "north")]]], False
+        return [(0, 0.8125, 0, 1, 1, 1) if st.get("half") == "top" else (0, 0, 0, 1, 0.1875, 1)], False
+    if base.endswith("_door") and st:
+        thin = {"east": (0, 0, 0, 0.1875, 1, 1), "west": (0.8125, 0, 0, 1, 1, 1),
+                "south": (0, 0, 0, 1, 1, 0.1875), "north": (0, 0, 0.8125, 1, 1, 1)}
+        return [thin[st.get("facing", "north")]], False
+    if base.endswith(("_carpet", "_pressure_plate")) or base in ("rail", "snow"):
+        return [(0, 0, 0, 1, 0.1875, 1)], False
+    if base.endswith(("torch", "_lantern")) or base in ("lantern", "bell", "flower_pot"):
+        return [(0.375, 0, 0.375, 0.625, 0.625, 0.625)], False
+    if base in ("chest", "trapped_chest"):
+        return [(0.0625, 0, 0.0625, 0.9375, 0.875, 0.9375)], False
+    return [(0, 0, 0, 1, 1, 1)], True
+
+
+# A quarter turn of the lobby's (x, y, z) -> (z, y, -x), for the
+# directions a block's state names.
+TURN = {"east": "north", "north": "west", "west": "south", "south": "east"}
+
+
+def turn_state(name):
+    base, st = split_state(name)
+    if not st:
+        return name
+    out = {}
+    for k, v in st.items():
+        if k in TURN:            # a fence's rails: east=true and so on
+            out[TURN[k]] = v
+        elif k == "facing" and v in TURN:
+            out[k] = TURN[v]
+        else:
+            out[k] = v
+    return "|".join([base] + [f"{k}={v}" for k, v in sorted(out.items())])
 
 
 def read_nbt(path):
@@ -183,12 +350,36 @@ def load_template(path, sea):
     # Shipwrecks carry several palettes - one per wood - under
     # "palettes"; anything else has one, under "palette".
     states = nbt["palette"] if "palette" in nbt else nbt["palettes"][0]
-    palette = [p["Name"].split(":")[-1] for p in states]
+    # Shape-bearing state kept, as "name|key=value|...".
+    KEEP = ("facing", "half", "type", "open")
+    palette = []
+    for p in states:
+        n = p["Name"].split(":")[-1]
+        props = p.get("Properties", {})
+        # Not stairs: drawn true, the upside-down stairs of a hull are a
+        # step on every block and the hull read as brickwork. As cubes
+        # it is a clean wall.
+        if n.endswith(("_slab", "_trapdoor", "_door")):
+            n = "|".join([n] + [f"{k}={props[k]}" for k in KEEP if k in props])
+        palette.append(n)
     blocks = {}
     for b in nbt["blocks"]:
         n = palette[b["state"]]
-        if n not in ("air", "cave_air", "structure_void", "water"):
+        # Structure blocks are markers for loot, replaced when the
+        # structure is placed; there is nothing there in the world.
+        if n not in ("air", "cave_air", "structure_void", "water", "structure_block"):
             blocks[tuple(b["pos"])] = n
+    # A template's fences are stored unconnected - the game joins them
+    # once placed. Join them here: to another fence, or to a full block.
+    for (x, y, z), n in list(blocks.items()):
+        if n.endswith("_fence"):
+            joins = []
+            for d, (dx, dz) in (("north", (0, -1)), ("south", (0, 1)),
+                                ("west", (-1, 0)), ("east", (1, 0))):
+                m = blocks.get((x + dx, y, z + dz))
+                if m and (m.endswith("_fence") or shape(m)[1]):
+                    joins.append(f"{d}=true")
+            blocks[(x, y, z)] = "|".join([n] + joins)
     sx, sy, sz = nbt["size"]
     for x in range(-8, sx + 8):
         for z in range(-8, sz + 8):
@@ -259,6 +450,13 @@ def build_scene(dump_dir, kind, crop, slab=True, least=8):
     hz = max((max(zs) - min(zs)) / 2 + pad, least)
     x0, x1 = int(math.floor(cx - hx)), int(math.ceil(cx + hx))
     z0, z1 = int(math.floor(cz - hz)), int(math.ceil(cz + hz))
+    # A whole number of floor-grid squares, so the slab's edges can lie
+    # on grid lines: trimmed evenly off both sides.
+    def to_grid(a, b):
+        extra = (b + 1 - a) % GRID
+        return a + extra // 2, b - (extra - extra // 2)
+    x0, x1 = to_grid(x0, x1)
+    z0, z1 = to_grid(z0, z1)
 
     # Column tops of the ground, ignoring trees and plants.
     tops = {}
@@ -294,8 +492,30 @@ def build_scene(dump_dir, kind, crop, slab=True, least=8):
                 continue
             scene[k] = ("T", name)
     for (x, z), y in water_top.items():
-        if (x, y + 1, z) not in on:
+        if (x, y + 1, z) in on:
+            continue
+        if slab:
             scene[(x, y, z)] = ("W", "water")
+    # Align the slab AS BUILT to the floor grid: columns with no ground
+    # leave it narrower than the footprint, and its bottom can sit a
+    # block above the planned floor. Trimmed to whole grid squares, and
+    # the floor - where the grid is drawn - is its actual bottom.
+    ground = [k for k, v in scene.items() if v[0] == "T"]
+    if ground:
+        def to_grid(a, b):
+            extra = (b + 1 - a) % GRID
+            return a + extra // 2, b - (extra - extra // 2)
+        x0, x1 = to_grid(min(k[0] for k in ground), max(k[0] for k in ground))
+        z0, z1 = to_grid(min(k[2] for k in ground), max(k[2] for k in ground))
+        scene = {k: v for k, v in scene.items()
+                 if v[0] != "T" or (x0 <= k[0] <= x1 and z0 <= k[2] <= z1)}
+        floor = min(k[1] for k, v in scene.items() if v[0] == "T")
+    else:
+        # No slab (the shipwreck): it stands on the floor itself, its
+        # corner on grid lines. A 9-wide hull cannot fill whole squares.
+        hull = [k for k, v in scene.items() if v[0] == "S"]
+        x0, z0 = min(k[0] for k in hull), min(k[2] for k in hull)
+        floor = min(k[1] for k in hull)
     return scene, floor, (x0, x1, z0, z1)
 
 
@@ -323,40 +543,41 @@ def faces_of(scene):
 
     out = []
     for (x, y, z), (cls, name) in scene.items():
-        box, cube = shape(name)
-        for normal, corners in FACES:
-            n = (x + normal[0], y + normal[1], z + normal[2])
-            if cls == "W" and normal != (0, 1, 0):
-                continue
-            # Hidden only behind the SAME kind of thing: the model and
-            # its slab are see-through to each other, which is how a
-            # buried chest shows through the sand.
-            if cube and full(n, cls):
-                continue
-            pts = []
-            for c in corners:
-                px = box[0] if c[0] == 0 else box[3]
-                py = box[1] if c[1] == 0 else box[4]
-                pz = box[2] if c[2] == 0 else box[5]
-                pts.append((x + px, y + py, z + pz))
-            edges = []
-            for i in range(4):
-                a, b = corners[i], corners[(i + 1) % 4]
-                # Which way is "across" this edge, in the face's plane:
-                # from the face's centre toward the edge's midpoint.
-                mid = [(a[j] + b[j]) / 2 - 0.5 for j in range(3)]
-                step = [0, 0, 0]
-                for j in range(3):
-                    if normal[j] == 0 and abs(mid[j]) == 0.5:
-                        step[j] = int(mid[j] * 2)
-                bright = True
-                if cube:
-                    m = (x + step[0], y + step[1], z + step[2])
-                    beyond = (m[0] + normal[0], m[1] + normal[1], m[2] + normal[2])
-                    if full(m, cls) and not full(beyond, cls):
-                        bright = False
-                edges.append((i, bright))
-            out.append((cls, name, normal, pts, edges))
+        boxes, cube = shape(name)
+        for box in boxes:
+            for normal, corners in FACES:
+                n = (x + normal[0], y + normal[1], z + normal[2])
+                if cls == "W" and normal != (0, 1, 0):
+                    continue
+                # Hidden only behind the SAME kind of thing: the model and
+                # its slab are see-through to each other, which is how a
+                # buried chest shows through the sand.
+                if cube and full(n, cls):
+                    continue
+                pts = []
+                for c in corners:
+                    px = box[0] if c[0] == 0 else box[3]
+                    py = box[1] if c[1] == 0 else box[4]
+                    pz = box[2] if c[2] == 0 else box[5]
+                    pts.append((x + px, y + py, z + pz))
+                edges = []
+                for i in range(4):
+                    a, b = corners[i], corners[(i + 1) % 4]
+                    # Which way is "across" this edge, in the face's plane:
+                    # from the face's centre toward the edge's midpoint.
+                    mid = [(a[j] + b[j]) / 2 - 0.5 for j in range(3)]
+                    step = [0, 0, 0]
+                    for j in range(3):
+                        if normal[j] == 0 and abs(mid[j]) == 0.5:
+                            step[j] = int(mid[j] * 2)
+                    bright = True
+                    if cube:
+                        m = (x + step[0], y + step[1], z + step[2])
+                        beyond = (m[0] + normal[0], m[1] + normal[1], m[2] + normal[2])
+                        if full(m, cls) and not full(beyond, cls):
+                            bright = False
+                    edges.append((i, bright))
+                out.append((cls, name, normal, pts, edges))
     return out
 
 
@@ -399,7 +620,7 @@ def sky(img, horizon):
     # Below the horizon: near-black floor, warming toward the horizon
     # where it catches the sunset.
     below = np.clip((ys - horizon) / max(h - horizon, 1), 0, 1)[..., None]
-    floor = np.array([28, 8, 36]) * (1 - below) ** 3 + np.array([2, 2, 6])
+    floor = np.array([26, 70, 96]) * (1 - below) ** 1.6 + np.array([6, 16, 26])
     px[:] = np.where((ys < horizon)[..., None], col, floor)
     # The sun: a wide low glow on the horizon behind the model.
     xs = np.arange(w)[None, :]
@@ -412,27 +633,34 @@ def sky(img, horizon):
     img.paste(Image.fromarray(np.clip(px, 0, 255).astype(np.uint8)))
 
 
-def grid(draw, cam, floor_y, horizon, w, h, spacing=4, reach=400):
+GRID = 4   # floor grid spacing, in blocks
+# Line softness and glow size. The lobby's models are far and small,
+# and at full size the glow swallowed them.
+LINE_SCALE = 1.0
+# How far the floor grid runs before it has faded out. The lobby's
+# models stand 170-300 blocks off, where the default had all but gone.
+GRID_REACH = 400
+
+
+def grid(draw, cam, floor_y, horizon, w, h, origin=(0, 0), spacing=GRID, reach=400):
     """The Tron floor: cyan lines on the plane under the slab, fading
     into the haze at the horizon."""
     c = cam.t
     def line(p0, p1):
         steps = 60
-        prev = None
+        pts, alphas = [], []
         for i in range(steps + 1):
             p = p0 + (p1 - p0) * i / steps
             sx, sy, z = cam.project(p)
             if z < 1:
-                prev = None
                 continue
-            if prev:
-                fade = max(0.0, 1 - z / (reach * 0.9)) ** 1.5
-                a = int(150 * fade)
-                if a > 2:
-                    draw.line([prev, (sx, sy)], fill=CYAN + (a,), width=SS)
-            prev = (sx, sy)
-    gx0 = int(c[0] // spacing) * spacing
-    gz0 = int(c[2] // spacing) * spacing
+            pts.append((sx, sy))
+            alphas.append(70 * max(0.0, 1 - z / (reach * 0.9)) ** 1.5)
+        if len(pts) > 1 and max(alphas) > 2:
+            draw.faded_line(pts, alphas, CYAN, SS)
+    # Lines through the origin given, so they can run along a slab's edges.
+    gx0 = origin[0] + int((c[0] - origin[0]) // spacing) * spacing
+    gz0 = origin[1] + int((c[2] - origin[1]) // spacing) * spacing
     for k in range(-reach // spacing, reach // spacing + 1):
         x = gx0 + k * spacing
         line(np.array([x, floor_y, c[2] - reach]), np.array([x, floor_y, c[2] + reach]))
@@ -441,11 +669,12 @@ def grid(draw, cam, floor_y, horizon, w, h, spacing=4, reach=400):
 
 
 def draw_model(base, glow, cam, faces, mirror_y=None, dim=1.0, slab_alpha=170):
-    """Painter's algorithm, far to near. Faces go into the base image;
-    edges go into both, so the glow layer can be bloomed without
-    blooming the dark faces."""
-    bd = ImageDraw.Draw(base, "RGBA")
-    gd = ImageDraw.Draw(glow, "RGBA")
+    """Fills by the painter's algorithm, then the lines found from the
+    picture rather than drawn edge by edge: a map of which flat surface
+    covers each pixel, and a line wherever two surfaces meet. Every line
+    is where an edge is actually seen, all of one width, and stops where
+    the edge does. Glass (a see-through slab) gets its own map, so what
+    is behind it keeps its lines."""
     light = np.array([0.4, 0.85, 0.3])
     light /= np.linalg.norm(light)
     items = []
@@ -457,41 +686,87 @@ def draw_model(base, glow, cam, faces, mirror_y=None, dim=1.0, slab_alpha=170):
         if min(p[2] for p in proj) < 0.5:
             continue
         depth = sum(p[2] for p in proj) / 4
-        items.append((depth, cls, name, normal, proj, edges))
+        poly = [(p[0], p[1]) for p in proj]
+        items.append((depth, cls, name, normal, poly, pts))
     items.sort(key=lambda it: -it[0])
 
-    for depth, cls, name, normal, proj, edges in items:
-        poly = [(p[0], p[1]) for p in proj]
+    w, h = base.surface.get_width(), base.surface.get_height()
+    keys = {}
+    solid_map, glass_map = Canvas((w, h)), Canvas((w, h))
+    colour_map = Canvas((w, h))
+    for depth, cls, name, normal, poly, world in items:
         shade = max(0.0, float(np.dot(normal, light)))
-        neon = accent(name) if cls == "S" else CYAN
         if cls == "S":
-            # Glossy black with a breath of the block's own neon in it -
-            # Tron's solids are not black, they are lit from inside.
-            base_rgb = [int(6 + c * 0.05 + 22 * shade) for c in neon]
-            fill_a, edge_a, seam_a = 235, 255, 70
+            g = 58 + 70 * shade
+            rgb, fill_a = [int(g * 0.92), int(g * 0.97), int(g * 1.08)], 255
+            line = accent(split_state(name)[0])
         elif cls in ("T", "G"):
-            # The slab is the stage, not the subject: dim blue, never
-            # bloomed, so the only thing glowing is the structure. G is a
-            # glass slab - see SLAB_ALPHA - in a scene that mixes both.
-            neon = SLAB
-            base_rgb = [int(3 + 8 * shade), int(6 + 12 * shade), int(14 + 22 * shade)]
-            fill_a, edge_a, seam_a = (GLASS_ALPHA if cls == "G" else slab_alpha), 90, 14
-        else:  # water
-            base_rgb = [10, 40, 70]
-            fill_a, edge_a, seam_a = 70, 0, 0
+            g = 22 + 30 * shade
+            rgb = [int(g * 0.8), int(g * 0.95), int(g * 1.25)]
+            fill_a = GLASS_ALPHA if cls == "G" else 255
+            line = SLAB
+        else:
+            rgb, fill_a, line = [10, 40, 70], 70, None
         fill_a = int(fill_a * dim)
-        bd.polygon(poly, fill=tuple(base_rgb) + (fill_a,))
-        gd.polygon(poly, fill=(0, 0, 0, fill_a))
-        for i, bright in edges:
-            a = edge_a if bright else seam_a
-            a = int(a * dim)
-            if a <= 0:
-                continue
-            seg = [poly[i], poly[(i + 1) % 4]]
-            width = (2 if bright else 1) * SS
-            bd.line(seg, fill=neon + (a,), width=width)
-            if bright and cls == "S":
-                gd.line(seg, fill=neon + (a,), width=width + SS)
+        base.polygon(poly, fill=tuple(rgb) + (fill_a,))
+        glow.polygon(poly, fill=(0, 0, 0, fill_a))
+        if line is None:
+            continue
+        # A flat surface: its class, which way it faces, and where along
+        # that axis it lies. Coplanar faces share one, so no seam.
+        axis = int(np.argmax(np.abs(normal)))
+        key = keys.setdefault((cls, tuple(normal), round(world[0][axis] * 16)), len(keys) + 1)
+        enc = (key >> 16, (key >> 8) & 255, key & 255, 255)
+        (glass_map if cls == "G" else solid_map).polygon(poly, fill=enc)
+        if cls != "G":
+            colour_map.polygon(poly, fill=line + (255,))
+
+    def edges_of(canvas):
+        canvas.surface.flush()
+        b = canvas.buf.astype(np.int64)
+        k = (b[..., 2] << 16) | (b[..., 1] << 8) | b[..., 0]
+        e = np.zeros(k.shape, bool)
+        e[:, :-1] |= k[:, :-1] != k[:, 1:]
+        e[:-1, :] |= k[:-1, :] != k[1:, :]
+        e[:, 1:] |= k[:, 1:] != k[:, :-1]
+        e[1:, :] |= k[1:, :] != k[:-1, :]
+        return e
+    solid_e, glass_e = edges_of(solid_map), edges_of(glass_map)
+    colour_map.surface.flush()
+    col = colour_map.buf[..., 2::-1].astype(float)
+    # A pixel on the outside of a silhouette has no colour of its own -
+    # it takes its neighbour's.
+    colour = Image.fromarray(col.astype(np.uint8)).filter(ImageFilter.MaxFilter(5))
+    col = np.maximum(col, np.asarray(colour, float))
+    is_neon = (np.abs(col - np.array(SLAB)).sum(-1) > 30)[..., None]
+
+    def soft(mask, grow):
+        m = Image.fromarray((mask * 255).astype(np.uint8))
+        if grow > 1:
+            m = m.filter(ImageFilter.MaxFilter(grow))
+        # Blurred well past the pixel grid, so a stair-stepped diagonal
+        # cannot read as one; lifted back so the core stays bright.
+        soft = np.asarray(m.filter(ImageFilter.GaussianBlur(1.5 * SS * LINE_SCALE)), float) / 255
+        return np.minimum(1.0, soft * 1.5)[..., None]
+
+    core = soft(solid_e, 3) * dim
+    b = np.asarray(base.image(), float)
+    white = col + (255 - col) * 0.7
+    line_rgb = np.where(is_neon, white, col)
+    line_a = np.where(is_neon, 1.0, 140 / 255) * core
+    b = b * (1 - line_a) + line_rgb * line_a
+    ga = soft(glass_e, 3) * dim * (140 / 255)
+    b = b * (1 - ga) + np.array(SLAB) * ga
+    g = np.asarray(glow.image(), float)
+    halo = soft(solid_e, 7 if LINE_SCALE >= 1 else 3) * dim * is_neon
+    g = g * (1 - halo) + col * halo
+    for canvas, arr in ((base, b), (glow, g)):
+        img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+        rgb = np.asarray(img)
+        canvas.buf[..., 0] = rgb[..., 2]
+        canvas.buf[..., 1] = rgb[..., 1]
+        canvas.buf[..., 2] = rgb[..., 0]
+        canvas.surface.mark_dirty()
 
 
 def beam(base, glow, cam, scene):
@@ -510,15 +785,16 @@ def beam_at(base, glow, cam, pos, height=60):
     bot = cam.project((x + 0.5, y + 0.5, z + 0.5))
     top = cam.project((x + 0.5, y + height, z + 0.5))
     for layer, width, alpha in ((glow, 10, 200), (glow, 4, 255), (base, 2, 255)):
-        d = ImageDraw.Draw(layer, "RGBA")
-        d.line([(bot[0], bot[1]), (top[0], top[1])], fill=YELLOW + (alpha,), width=width * SS)
+        layer.line([(bot[0], bot[1]), (top[0], top[1])], fill=YELLOW + (alpha,), width=width * SS)
 
 
 def bloom(img):
-    tight = img.filter(ImageFilter.GaussianBlur(4 * SS))
-    wide = img.filter(ImageFilter.GaussianBlur(18 * SS))
+    tight = img.filter(ImageFilter.GaussianBlur(5 * SS * LINE_SCALE))
+    wide = img.filter(ImageFilter.GaussianBlur(26 * SS * LINE_SCALE))
     a = np.asarray(img, float)
-    out = a * 0.6 + np.asarray(tight, float) * 1.1 + np.asarray(wide, float) * 0.9
+    # The halo around the strips. paint() rolls highlights off toward
+    # white, so a strong glow brightens rather than clipping flat.
+    out = a * 0.6 + np.asarray(tight, float) * 1.0 + np.asarray(wide, float) * 0.8
     return np.clip(out, 0, 255)
 
 
@@ -542,6 +818,9 @@ SLAB_ALPHA = {"buried_treasure": GLASS_ALPHA}
 def render(dump_dir, out_dir, kind, out_w=W):
     yaw, span, crop, opts = VIEWS[kind]
     scene, floor, (x0, x1, z0, z1) = build_scene(dump_dir, kind, crop, **opts)
+    if SLAB_ALPHA.get(kind) == GLASS_ALPHA:
+        # Glass: the chest under the sand is the point.
+        scene = {k: ("G" if c == "T" else c, n) for k, (c, n) in scene.items()}
     faces = faces_of(scene)
     pitch = 20.0
 
@@ -587,11 +866,12 @@ def render(dump_dir, out_dir, kind, out_w=W):
     beams = []
     if kind == "buried_treasure":
         beams = [k for k, v in scene.items() if v[0] == "S" and v[1] == "chest"][:1]
-    paint(cam, horizon, faces, floor, SLAB_ALPHA.get(kind, 170), beams, f"{out_dir}/{kind}.png", out_w)
+    paint(cam, horizon, faces, floor, SLAB_ALPHA.get(kind, 170), beams, f"{out_dir}/{kind}.png", out_w,
+          grid_origin=(x0, z0))
     print(f"{kind}: {len(faces)} faces -> {out_dir}/{kind}.png")
 
 
-def paint(cam, horizon, faces, floor, slab_alpha, beams, path, out_w, beam_height=60):
+def paint(cam, horizon, faces, floor, slab_alpha, beams, path, out_w, beam_height=60, grid_origin=(0, 0)):
     """Sky, reflection, grid, model, bloom, CRT - shared by the seed
     wallpapers and the lobby."""
     w, h = W * SS, H * SS
@@ -600,26 +880,70 @@ def paint(cam, horizon, faces, floor, slab_alpha, beams, path, out_w, beam_heigh
 
     # Reflection first, dim and soft, then the grid over it, then the
     # model. The floor is glossy, not a mirror.
-    refl = Image.new("RGB", (w, h))
-    rglow = Image.new("RGB", (w, h))
-    draw_model(refl, rglow, cam, faces, mirror_y=floor, dim=0.8, slab_alpha=slab_alpha)
-    refl_a = np.asarray(refl.filter(ImageFilter.GaussianBlur(3 * SS)), float)
+    refl = Canvas((w, h))
+    # Only the glowing structures reflect. A slab's mirrored outline lay
+    # under it as stray lines across the grid, and the slab looked off it.
+    draw_model(refl, Canvas((w, h)), cam, [f for f in faces if f[0] == "S"],
+               mirror_y=floor, dim=0.8, slab_alpha=slab_alpha)
+    refl_a = np.asarray(refl.image().filter(ImageFilter.GaussianBlur(3 * SS)), float)
     rows = np.arange(h)[:, None, None]
     fade = np.clip((rows - horizon) / (h * 0.5), 0, 1)
     b = np.asarray(base, float) + refl_a * 0.28 * (1 - fade)
-    base = Image.fromarray(np.clip(b, 0, 255).astype(np.uint8))
+    b = np.clip(b, 0, 255).astype(np.uint8)
 
-    grid(ImageDraw.Draw(base, "RGBA"), cam, floor, horizon, w, h)
+    # The floor grid stops at the models. Their faces are see-through -
+    # the slab most of all - and the cyan floor lines showing through
+    # them read as lines ON the model, a second grid over the blocks.
+    gridded = Canvas(Image.fromarray(b))
+    grid(gridded, cam, floor, horizon, w, h, grid_origin, reach=GRID_REACH)
+    # The same goes for the models' reflections: the grid lay over the
+    # mirrored neon and crossed every line of it. There the mask is
+    # blurred and faded like the reflection, so the grid comes back as
+    # the reflection dies away rather than stopping at a hard edge.
+    def silhouette(mirror):
+        mask = Canvas((w, h))
+        for cls, _, _, pts, _ in faces:
+            # The grid stops at the slabs themselves but runs on under
+            # their reflections: cut away there, it never reached the
+            # slab's corners, and nothing showed it lined up.
+            if cls == "W" or (mirror and cls != "S"):
+                continue
+            if mirror:
+                pts = [(p[0], 2 * floor - p[1], p[2]) for p in pts]
+            proj = [cam.project(p) for p in pts]
+            if min(p[2] for p in proj) >= 0.5:
+                mask.polygon([(p[0], p[1]) for p in proj], (255, 255, 255, 255))
+        return mask.image()
+    # Not grown: the soft lines have no teeth, and a gap around each
+    # slab made the grid look offset from it.
+    m = np.asarray(silhouette(False).filter(ImageFilter.GaussianBlur(0.5 * SS)), float)[..., :1] / 255
+    mr = np.asarray(silhouette(True).filter(ImageFilter.GaussianBlur(3 * SS)), float)[..., :1] / 255
+    m = np.maximum(m, mr * (1 - fade))
+    g = np.asarray(gridded.image(), float)
+    base = Canvas(Image.fromarray((g * (1 - m) + b * m).astype(np.uint8)))
 
-    glow = Image.new("RGB", (w, h))
+    glow = Canvas((w, h))
     draw_model(base, glow, cam, faces, slab_alpha=slab_alpha)
     for pos in beams:
         beam_at(base, glow, cam, pos, beam_height)
+    base, glow = base.image(), glow.image()
+    # Film: a touch soft everywhere.
+    base = base.filter(ImageFilter.GaussianBlur(0.7 * SS))
 
     out = np.asarray(base, float) + bloom(glow) - np.asarray(glow, float) * 0.6
-    # Scanlines, the same CRT the wordmark is on: every third row a touch
-    # darker, faint enough to read as texture rather than stripes.
-    out[::3 * SS] *= 0.88
+    # Highlights roll off toward white instead of clipping.
+    out = 255 * (1 - np.exp(-out / 200))
+    # Grain.
+    rng = np.random.default_rng(1982)
+    # Made at the 1920 frame and enlarged, so it looks the same at any
+    # output size rather than finer and harsher at full resolution.
+    gh, gw = out.shape[0] // SS, out.shape[1] // SS
+    grain = Image.fromarray(np.clip(128 + rng.normal(0, 2.5, (gh, gw)) * 8, 0, 255).astype(np.uint8))
+    grain = np.asarray(grain.resize((out.shape[1], out.shape[0]), Image.BILINEAR), float)
+    out += ((grain - 128) / 8)[..., None]
+    # No scanlines. Every sixth row darkened, crossing a thin sloped gap
+    # between two neon lines, cut it into a regular row of dashes - and
+    # the game resizing the picture to the window beat against them too.
     # Vignette.
     yy, xx = np.mgrid[0:h, 0:w]
     r = np.sqrt(((xx - w / 2) / (w / 2)) ** 2 + ((yy - h / 2) / (h / 2)) ** 2)
@@ -663,18 +987,25 @@ LOBBY_CENTRE = 0.66     # image row the camera looks at
 
 
 def render_lobby(dump_dir, out_dir, out_w=W):
+    global LINE_SCALE, GRID_REACH
+    LINE_SCALE = 0.45
+    GRID_REACH = 700
     merged = {}
     beams = []
     for kind, u, depth, turns in LOBBY:
         _, _, crop, opts = VIEWS[kind]
         scene, floor, _ = build_scene(dump_dir, kind, crop, **opts)
         for _ in range(turns):
-            scene = {(z, y, -x): v for (x, y, z), v in scene.items()}
+            scene = {(z, y, -x): (v[0], turn_state(v[1])) for (x, y, z), v in scene.items()}
         solid = [k for k, v in scene.items() if v[0] != "W"]
         cx = (min(k[0] for k in solid) + max(k[0] for k in solid)) / 2
         cz = (min(k[2] for k in solid) + max(k[2] for k in solid)) / 2
         tx, tz = u * depth, -depth
         dx, dy, dz = int(round(tx - cx)), -floor, int(round(tz - cz))
+        # Onto the floor grid: the slab's near corner on a grid line.
+        ground = [k for k, v in scene.items() if v[0] == "T"] or solid
+        dx -= (min(k[0] for k in ground) + dx) % GRID
+        dz -= (min(k[2] for k in ground) + dz) % GRID
         glass = SLAB_ALPHA.get(kind) == GLASS_ALPHA
         for (x, y, z), (cls, name) in scene.items():
             k = (x + dx, y + dy, z + dz)
