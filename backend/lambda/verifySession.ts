@@ -26,9 +26,12 @@ const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
  * Compared as dotted numbers, not strings: "0.10.0" is NEWER than
  * "0.9.0" and a lexicographic compare gets that backwards.
  *
- * Raise this only for a change that genuinely breaks older clients.
  * Every bump locks out anyone who has not updated, so it is a
- * deliberate act, not routine release housekeeping.
+ * deliberate act. Since 0.1.29 the choice has been to require the
+ * latest release, so players are not racing on fixes the other side
+ * lacks - but raise it only AFTER the release is downloadable, or
+ * everybody is locked out with nothing to update to. Set in
+ * backend-stack.ts.
  */
 const MIN_CLIENT_VERSION = process.env.MIN_CLIENT_VERSION ?? '0.1.0';
 

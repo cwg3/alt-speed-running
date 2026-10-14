@@ -130,6 +130,9 @@ export class BackendStack extends cdk.Stack {
 			environment: {
 				PLAYERS_TABLE_NAME: playersTable.tableName,
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
+				// Oldest client allowed to log in. Raise it only once the
+				// release it names is published - see verifySession.ts.
+				MIN_CLIENT_VERSION: '0.1.29',
 			},
 		});
 		playersTable.grantReadWriteData(verifySessionFn);
