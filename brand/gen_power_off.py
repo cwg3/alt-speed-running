@@ -4,8 +4,8 @@
 A 1970s set being switched off: the clunk of the knob, a loud "tsch"
 of static noise with the clicky crackle of charge discharging off the
 glass on top of it, a knock and a crackle of discharge as
-it folds to a line, then the flyback's high whine dying away over the
-last of the transformer hum.
+it folds to a line, then the last of the transformer hum. No flyback
+whine - it grated, and was taken out.
 
 Nothing is sampled - every layer is generated here, so there is no
 licence to track. Built the same way as gen_tune_in.py, and mastered to
@@ -13,8 +13,7 @@ the same loudness so Cues can play both at the same volume.
 
 THE TIMELINE IS SHARED WITH PowerOff.java. SQUEEZE_MS is where the
 picture has closed to a line and LINE_MS where the line has pulled in to
-a dot; the knock and crackle land on the first, the whine takes over
-from the second. STOP_MS is when PowerOff stops the game - the sound has
+a dot; the knock and crackle land on the first. STOP_MS is when PowerOff stops the game - the sound has
 to be over by then, or the shutdown cuts it off. Change one, change the
 other.
 
@@ -174,27 +173,10 @@ def discharge(t, rng):
     return at(t, start, 0.5 * clicks / max(1e-9, np.abs(clicks).max()))
 
 
-def whine(t):
-    """The flyback dying away - the sound everybody remembers.
-
-    The real thing is at 15.7 kHz, which half the audience cannot hear
-    and the encoder would shave off anyway; an octave down reads as the
-    same sound. It sags as it fades, the transformer winding down.
-    """
-    start = LINE_MS - 80
-    n = ms(TOTAL_MS - start)
-    lt = np.arange(n) / RATE
-    f = 7850 - 900 * (lt / lt[-1]) ** 2
-    phase = 2 * np.pi * np.cumsum(f) / RATE
-    level = env_segments(lt, [(0, 0), (40, 0.12), (120, 0.1), ((TOTAL_MS - start) - 20, 0.0),
-                              (TOTAL_MS - start, 0)])
-    return at(t, start, np.sin(phase) * level)
-
-
 def render():
     rng = np.random.default_rng(SEED)
     t = t_axis()
-    mix = clunk(t, rng) + tsch(t, rng) + static_blip(t, rng) + hum(t) + knock(t) + discharge(t, rng) + whine(t)
+    mix = clunk(t, rng) + tsch(t, rng) + static_blip(t, rng) + hum(t) + knock(t) + discharge(t, rng)
     # gen_tune_in.py's mastering: gentle limiter, normalise by loudness,
     # pull down only if a peak would clip.
     mix = np.tanh(mix * 1.2)

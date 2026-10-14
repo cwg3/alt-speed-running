@@ -23,8 +23,8 @@ import net.minecraft.util.Util;
 public final class PowerOff {
 	/*
 	 * THE TIMELINE IS SHARED WITH brand/gen_power_off.py, which renders
-	 * the sound: its knock lands on SQUEEZE_MS and its whine takes over
-	 * from LINE_MS. Change one, re-render the other.
+	 * the sound: its knock lands on SQUEEZE_MS. Change one, re-render
+	 * the other.
 	 */
 	private static final int SQUEEZE_MS = 260;
 	private static final int LINE_MS = 450;
@@ -32,8 +32,8 @@ public final class PowerOff {
 	/**
 	 * When the game actually stops: the screen holds black after the
 	 * dot is gone while the sound plays out - a one-second "tsch" of
-	 * static, the whine and the hum dying under it. Stopping at
-	 * TOTAL_MS shut the sound system down mid-whine.
+	 * static, the hum dying under it. Stopping at TOTAL_MS shut the
+	 * sound system down mid-sound.
 	 */
 	private static final int STOP_MS = 1100;
 

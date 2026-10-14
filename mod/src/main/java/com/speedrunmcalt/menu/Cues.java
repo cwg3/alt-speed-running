@@ -106,7 +106,7 @@ public final class Cues {
 	/**
 	 * The set switching off as Quit Game is pressed: the knob's clunk,
 	 * a "tsch" of static with the glass crackling over it, the tube's
-	 * knock, the flyback whine dying - timed against PowerOff's picture.
+	 * knock and the hum dying - timed against PowerOff's picture.
 	 *
 	 * Synthesised by brand/gen_power_off.py and shipped as
 	 * sounds/power_off.ogg, mastered to the tune-in's loudness and
