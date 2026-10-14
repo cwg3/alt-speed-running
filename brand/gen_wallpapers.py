@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Render the five seed-type wallpapers shown behind the countdown.
 
-The look is a still from Tron (1982): each structure a lit grey model
-traced in glowing strips - a white-hot core in an azure halo, only where
-two surfaces meet - standing on a dark slab of its own terrain, on a
-glossy floor grid under a low sunset, softened like film and grained.
+Each structure is a lit grey model traced in glowing strips - a
+white-hot core in an azure halo, only where two surfaces meet -
+standing on a dark slab of its own terrain, on a glossy floor grid
+under a low sunset, softened like film and grained.
 
 The lines are not drawn edge by edge. Every attempt at that left nicks,
 beads or overshoots where one block's stroke met the next; instead each
@@ -134,7 +134,7 @@ class Canvas:
 
 # The mod's palette (Palette.java), so the renders and the screens they
 # sit behind are one set of colours.
-CYAN = (90, 185, 255)  # Tron azure
+CYAN = (90, 185, 255)  # azure
 PURPLE = (169, 123, 255)
 MAGENTA = (236, 72, 153)
 ORANGE = (255, 106, 0)
@@ -533,7 +533,7 @@ def faces_of(scene):
     """Every exposed face, with its edges marked bright (a silhouette
     or crease) or faint (a seam to the next block in the same plane).
 
-    The bright/faint split is what makes this read as Tron rather than
+    The bright/faint split is what makes this read as neon rather than
     as Minecraft with the textures off. Every block outlined equally is
     a grid; outlining only where the surface turns is a shape.
     """
@@ -603,7 +603,7 @@ class Camera:
 
 
 def sky(img, horizon):
-    """Night overhead, a Mead sunset at the horizon, black floor below."""
+    """Night overhead, a sunset at the horizon, black floor below."""
     w, h = img.size
     px = np.zeros((h, w, 3), float)
     ys = np.arange(h)[:, None]
@@ -637,13 +637,17 @@ GRID = 4   # floor grid spacing, in blocks
 # Line softness and glow size. The lobby's models are far and small,
 # and at full size the glow swallowed them.
 LINE_SCALE = 1.0
+# How soft the lines are, apart from the glow's size. The lobby's lines
+# are thin (LINE_SCALE) but still want blurring well past a pixel, or a
+# far diagonal edge shows its steps when the window is large.
+LINE_SOFT = 1.0
 # How far the floor grid runs before it has faded out. The lobby's
 # models stand 170-300 blocks off, where the default had all but gone.
 GRID_REACH = 400
 
 
 def grid(draw, cam, floor_y, horizon, w, h, origin=(0, 0), spacing=GRID, reach=400):
-    """The Tron floor: cyan lines on the plane under the slab, fading
+    """The floor: cyan lines on the plane under the slab, fading
     into the haze at the horizon."""
     c = cam.t
     def line(p0, p1):
@@ -746,7 +750,7 @@ def draw_model(base, glow, cam, faces, mirror_y=None, dim=1.0, slab_alpha=170):
             m = m.filter(ImageFilter.MaxFilter(grow))
         # Blurred well past the pixel grid, so a stair-stepped diagonal
         # cannot read as one; lifted back so the core stays bright.
-        soft = np.asarray(m.filter(ImageFilter.GaussianBlur(1.5 * SS * LINE_SCALE)), float) / 255
+        soft = np.asarray(m.filter(ImageFilter.GaussianBlur(1.5 * SS * LINE_SCALE * LINE_SOFT)), float) / 255
         return np.minimum(1.0, soft * 1.5)[..., None]
 
     core = soft(solid_e, 3) * dim
@@ -773,7 +777,7 @@ def beam(base, glow, cam, scene):
     """A shaft of light straight up out of the chest, to the sky.
 
     The treasure is one block under several of sand; without a marker
-    the picture is a slab of beach. X marks the spot, Tron-style.
+    the picture is a slab of beach. X marks the spot.
     """
     chests = [k for k, v in scene.items() if v[0] == "S" and v[1] == "chest"]
     if chests:
@@ -838,7 +842,7 @@ def render(dump_dir, out_dir, kind, out_w=W):
     # sunset is - and at a given pitch, how high the horizon sits is set
     # by the focal length. A long lens pushes it off the top of the
     # frame (the first renders had no sky at all); a short one, from
-    # close in, brings it down and gives the steep Mead perspective.
+    # close in, brings it down and gives a steep perspective.
     sample = pts[:: max(1, len(pts) // 4000)]
     want_horizon = h * 0.27
     dist = radius * 2.6
@@ -987,8 +991,9 @@ LOBBY_CENTRE = 0.66     # image row the camera looks at
 
 
 def render_lobby(dump_dir, out_dir, out_w=W):
-    global LINE_SCALE, GRID_REACH
+    global LINE_SCALE, GRID_REACH, LINE_SOFT
     LINE_SCALE = 0.45
+    LINE_SOFT = float(os.environ.get('LOBBY_SOFT', 1.8))
     GRID_REACH = 700
     merged = {}
     beams = []
