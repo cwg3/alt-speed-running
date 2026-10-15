@@ -447,7 +447,8 @@ between the two, which is what Divine Travel depends on.
 |---|---|
 | Independent overworld/nether seeds (Divine Travel broken) | built |
 | Bastion unambiguous: nearest, and 10 chunks clearer than any rival | built |
-| All four bastion types in the pool, recorded not filtered | built |
+| All four bastion types in the pool | built |
+| Hoglin stables: at least one good gap, or the triple-chest rampart | built (filter, `nether` check) — rule as runners describe Ranked's; see "Stables gap" |
 | Piglin barters mirrored between players | built — confirmed in a live match |
 | Piglin barters: per 72 (8 gold blocks) — exactly 3 pearl trades, 6+ obsidian | built |
 | Piglin barters: baseline obsidian rate boosted ~35% above vanilla | built (8 trades per cycle, floor of 6) |
@@ -479,6 +480,25 @@ Not obviously fixable without breaking the queue. Widening the test to
 "died anywhere near a player" would let distant deaths consume slots
 again. Worth putting to runners: does anyone actually cook hoglins
 often enough for the variance to matter?
+
+**Stables gap.** Each of a hoglin stable's two side walls is one of
+two vanilla templates, chosen independently by the jigsaw:
+`hoglin_stable/walls/side_wall_1` is the good gap runners route
+through, `side_wall_0` the bad one - cracked blackstone in the centre
+of the wall is how a runner tells them apart in play. Those labels come
+from the MCSR Practice map's bastion builder, whose Good Gap / Bad Gap
+setting places exactly these two templates.
+
+A stables pair passes the `nether` check only with at least one
+`side_wall_1`, or with two bad gaps and `ramparts_1`, the only stables
+rampart with three chests, to make up the gold. That is Ranked's rule
+as runners describe it, not taken from Ranked's own documentation. The
+check reads template names from the bastion's structure start
+(`StablesGap`), never blocks, and writes `good-gap`, `triple-chest`,
+`bad-gap` or `-` (not a stable) as the last column of its row.
+
+Stables pairs already in the pool before this check existed were never
+judged on it.
 
 **The nether distance rules, corrected.** The standard is:
 
@@ -1079,7 +1099,7 @@ invented their own "stage 3" and none of them meant the same check.
 | `village` | a real blacksmith chest, and what is in it | generated world | ~15 s |
 | `ravine` | two magma ravines in reach of the ship, plus kelp | generated world | ~12 s |
 | `portalfilter` | a ruined portal frame that can actually be completed | generated world | ~15 s |
-| `nether` | the nether as a MATCH builds it: a bastion at the shipped coordinate, a fortress in range | match world, two seeds | ~40 s |
+| `nether` | the nether as a MATCH builds it: a bastion at the shipped coordinate, a fortress in range, a stables gap | match world, two seeds | ~40 s |
 | `route` | the overworld opening `MatchWorldSetup` actually makes | match world, two seeds | ~40 s |
 
 The split that matters is the last two. Everything above them verifies a

@@ -19,7 +19,7 @@
 #
 # Row: seed,bx,bz,fx,fz,bastionDist,fortressDist,PASS|FAIL,
 #      shippedX,shippedZ,shipError,containersAtShipped,
-#      secondBastionDist,bastionCount
+#      secondBastionDist,bastionCount,stablesGap
 set -u
 # CASTX/CASTZ are optional: the OVERWORLD point the player casts their
 # portal from. For land types that is the objective, within tens of

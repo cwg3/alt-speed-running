@@ -193,7 +193,7 @@ for line in pathlib.Path('/tmp/held-pairs.txt').read_text().split('\n'):
     if len(f) >= 6:
         byseed[f[0]] = (f[4], f[5])
 out = ['pairId,type,seed,bx,bz,fx,fz,bastionDist,fortressDist,verdict,'
-       'shippedX,shippedZ,shipError,containers,secondBastionDist,bastionCount']
+       'shippedX,shippedZ,shipError,containers,secondBastionDist,bastionCount,stablesGap']
 src = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else None
 if src:
     for r in csv.reader(open(src)):
@@ -282,13 +282,16 @@ def verdicts(path, pid_col, verdict_col, detail_cols):
     for r in rows[1:]:
         if not r or len(r) <= verdict_col:
             continue
-        detail = ' '.join(r[c] for c in detail_cols if c < len(r) and r[c])
+        detail = ' '.join(r[c] for c in detail_cols
+                          if c < len(r) and r[c] and r[c] != '-')
         out[r[pid_col]] = (r[verdict_col], detail)
     return out
 
 # pairs-all.csv:  pairId,type,seed,bx,bz,fx,fz,bastionDist,fortressDist,verdict,...
 # routes-all.csv: pairId,type,seed,lava,chests,verdict,detail,extra
-nether = verdicts(f'{root}/mod/run/pairs-all.csv', 0, 9, [7, 8, 12, 13])
+# Column 16 is the stables gap. A bastion that is not a stable writes
+# '-', which is left out of the reason.
+nether = verdicts(f'{root}/mod/run/pairs-all.csv', 0, 9, [7, 8, 12, 13, 16])
 routes = verdicts(f'{root}/mod/run/routes-all.csv', 0, 5, [6, 7])
 
 

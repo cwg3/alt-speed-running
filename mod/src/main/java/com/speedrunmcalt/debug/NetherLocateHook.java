@@ -173,7 +173,25 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 					}
 				}
 
-				boolean pass = bd >= 0 && bd <= 14 * 16 && fd >= 0 && fd <= 16 * 16;
+				// A hoglin stable must have a usable gap - see StablesGap.
+				// Read off the same start the distances came from, so it
+				// judges the bastion the player is sent to.
+				com.speedrunmcalt.seed.StablesGap.Verdict gap =
+						com.speedrunmcalt.seed.StablesGap.Verdict.NOT_STABLES;
+				if (bastion != null) {
+					net.minecraft.structure.StructureStart<?> start = nether.getChunk(
+							bastion.getX() >> 4, bastion.getZ() >> 4,
+							net.minecraft.world.chunk.ChunkStatus.STRUCTURE_STARTS, true)
+							.getStructureStarts().get(StructureFeature.BASTION_REMNANT);
+					gap = com.speedrunmcalt.seed.StablesGap.judge(start);
+					if (gap != com.speedrunmcalt.seed.StablesGap.Verdict.NOT_STABLES) {
+						SpeedrunMcAlt.LOGGER.info("[netherlocate] stables gap {}: {}",
+								gap.csv, com.speedrunmcalt.seed.StablesGap.describe(start));
+					}
+				}
+
+				boolean pass = bd >= 0 && bd <= 14 * 16 && fd >= 0 && fd <= 16 * 16
+						&& gap.passes();
 
 				SpeedrunMcAlt.LOGGER.info(
 						"[netherlocate] {} bastion={} ({} blocks, next nearest {}) fortress={} ({} from bastion) {}",
@@ -212,7 +230,8 @@ public class NetherLocateHook implements DedicatedServerModInitializer {
 							+ Math.round(shipErr) + ","
 							+ probeContainers + ","
 							+ Math.round(bd2) + ","
-							+ bastions.size() + "\n");
+							+ bastions.size() + ","
+							+ gap.csv + "\n");
 				}
 			} catch (Exception e) {
 				SpeedrunMcAlt.LOGGER.error("[netherlocate] failed", e);

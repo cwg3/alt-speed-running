@@ -181,8 +181,9 @@ does not work here, deliberately.
 - A **fortress within 16 chunks of that bastion** — not of spawn. The
   leg that matters is the second one, because the route is spawn →
   bastion → fortress
-- All four bastion types are eligible. The type is recorded, not
-  filtered out
+- All four bastion types are eligible. A **hoglin stable** must have
+  at least one good gap, or the triple-chest rampart if both gaps are
+  bad
 - Your arrival is never in Basalt Deltas, and if it would leave you
   sealed in netherrack, at a dead end, or on an island in lava, the
   cheapest way out is opened for you
