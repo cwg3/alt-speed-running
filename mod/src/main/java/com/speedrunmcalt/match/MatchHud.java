@@ -9,9 +9,8 @@ import net.minecraft.client.util.math.MatrixStack;
  * In-match overlay: run timer, opponent, and a split-by-split
  * comparison.
  *
- * Drawn top-left. Vanilla puts nothing there during normal play, unlike
- * the top-right (which can hold the scoreboard) or the bottom (hotbar,
- * health, effects).
+ * The match panel is drawn on the right, a quarter of the way down;
+ * the queue status line stays top-left.
  */
 public final class MatchHud {
 	private static final int DIM = com.speedrunmcalt.menu.Palette.DIM;
@@ -512,8 +511,9 @@ public final class MatchHud {
 	 * debug text - and the clock, the one number glanced at every few
 	 * seconds, was the same size as the word "rod".
 	 *
-	 * Still top-left. Top-right is where vanilla stacks status effect
-	 * icons, and a speedrunner always has some.
+	 * Right side, a quarter of the way down. Top-right is where
+	 * vanilla stacks status effect icons, and a speedrunner always has
+	 * some; this sits under them and well clear of the hotbar.
 	 */
 	private static void renderMatch(MatrixStack matrices, MinecraftClient client) {
 		net.minecraft.client.font.TextRenderer font = client.textRenderer;
@@ -580,8 +580,16 @@ public final class MatchHud {
 			height += 5 + LINE + rows.size() * LINE;
 		}
 
-		int left = X - 2;
-		int top = Y - 2;
+		// Right edge, centred on the line a quarter of the way down
+		// (three quarters of the way up) - clamped, because the table
+		// grows a row per split and a small window at a big GUI scale
+		// would push it off the bottom.
+		int panelW = pad * 2 + inner;
+		int panelH = pad * 2 + height - 2;
+		int screenW = client.getWindow().getScaledWidth();
+		int screenH = client.getWindow().getScaledHeight();
+		int left = screenW - (X - 2) - panelW;
+		int top = Math.max(Y - 2, Math.min(screenH / 4 - panelH / 2, screenH - (Y - 2) - panelH));
 		com.speedrunmcalt.menu.Ui.hudPanel(matrices, left, top,
 				left + pad * 2 + inner, top + pad * 2 + height - 2);
 
