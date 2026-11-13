@@ -5,7 +5,7 @@ A 1v1 ladder for Minecraft 1.16.1 speedrunning (RSG).
 Two players race the same filtered seed in their own worlds. Whoever
 kills the dragon first wins. Ratings move, seasons reset.
 
-**Status: pre-alpha, open to everyone.** It works end to end, but it
+**Status: alpha, open to everyone.** It works end to end, but it
 has had very little real play. Expect rough edges.
 
 **The ladder cannot choose which world it deals you, and you can check
