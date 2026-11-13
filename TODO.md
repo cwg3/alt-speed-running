@@ -152,6 +152,17 @@ Known outstanding work, roughly in the order it would matter.
   `cdk synth` warns - so it fails quietly. Copy is in the backup bundle
   under `secrets/`. Any new machine needs it before its first deploy.
 
+- [ ] **API throttling is account-wide, not per caller.** The stage
+  limits in `backend-stack.ts` cap the bill, but a flood is refused
+  alongside real players rather than instead of them. HTTP APIs have no
+  per-client limit and WAF cannot attach to one. If it ever matters:
+  a per-uuid counter in the authenticated Lambdas, or move to a REST
+  API with usage plans.
+- [ ] **`scripts/ban.ts` has never been run against the live tables.**
+  Typechecked only. Its session sweep is a full Scan of the sessions
+  table, which is fine at this size. First real use: check that the
+  player's next login gets the 403 and their old token stops working.
+
 ## Mods
 
 - [ ] **Turn the queue-join gate on.** It is BUILT and switched off:
