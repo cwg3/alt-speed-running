@@ -47,8 +47,8 @@ The rest of this file is what the project is and how it works.
    The range widens the longer you wait.
 4. A world is generated and you are dropped straight into it. The timer
    starts.
-5. Race. The HUD top-left shows your splits against your opponent's —
-   green means you are ahead, red means behind.
+5. Race. The HUD on the right shows your splits against your
+   opponent's — green means you are ahead, red means behind.
 6. First to kill the dragon wins. Ratings update automatically.
 
 **Leaderboard** on the alt menu shows where everyone stands — rating,

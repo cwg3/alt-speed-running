@@ -82,9 +82,10 @@ public final class MatchHud {
 	/**
 	 * Both clocks, top right, the one being watched highlighted.
 	 *
-	 * Top right rather than the match HUD's top left: it is a different
-	 * readout answering a different question, and putting it somewhere
-	 * else stops it being read as the live one.
+	 * Pinned to the top corner, above where the match HUD sits a
+	 * quarter of the way down: it is a different readout answering a
+	 * different question, and a different place stops it being read as
+	 * the live one.
 	 */
 	private static void renderReplay(MatrixStack matrices, MinecraftClient client) {
 		com.speedrunmcalt.net.ReplayData data = com.speedrunmcalt.replay.ReplayPlayback.data();
