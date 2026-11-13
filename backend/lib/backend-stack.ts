@@ -184,13 +184,13 @@ export class BackendStack extends cdk.Stack {
 				SESSIONS_TABLE_NAME: sessionsTable.tableName,
 				// Oldest client allowed to log in. Raise it only once the
 				// release it names is published - see verifySession.ts.
-				MIN_CLIENT_VERSION: '0.1.29',
+				MIN_CLIENT_VERSION: '0.1.32',
 				CHALLENGES_TABLE_NAME: challengesTable.tableName,
-				// OFF until 0.1.32 is downloadable: older clients make up
-				// their own serverId and would all be refused. Turn it on
-				// in the same deploy that raises MIN_CLIENT_VERSION to
-				// 0.1.32 - see verifySession.ts.
-				REQUIRE_AUTH_CHALLENGE: 'false',
+				// On since 0.1.32, the first client that fetches its
+				// serverId from /auth/challenge. Older clients make up
+				// their own and are turned away by MIN_CLIENT_VERSION
+				// first, with a message to update - see verifySession.ts.
+				REQUIRE_AUTH_CHALLENGE: 'true',
 			},
 		});
 		playersTable.grantReadWriteData(verifySessionFn);
