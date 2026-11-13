@@ -57,7 +57,7 @@ export const handler = async (
 	// the most ordinary thing a ladder publishes, every field on them is
 	// already shown to both players after a match, and requiring a login
 	// to see who is winning would make the board useless to the people
-	// deciding whether to ask for an invite.
+	// deciding whether to play.
 	const q = event.queryStringParameters ?? {};
 	const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(q.limit ?? '', 10) || DEFAULT_LIMIT));
 

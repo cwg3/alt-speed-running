@@ -348,7 +348,7 @@ public final class BackendClient {
 	 * Takes no session token, because the endpoint takes none: the board
 	 * is public. That also means this works on the title screen before a
 	 * player has been verified, which is where someone deciding whether
-	 * to ask for an invite would look at it.
+	 * to play would look at it.
 	 */
 	public static LeaderboardResult leaderboard(int limit) throws IOException {
 		JsonObject resp = get(API_BASE + "/leaderboard?limit=" + limit, null);

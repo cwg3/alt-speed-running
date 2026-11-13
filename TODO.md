@@ -281,9 +281,13 @@ Known outstanding work, roughly in the order it would matter.
   throughput figure reached GitHub after being scrubbed from the docs.
 
 - [x] **The repo is public** and **v0.1.0 is released** — the pack,
-  the mod jar and Fabric API are downloadable. Login is still
-  invite-only, so the allowlist is now the only access control and is
-  doing real work rather than sitting behind a private repo.
+  the mod jar and Fabric API are downloadable.
+- [x] **The ladder is open** (2026-11-12). `ALLOWLIST_ENABLED` is
+  'false'; any account Mojang verifies can log in. What keeps somebody
+  off now is a ban - `scripts/ban.ts`, checked at login whatever the
+  allowlist says, and it ends the sessions they already hold. Login
+  takes a serverId the backend issued (0.1.32+), and the API is
+  throttled. The mod gate is still off; see above for why.
 - [x] **Social preview image** uploaded. `brand/social_preview.png`,
   regenerate with `brand/gen_social.py`.
 

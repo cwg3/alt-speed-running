@@ -1045,7 +1045,7 @@ are how much you played this season - and a board showing one without
 the other invites the wrong comparison.
 
 **Public, no session token.** Requiring a login to see who is winning
-hides the board from the people deciding whether to ask for an invite.
+hides the board from the people deciding whether to play.
 The Lambda has read-only access to the players table; an unauthenticated
 endpoint that could write to it would be the most attractive thing in
 the stack.

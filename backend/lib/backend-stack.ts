@@ -185,6 +185,10 @@ export class BackendStack extends cdk.Stack {
 				// Oldest client allowed to log in. Raise it only once the
 				// release it names is published - see verifySession.ts.
 				MIN_CLIENT_VERSION: '0.1.32',
+				// The ladder is open: any account Mojang verifies can log
+				// in. A ban (scripts/ban.ts) is what keeps somebody off.
+				// Set back to 'true' to return to invite-only.
+				ALLOWLIST_ENABLED: 'false',
 				CHALLENGES_TABLE_NAME: challengesTable.tableName,
 				// On since 0.1.32, the first client that fetches its
 				// serverId from /auth/challenge. Older clients make up
@@ -624,8 +628,8 @@ export class BackendStack extends cdk.Stack {
 
 		// The leaderboard. No sessions table and no auth: the board is
 		// public on purpose, since requiring a login to see who is winning
-		// would hide it from exactly the people deciding whether to ask
-		// for an invite.
+		// would hide it from exactly the people deciding whether to
+		// play.
 		const leaderboardFn = new NodejsFunction(this, 'LeaderboardFunction', {
 			entry: path.join(__dirname, '..', 'lambda', 'leaderboard.ts'),
 			runtime: Runtime.NODEJS_24_X,
