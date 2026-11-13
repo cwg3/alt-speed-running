@@ -126,7 +126,7 @@ and only the shortfall is added, so a good roll stays a good roll:
 |---|---|
 | Village smith | 3 iron (+4 from the golem), or 4 iron and 3 diamonds |
 | Desert temple | 7 iron, 52 hunger points of food |
-| Ruined portal | 27 nuggets (three ingots — a bucket), 2–4 obsidian |
+| Ruined portal | 27 nuggets (three ingots — an iron pickaxe), 2–4 obsidian |
 | Shipwreck, buried treasure | 7 iron equivalent, 88 hunger points |
 | Bastion, across its chests | 3 iron, 5 obsidian, 48–64 string |
 

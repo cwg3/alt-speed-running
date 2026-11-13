@@ -223,7 +223,7 @@ read what you actually found.
 |---|---|
 | Village smith | 3 iron, plus the golem's 4 — or 4 iron and 3 diamonds |
 | Desert temple | 7 iron, 52 hunger points of food |
-| Ruined portal | 27 nuggets — three ingots, exactly a bucket — and 2–4 obsidian, varying by seed |
+| Ruined portal | 27 nuggets — three ingots, exactly an iron pickaxe — and 2–4 obsidian, varying by seed |
 | Shipwreck, buried treasure | 7 iron equivalent, 88 hunger points of food |
 | Bastion, across all its chests | 3 iron, 5 obsidian, 48–64 string — four to five beds |
 
