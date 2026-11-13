@@ -1,12 +1,13 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { randomBytes } from 'crypto';
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
 const SESSIONS_TABLE_NAME = process.env.SESSIONS_TABLE_NAME!;
+const CHALLENGES_TABLE_NAME = process.env.CHALLENGES_TABLE_NAME!;
 
 // New players start at a standard Elo default; this is the hidden
 // matchmaking rating, separate from the season points shown to players.
@@ -49,6 +50,19 @@ const MIN_CLIENT_VERSION = process.env.MIN_CLIENT_VERSION ?? '0.1.0';
  * "false" to open it up.
  */
 const ALLOWLIST_ENABLED = (process.env.ALLOWLIST_ENABLED ?? 'true') !== 'false';
+
+/**
+ * Whether the serverId must be one /auth/challenge issued.
+ *
+ * Defaults to ON, for the allowlist's reason: without it anyone holding
+ * a player's serverId can log in as them, and any Minecraft server the
+ * player joins can compute one - see authChallenge.ts.
+ *
+ * Clients before 0.1.32 make up their own serverId and cannot pass it,
+ * so the stack keeps this off until that release is downloadable, then
+ * turns it on in the same deploy that raises MIN_CLIENT_VERSION to it.
+ */
+const REQUIRE_AUTH_CHALLENGE = (process.env.REQUIRE_AUTH_CHALLENGE ?? 'true') !== 'false';
 
 /** true when `have` is at least `want`. */
 export function versionAtLeast(have: string, want: string): boolean {
@@ -172,6 +186,31 @@ export const handler = async (
 		};
 	}
 
+	// Spend the challenge BEFORE asking Mojang, in one conditional
+	// delete. Redeemed after, two requests carrying the same id could
+	// both get through the check while Mojang answered the first. A
+	// genuine login that then fails at Mojang just fetches a fresh one,
+	// which the client does on every connect anyway.
+	if (REQUIRE_AUTH_CHALLENGE) {
+		try {
+			await ddb.send(new DeleteCommand({
+				TableName: CHALLENGES_TABLE_NAME,
+				Key: { serverId: body.serverId },
+				ConditionExpression: 'attribute_exists(serverId) AND expiresAtMs > :now',
+				ExpressionAttributeValues: { ':now': Date.now() },
+			}));
+		} catch (e) {
+			if ((e as Error).name !== 'ConditionalCheckFailedException') {
+				throw e;
+			}
+			return {
+				statusCode: 401,
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ error: 'login challenge expired or not recognised - try connecting again' }),
+			};
+		}
+	}
+
 	const url = `https://sessionserver.mojang.com/session/minecraft/hasJoined?username=${encodeURIComponent(body.username)}&serverId=${encodeURIComponent(body.serverId)}`;
 	const res = await fetch(url);
 
@@ -216,20 +255,35 @@ export const handler = async (
 	// why no decision hangs on it.
 	const mods = sanitizeModList(body.mods);
 
-	// After Mojang, because the allowlist is keyed by the VERIFIED uuid
-	// rather than a claimed username - otherwise anyone could be turned
-	// away or let in by typing a name. Before the upsert, so a stranger
-	// does not leave a player row behind.
-	//
+	// After Mojang, because the allowlist and the ban are keyed by the
+	// VERIFIED uuid rather than a claimed username - otherwise anyone
+	// could be turned away or let in by typing a name. Before the
+	// upsert, so a stranger does not leave a player row behind.
+	const existing = await ddb.send(new GetCommand({
+		TableName: PLAYERS_TABLE_NAME,
+		Key: { uuid: profile.id },
+		ProjectionExpression: 'allowed, banned',
+	}));
+
+	// Checked whether or not the allowlist is on. With it off, a ban is
+	// the only way left to keep somebody off the ladder - which is what
+	// it is for. scripts/ban.ts sets it and ends the sessions they
+	// already hold, which this check alone could not reach.
+	if (existing.Item?.banned === true) {
+		return {
+			statusCode: 403,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				error: 'this account is banned from the ladder',
+				uuid: profile.id,
+			}),
+		};
+	}
+
 	// An invite IS the row: scripts/invite.ts creates it with
 	// allowed = true. A player who has never been invited has no row at
 	// all, so the default is refusal without needing a second table.
 	if (ALLOWLIST_ENABLED) {
-		const existing = await ddb.send(new GetCommand({
-			TableName: PLAYERS_TABLE_NAME,
-			Key: { uuid: profile.id },
-			ProjectionExpression: 'allowed',
-		}));
 		if (existing.Item?.allowed !== true) {
 			return {
 				statusCode: 403,

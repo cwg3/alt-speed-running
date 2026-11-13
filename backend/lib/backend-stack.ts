@@ -4,7 +4,7 @@ import * as cdk from 'aws-cdk-lib/core';
 import { Construct } from 'constructs';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
-import { HttpApi, HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
+import { CfnStage, HttpApi, HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import { AttributeType, BillingMode, Table } from 'aws-cdk-lib/aws-dynamodb';
 import { BlockPublicAccess, Bucket } from 'aws-cdk-lib/aws-s3';
@@ -23,6 +23,33 @@ export class BackendStack extends cdk.Stack {
 		});
 
 		const api = new HttpApi(this, 'HttpApi');
+
+		// Throttling, so a script hammering the API is capped at a bill
+		// rather than unbounded. Account-wide, not per caller - HTTP APIs
+		// have no per-client limit, and WAF cannot attach to one - so a
+		// flood is refused alongside real players instead of costing
+		// money. That is the trade being made.
+		//
+		// A client in a match or a search polls every 3 s (LiveMatchPoller,
+		// Matchmaker), so the stage limit carries well over a hundred
+		// players at once. Login happens once per launch, so the auth
+		// routes are held far lower: they are the unauthenticated ones,
+		// and each verify costs a Mojang call and a table write.
+		//
+		// Set on the CfnStage because HttpApi's default stage takes no
+		// throttle props.
+		const stage = api.defaultStage!.node.defaultChild as CfnStage;
+		stage.defaultRouteSettings = {
+			throttlingRateLimit: 50,
+			throttlingBurstLimit: 100,
+		};
+		// routeSettings is untyped JSON that CDK passes through as is, so
+		// the keys are CloudFormation's PascalCase, not the camelCase
+		// above - camelCase here deploys and is silently ignored.
+		stage.routeSettings = {
+			'POST /auth/challenge': { ThrottlingRateLimit: 5, ThrottlingBurstLimit: 10 },
+			'POST /auth/verify': { ThrottlingRateLimit: 5, ThrottlingBurstLimit: 10 },
+		};
 		api.addRoutes({
 			path: '/health',
 			integration: new HttpLambdaIntegration('HealthIntegration', healthFn),
@@ -112,6 +139,31 @@ export class BackendStack extends cdk.Stack {
 			timeToLiveAttribute: 'expiresAt',
 		});
 
+		// serverIds issued by /auth/challenge, each redeemable once at
+		// /auth/verify. The TTL only keeps the table small; expiry is
+		// enforced by verifySession, since the reaper can lag by days.
+		const challengesTable = new Table(this, 'AuthChallengesTable', {
+			partitionKey: { name: 'serverId', type: AttributeType.STRING },
+			billingMode: BillingMode.PAY_PER_REQUEST,
+			timeToLiveAttribute: 'expiresAt',
+		});
+
+		const authChallengeFn = new NodejsFunction(this, 'AuthChallengeFunction', {
+			entry: path.join(__dirname, '..', 'lambda', 'authChallenge.ts'),
+			runtime: Runtime.NODEJS_24_X,
+			handler: 'handler',
+			environment: {
+				CHALLENGES_TABLE_NAME: challengesTable.tableName,
+			},
+		});
+		challengesTable.grantWriteData(authChallengeFn);
+
+		const challengeRoutes = api.addRoutes({
+			path: '/auth/challenge',
+			methods: [HttpMethod.POST],
+			integration: new HttpLambdaIntegration('AuthChallengeIntegration', authChallengeFn),
+		});
+
 		// Every function that settles a match runs applyMatchCompletion,
 		// several writes in a row, and on Lambda's 3 s default a cold start
 		// plus a settle timed out mid-request (2026-10-02, Race a Pace
@@ -133,16 +185,32 @@ export class BackendStack extends cdk.Stack {
 				// Oldest client allowed to log in. Raise it only once the
 				// release it names is published - see verifySession.ts.
 				MIN_CLIENT_VERSION: '0.1.29',
+				CHALLENGES_TABLE_NAME: challengesTable.tableName,
+				// OFF until 0.1.32 is downloadable: older clients make up
+				// their own serverId and would all be refused. Turn it on
+				// in the same deploy that raises MIN_CLIENT_VERSION to
+				// 0.1.32 - see verifySession.ts.
+				REQUIRE_AUTH_CHALLENGE: 'false',
 			},
 		});
 		playersTable.grantReadWriteData(verifySessionFn);
 		sessionsTable.grantWriteData(verifySessionFn);
+		challengesTable.grantWriteData(verifySessionFn);
 
-		api.addRoutes({
+		const verifyRoutes = api.addRoutes({
 			path: '/auth/verify',
 			methods: [HttpMethod.POST],
 			integration: new HttpLambdaIntegration('VerifySessionIntegration', verifySessionFn),
 		});
+
+		// The stage's routeSettings name these routes by key, and the
+		// key has to exist when the stage is updated. CloudFormation
+		// sees no reference between them, so on the deploy that added
+		// /auth/challenge it updated the stage first, failed, and then
+		// failed its own rollback for the same reason.
+		for (const route of [...challengeRoutes, ...verifyRoutes]) {
+			stage.node.addDependency(route);
+		}
 
 		const queueTable = new Table(this, 'QueueTable', {
 			partitionKey: { name: 'uuid', type: AttributeType.STRING },

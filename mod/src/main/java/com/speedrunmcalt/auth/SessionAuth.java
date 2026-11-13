@@ -12,8 +12,6 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
-import java.util.Base64;
 
 /**
  * Reads the identity already established by the real Minecraft Launcher
@@ -44,9 +42,9 @@ public final class SessionAuth {
 
 	/**
 	 * Tells Mojang's session server this client is "joining" a server
-	 * identified by serverId. In the real flow, serverId comes from our
-	 * backend when a match starts; our backend then independently calls
-	 * the matching hasJoined endpoint to confirm this happened, proving
+	 * identified by serverId. The serverId comes from our backend
+	 * (BackendClient.challenge), which then independently calls the
+	 * matching hasJoined endpoint to confirm this happened, proving
 	 * account ownership without our servers ever seeing the access token.
 	 */
 	public static void joinServer(MinecraftIdentity identity, String serverId) throws IOException {
@@ -75,30 +73,6 @@ public final class SessionAuth {
 		InputStream err = conn.getErrorStream();
 		String text = err == null ? "" : readAll(err);
 		throw new IOException("Session join failed with HTTP " + status + ": " + text);
-	}
-
-	/**
-	 * A random serverId for the Mojang join/hasJoined handshake.
-	 *
-	 * Hex, and deliberately short. The first version base64url-encoded
-	 * 16 bytes, which yields 22 characters and can include '-' and '_'.
-	 * Mojang's serverId field is limited to 20 characters and rejects
-	 * those symbols, so most values worked and the occasional one came
-	 * back "Invalid serverId" - an intermittent login failure that
-	 * looked like a server problem rather than a client bug.
-	 *
-	 * Eight bytes is 16 hex characters and 64 bits of entropy, which is
-	 * far more than enough for a value used once within seconds.
-	 */
-	public static String randomServerId() {
-		byte[] buf = new byte[8];
-		new SecureRandom().nextBytes(buf);
-		StringBuilder hex = new StringBuilder(buf.length * 2);
-		for (byte b : buf) {
-			hex.append(Character.forDigit((b >> 4) & 0xF, 16));
-			hex.append(Character.forDigit(b & 0xF, 16));
-		}
-		return hex.toString();
 	}
 
 	private static String readAll(InputStream in) throws IOException {

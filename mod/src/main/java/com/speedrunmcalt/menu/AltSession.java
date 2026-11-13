@@ -85,7 +85,7 @@ public final class AltSession {
 		Thread thread = new Thread(() -> {
 			try {
 				MinecraftIdentity identity = SessionAuth.currentIdentity();
-				String serverId = SessionAuth.randomServerId();
+				String serverId = BackendClient.challenge();
 				SessionAuth.joinServer(identity, serverId);
 
 				VerifyResult verified = BackendClient.verify(identity.getUsername(), serverId);

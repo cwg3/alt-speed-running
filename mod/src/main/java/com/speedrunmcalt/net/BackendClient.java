@@ -37,6 +37,20 @@ public final class BackendClient {
 				.orElse("unknown");
 	}
 
+	/**
+	 * A serverId to join Mojang with, issued by the backend and good
+	 * for one login.
+	 *
+	 * It used to be made up here. Any Minecraft server the player
+	 * joins can compute a serverId of its own, so one the backend did
+	 * not issue proves nothing about who is asking - see
+	 * backend/lambda/authChallenge.ts.
+	 */
+	public static String challenge() throws IOException {
+		JsonObject resp = post(API_BASE + "/auth/challenge", new JsonObject(), null);
+		return resp.get("serverId").getAsString();
+	}
+
 	public static VerifyResult verify(String username, String serverId) throws IOException {
 		JsonObject body = new JsonObject();
 		body.addProperty("username", username);
